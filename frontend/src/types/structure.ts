@@ -1,0 +1,40 @@
+export interface Subject {
+  id: string;
+  ueId?: string | null;
+  ecueId?: string | null;
+  name: string;
+  instructor?: string | null;
+  color?: string | null;
+}
+
+export interface ECUE {
+  id: string;
+  ueId: string;
+  code?: string | null;
+  title: string;
+  subjects: Subject[];
+}
+
+export interface UE {
+  id: string;
+  semesterId: string;
+  code?: string | null;
+  title: string;
+  ects?: number | null;
+  ecues: ECUE[];
+  directSubjects: Subject[];
+}
+
+export interface SemesterTree {
+  id: string;
+  number: number;
+  label: string;
+  isActive: boolean;
+  ues: UE[];
+}
+
+export interface AcademicStructureTree {
+  academicYearLabel: string;
+  level: string;
+  semesters: SemesterTree[];
+}

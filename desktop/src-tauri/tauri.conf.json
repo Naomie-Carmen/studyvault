@@ -1,0 +1,84 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/tooling/cli/schema.json",
+  "build": {
+    "beforeBuildCommand": "npm --prefix ../frontend run build",
+    "beforeDevCommand": "npm --prefix ../frontend run dev",
+    "devPath": "http://localhost:5173",
+    "distDir": "../../frontend/dist"
+  },
+  "package": {
+    "productName": "StudyVault",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "dialog": {
+        "all": false,
+        "ask": true,
+        "message": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Education",
+      "copyright": "Copyright © 2026 StudyVault",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "identifier": "fr.studyvault.app",
+      "longDescription": "Bibliothèque universitaire SaaS pour étudiants — organisation de cours, coffre-fort personnel, planning OCR et classement intelligent.",
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "10.15",
+        "exceptionDomain": "",
+        "signingIdentity": null,
+        "entitlements": null
+      },
+      "resources": [],
+      "shortDescription": "StudyVault — Coffre-fort académique",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:5000 https://*; img-src 'self' data: blob: https:;"
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "http://localhost:5000/api/v1/version",
+        "https://api.studyvault.fr/api/v1/version"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE3RjgyNDg5RkU4NkE0RjIKUldSYVlKdm00MmRURnpwMUp1eXVkR3A3QlhDMkh1YjV6TG5rTXlhMWp6OGVqTHQ3c3VvNWdzN3IK"
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 800,
+        "resizable": true,
+        "title": "StudyVault",
+        "width": 1280,
+        "center": true,
+        "focus": true,
+        "visible": true
+      }
+    ]
+  }
+}

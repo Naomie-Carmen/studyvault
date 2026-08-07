@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2026-08-07",
+  "channel": "stable",
+  "notes": [
+    "Application desktop Tauri disponible pour Windows, macOS et Linux",
+    "Mises à jour automatiques silencieuses depuis l'application desktop",
+    "Guide utilisateur interactif avec tour guidé au premier démarrage",
+    "Centre d'aide intégré avec articles et FAQ",
+    "Page Mes Données pour la transparence sur le stockage",
+    "Bannière de notification pour les nouvelles versions web",
+    "Conformité RGPD complète : export JSON et suppression sous 30 jours",
+    "Classement intelligent des documents avec validation humaine obligatoire",
+    "OCR d'emploi du temps depuis photo ou PDF",
+    "Recherche globale multi-critères sur tous vos documents"
+  ],
+  "history": [
+    {
+      "version": "1.0.0",
+      "releaseDate": "2026-08-07",
+      "highlights": [
+        "Lancement de StudyVault — version complète",
+        "11 modules : Auth, Profil, Structure, Documents, Recherche, Visionneuse, Planning, OCR, Classement IA, RGPD, Desktop"
+      ]
+    }
+  ]
+}

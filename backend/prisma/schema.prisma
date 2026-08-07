@@ -1,0 +1,397 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model SystemHealth {
+  id        String   @id @default(uuid())
+  status    String   @default("ok")
+  checkedAt DateTime @default(now())
+}
+
+model User {
+  id                        String                     @id @default(uuid())
+  email                     String                     @unique
+  passwordHash              String
+  fullName                  String
+  university                String?
+  program                   String?
+  level                     String?
+  role                      String                     @default("user") // "user" | "admin"
+  betaStatus                String                     @default("active") // "none" | "invited" | "active" | "revoked"
+  betaInviteCode            String?
+  betaActivatedAt           DateTime?
+  betaFeedbackCount         Int                        @default(0)
+  isScheduledForPurge       Boolean                    @default(false)
+  purgeScheduledAt          DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  refreshTokens             RefreshToken[]
+  resetTokens               PasswordResetToken[]
+  academicYears             AcademicYear[]
+  personalFolders           PersonalFolder[]
+  documents                 Document[]
+  favorites                 Favorite[]
+  quickAccesses             QuickAccess[]
+  tags                      Tag[]
+  documentViews             DocumentView[]
+  timetableImports          TimetableImport[]
+  timetableSessions         TimetableSession[]
+  classificationSuggestions ClassificationSuggestion[]
+  consents                  UserConsent[]
+  feedbacks                 Feedback[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model University {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  country   String?   @default("France")
+  programs  Program[]
+  createdAt DateTime  @default(now())
+}
+
+model Program {
+  id           String     @id @default(uuid())
+  name         String
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([name, universityId])
+}
+
+model AcademicYear {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  yearLabel String
+  level     String
+  isCurrent Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  semesters Semester[]
+
+  @@index([userId])
+}
+
+model Semester {
+  id             String       @id @default(uuid())
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  number         Int
+  label          String
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  ues            UE[]
+
+  @@index([academicYearId])
+}
+
+model UE {
+  id         String    @id @default(uuid())
+  semesterId String
+  semester   Semester  @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  code       String?
+  title      String
+  ects       Float?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  ecues      ECUE[]
+  subjects   Subject[]
+
+  @@index([semesterId])
+}
+
+model ECUE {
+  id        String    @id @default(uuid())
+  ueId      String
+  ue        UE        @relation(fields: [ueId], references: [id], onDelete: Cascade)
+  code      String?
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  subjects  Subject[]
+
+  @@index([ueId])
+}
+
+model Subject {
+  id                String             @id @default(uuid())
+  ueId              String?
+  ue                UE?                @relation(fields: [ueId], references: [id], onDelete: Cascade)
+  ecueId            String?
+  ecue              ECUE?              @relation(fields: [ecueId], references: [id], onDelete: Cascade)
+  name              String
+  instructor        String?
+  color             String?            @default("#6366f1")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  documents         Document[]
+  timetableSessions TimetableSession[]
+
+  @@index([ueId])
+  @@index([ecueId])
+}
+
+model PersonalFolder {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryType String
+  name         String
+  createdAt    DateTime   @default(now())
+  documents    Document[]
+
+  @@index([userId])
+}
+
+model Document {
+  id                        String                     @id @default(uuid())
+  userId                    String
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId                 String?
+  subject                   Subject?                   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  personalFolderId          String?
+  personalFolder            PersonalFolder?            @relation(fields: [personalFolderId], references: [id], onDelete: SetNull)
+  originalName              String
+  filePath                  String
+  mimeType                  String
+  fileSize                  Int
+  docType                   String                     @default("cours")
+  status                    String                     @default("ready")
+  isDeleted                 Boolean                    @default(false)
+  deletedAt                 DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  favorites                 Favorite[]
+  quickAccesses             QuickAccess[]
+  documentTags              DocumentTag[]
+  documentViews             DocumentView[]
+  classificationSuggestions ClassificationSuggestion[]
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([personalFolderId])
+  @@index([isDeleted])
+  @@index([docType])
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, documentId])
+  @@index([userId])
+}
+
+model QuickAccess {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, documentId])
+  @@index([userId])
+}
+
+model Tag {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  color        String?       @default("#6366f1")
+  createdAt    DateTime      @default(now())
+  documentTags DocumentTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model DocumentTag {
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+}
+
+model DocumentView {
+  id              String   @id @default(uuid())
+  documentId      String
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  durationSeconds Int      @default(0)
+  viewedAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([documentId])
+}
+
+model TimetableImport {
+  id          String                @id @default(uuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filePath    String
+  fileName    String
+  mimeType    String
+  status      String                @default("pending") // pending, processing, completed, failed, rejected
+  createdAt   DateTime              @default(now())
+  sessions    TimetableSession[]
+  suggestions TimetableSuggestion[]
+
+  @@index([userId])
+}
+
+model TimetableSession {
+  id                String           @id @default(uuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId         String
+  subject           Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  timetableImportId String?
+  timetableImport   TimetableImport? @relation(fields: [timetableImportId], references: [id], onDelete: SetNull)
+  dayOfWeek         Int              // 0 = Lundi, 1 = Mardi, ... 6 = Dimanche
+  startTime         String           // HH:mm
+  endTime           String           // HH:mm
+  room              String?
+  sessionType       String           @default("CM") // CM, TD, TP, EXAM, OTHER
+  recurrence        String           @default("weekly") // weekly, biweekly, none
+  color             String?
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([subjectId])
+}
+
+model TimetableSuggestion {
+  id                  String          @id @default(uuid())
+  timetableImportId   String
+  timetableImport     TimetableImport @relation(fields: [timetableImportId], references: [id], onDelete: Cascade)
+  detectedSubjectName String
+  matchedSubjectId    String?
+  dayOfWeek           Int?            // 0 = Lundi, 1 = Mardi, ... 6 = Dimanche
+  startTime           String?         // HH:mm
+  endTime             String?         // HH:mm
+  room                String?
+  sessionType         String?         // CM, TD, TP, EXAM, OTHER
+  confidenceScore     Int             @default(50) // 0 à 100
+  status              String          @default("pending") // pending, accepted, rejected, modified
+  createdAt           DateTime        @default(now())
+
+  @@index([timetableImportId])
+}
+
+model ClassificationSuggestion {
+  id                  String    @id @default(uuid())
+  documentId          String
+  document            Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposedSubjectId   String?
+  proposedDocType     String    @default("cours") // cours, TD, TP, examen, autre
+  proposedSemesterId  String?
+  confidenceScore     Int       @default(50) // 0 à 100
+  explanation         String
+  source              String    @default("filename") // filename, content, history
+  status              String    @default("pending") // pending, accepted, modified, rejected
+  modifiedSubjectId   String?
+  modifiedDocType     String?
+  createdAt           DateTime  @default(now())
+  resolvedAt          DateTime?
+
+  @@index([userId])
+  @@index([documentId])
+}
+
+model UserConsent {
+  id                     String   @id @default(uuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyticsOptIn         Boolean  @default(false)
+  contentAnalysisOptIn   Boolean  @default(false)
+  transactionalEmails    Boolean  @default(true)
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
+
+  @@unique([userId])
+}
+
+// Phase 13 Models — Beta, Waitlist, Feedback
+
+model BetaInvite {
+  id         String   @id @default(uuid())
+  email      String
+  inviteCode String   @unique
+  status     String   @default("pending") // "pending" | "used" | "expired"
+  invitedBy  String?  @default("admin")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([inviteCode])
+}
+
+model Waitlist {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String   // "bug" | "suggestion" | "love" | "question"
+  message       String
+  rating        Int?     // 1 to 5
+  screenshotUrl String?
+  pageUrl       String?
+  browserInfo   String?
+  osInfo        String?
+  appVersion    String?  @default("1.0.0")
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
