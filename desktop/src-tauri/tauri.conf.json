@@ -60,7 +60,7 @@
       "csp": null
     },
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
         "https://api.studyvault.fr/api/v1/version"
       ],
