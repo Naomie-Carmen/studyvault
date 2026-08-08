@@ -72,11 +72,11 @@ fn main() {
         .menu(menu)
         .on_menu_event(handle_menu_event)
         .setup(|app| {
-            // Trigger background silent update check on startup
-            let handle = app.handle();
-            tauri::async_runtime::spawn(async move {
-                let _ = handle.updater().check().await;
-            });
+            // Updater disabled in v1.0.0 beta — re-enable later with TAURI_PRIVATE_KEY
+            // let handle = app.handle();
+            // tauri::async_runtime::spawn(async move {
+            //     let _ = handle.updater().check().await;
+            // });
             Ok(())
         })
         .run(tauri::generate_context!())
