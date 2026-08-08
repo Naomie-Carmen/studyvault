@@ -38,3 +38,5 @@ uploads/*
 # Prisma / SQLite temp
 *.db
 *.db-journal
+# Tauri / Rust build artifacts
+desktop/src-tauri/target/

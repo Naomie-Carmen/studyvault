@@ -57,12 +57,11 @@
       }
     },
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:5000 https://*; img-src 'self' data: blob: https:;"
+      "csp": null
     },
     "updater": {
       "active": true,
       "endpoints": [
-        "http://localhost:5000/api/v1/version",
         "https://api.studyvault.fr/api/v1/version"
       ],
       "dialog": true,

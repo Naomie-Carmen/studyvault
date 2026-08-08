@@ -1,6 +1,15 @@
 import { ApiResponse } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const isTauri = typeof window !== 'undefined' && (
+  '__TAURI__' in window ||
+  '__TAURI_IPC__' in window ||
+  '__TAURI_METADATA__' in window ||
+  window.location.protocol.startsWith('tauri') ||
+  window.location.protocol.startsWith('asset')
+);
+
+const defaultBaseUrl = isTauri ? 'http://localhost:5000/api/v1' : '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
 
 let currentAccessToken: string | null = null;
 

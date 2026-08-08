@@ -30,7 +30,7 @@ const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').t
 export const App: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+ const [activeTab, setActiveTab] = useState<string>('landing');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [showTour, setShowTour] = useState<boolean>(false);
 
@@ -58,7 +58,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadHealthStatus();
   }, []);
-
+  // Accueil par défaut : page d'accueil si non connecté, dashboard si connecté
+  useEffect(() => {
+    setActiveTab(isAuthenticated ? 'dashboard' : 'landing');
+  }, [isAuthenticated]);
   // Show onboarding tour for new users after login
   useEffect(() => {
     if (isAuthenticated && !localStorage.getItem(TOUR_DONE_KEY)) {
