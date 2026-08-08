@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AcademicProfile } from '../types/academic';
 import * as academicService from '../services/academicService';
-import { AcademicProfileInput } from '../../../backend/src/utils/validators';
+import { AcademicProfileInput } from '../types/validators';
 import { AcademicContext } from './AcademicContextInstance';
 import { useAuth } from './useAuth';
 

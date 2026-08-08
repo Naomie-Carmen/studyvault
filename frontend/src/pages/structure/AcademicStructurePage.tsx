@@ -15,7 +15,7 @@ import {
   GraduationCap, 
   ArrowRight
 } from 'lucide-react';
-import { SubjectInput } from '../../../../backend/src/utils/validators';
+import { SubjectInput } from '../../types/validators';
 
 interface AcademicStructurePageProps {
   onNavigateAcademicProfile?: () => void;

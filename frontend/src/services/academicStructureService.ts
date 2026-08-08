@@ -1,7 +1,7 @@
 import { fetchApi } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { AcademicStructureTree, UE, ECUE, Subject } from '../types/structure';
-import { UEInput, ECUEInput, SubjectInput } from '../../../backend/src/utils/validators';
+import { UEInput, ECUEInput, SubjectInput } from '../types/validators';
 
 export async function getStructureTree(): Promise<ApiResponse<AcademicStructureTree>> {
   return fetchApi<AcademicStructureTree>('/academic-structure', {

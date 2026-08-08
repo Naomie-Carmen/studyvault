@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { User } from '../types/auth';
 import { setClientAccessToken } from '../services/apiClient';
 import * as authService from '../services/authService';
-import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../../../backend/src/utils/validators';
+import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../types/validators';
 import { AuthContext } from './AuthContextInstance';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

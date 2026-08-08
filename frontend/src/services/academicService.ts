@@ -1,7 +1,7 @@
 import { fetchApi } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { AcademicProfile, Semester } from '../types/academic';
-import { AcademicProfileInput } from '../../../backend/src/utils/validators';
+import { AcademicProfileInput } from '../types/validators';
 
 export async function getProfile(): Promise<ApiResponse<AcademicProfile>> {
   return fetchApi<AcademicProfile>('/academic-profile', {

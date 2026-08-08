@@ -1,7 +1,7 @@
 import { fetchApi } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { TimetableSession, TimetableImport, TimetableStats } from '../types/timetable';
-import { TimetableSessionInput } from '../../../backend/src/utils/validators';
+import { TimetableSessionInput } from '../types/validators';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 

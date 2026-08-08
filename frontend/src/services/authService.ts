@@ -1,7 +1,7 @@
 import { fetchApi } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { AuthSuccessPayload, User } from '../types/auth';
-import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../../../backend/src/utils/validators';
+import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../types/validators';
 
 export async function register(data: RegisterInput): Promise<ApiResponse<AuthSuccessPayload>> {
   return fetchApi<AuthSuccessPayload>('/auth/register', {

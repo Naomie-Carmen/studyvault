@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 import { AuthState } from '../types/auth';
-import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../../../backend/src/utils/validators';
+import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../types/validators';
 
 export interface AuthContextType extends AuthState {
   login: (data: LoginInput) => Promise<{ success: boolean; error?: string }>;

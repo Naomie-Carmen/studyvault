@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 import { AcademicProfile } from '../types/academic';
-import { AcademicProfileInput } from '../../../backend/src/utils/validators';
+import { AcademicProfileInput } from '../types/validators';
 
 export interface AcademicContextType {
   profile: AcademicProfile | null;

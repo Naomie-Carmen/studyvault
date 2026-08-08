@@ -14,7 +14,7 @@ import {
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
-import { SemesterInput, AcademicProfileInput } from '../../../../backend/src/utils/validators';
+import { SemesterInput, AcademicProfileInput } from '../../types/validators';
 
 const LEVEL_OPTIONS: AcademicProfileInput['level'][] = [
   'L1',

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AcademicStructureTree } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
 import * as timetableService from '../../services/timetableService';
-import { TimetableSessionInput } from '../../../../backend/src/utils/validators';
+import { TimetableSessionInput } from '../../types/validators';
 import { X, Plus, AlertCircle, Calendar } from 'lucide-react';
 
 interface SessionFormModalProps {

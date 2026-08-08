@@ -17,7 +17,7 @@ import {
   Folder,
   Plus
 } from 'lucide-react';
-import { PersonalFolderInput } from '../../../../backend/src/utils/validators';
+import { PersonalFolderInput } from '../../types/validators';
 
 const CATEGORIES = [
   { type: 'cv', label: 'Curriculum Vitae (CV)', icon: FileText },
