@@ -21,12 +21,18 @@ import {
   rejectClassification,
   listUnclassified
 } from '../controllers/documentController';
-import { requireAuth } from '../middleware/authMiddleware';
+import { requireAuth, requireAuthOrToken } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
 
 const router = Router();
 
-// Require authentication for all document management endpoints
+// Prévisualisation & téléchargement : authentification via Bearer header OU
+// via ?token= dans l'URL (requis pour <img>/<iframe>/window.open qui ne peuvent
+// pas envoyer de header Authorization).
+router.get('/:id/preview', requireAuthOrToken, previewFile);
+router.get('/:id/download', requireAuthOrToken, downloadFile);
+
+// Require authentication for all other document management endpoints
 router.use(requireAuth);
 
 // Document Endpoints
@@ -40,8 +46,6 @@ router.get('/recently-viewed', getRecentlyViewed);
 router.get('/unclassified', listUnclassified);
 
 router.get('/:id', getDocument);
-router.get('/:id/preview', previewFile);
-router.get('/:id/download', downloadFile);
 router.get('/:id/metadata', getMetadata);
 router.post('/:id/views', recordView);
 router.patch('/:id', updateDocument);

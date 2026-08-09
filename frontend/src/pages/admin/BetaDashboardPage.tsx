@@ -99,8 +99,8 @@ export const BetaDashboardPage: React.FC = () => {
     setGeneratedCode(null);
 
     try {
-      const token = localStorage.getItem('studyvault_access_token');
-      const res = await fetch('/api/v1/beta/invite', {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/beta/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

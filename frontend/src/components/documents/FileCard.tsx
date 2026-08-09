@@ -38,21 +38,29 @@ export const FileCard: React.FC<FileCardProps> = ({
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
-  const isPdf = document.mimeType === 'application/pdf';
-  const isImage = document.mimeType.startsWith('image/');
+  const mimeType = document.mimeType || '';
+  const isPdf = mimeType === 'application/pdf';
+  const isImage = mimeType.startsWith('image/');
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const formatSize = (bytes?: number) => {
+    const size = bytes || 0;
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: 'short',
     });
   };
+
+  const docType = document.docType || 'autre';
+  const originalName = document.originalName || 'Fichier sans nom';
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,8 +86,8 @@ export const FileCard: React.FC<FileCardProps> = ({
           {!isPdf && !isImage && <FileSpreadsheet className="text-indigo" size={22} />}
         </div>
 
-        <span className={`doc-type-pill ${document.docType}`}>
-          {document.docType.toUpperCase()}
+        <span className={`doc-type-pill ${docType}`}>
+          {docType.toUpperCase()}
         </span>
 
         <div className="header-right-actions">
@@ -152,8 +160,8 @@ export const FileCard: React.FC<FileCardProps> = ({
       </div>
 
       <div className="file-card-body" onClick={() => onPreview(document)}>
-        <h4 className="file-name" title={document.originalName}>
-          {document.originalName}
+        <h4 className="file-name" title={originalName}>
+          {originalName}
         </h4>
         <div className="file-meta">
           <span>{formatSize(document.fileSize)}</span>

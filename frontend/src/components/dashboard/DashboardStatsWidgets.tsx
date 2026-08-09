@@ -30,10 +30,14 @@ export const DashboardStatsWidgets: React.FC<DashboardStatsWidgetsProps> = ({
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
-  const usedPercentage = Math.min(
-    100,
-    parseFloat(((stats.storageUsedBytes / stats.storageQuotaBytes) * 100).toFixed(1))
-  );
+  const quotaBytes = stats.storageQuotaBytes || 0;
+  const usedPercentage =
+    quotaBytes > 0
+      ? Math.min(100, parseFloat(((stats.storageUsedBytes / quotaBytes) * 100).toFixed(1)))
+      : 0;
+
+  const byType = stats.documentsByType || {};
+  const docTypeCount = (key: keyof typeof byType) => (byType[key] ?? 0);
 
   return (
     <div className="dashboard-widgets-container">
@@ -122,23 +126,23 @@ export const DashboardStatsWidgets: React.FC<DashboardStatsWidgetsProps> = ({
           <div className="breakdown-grid">
             <div className="breakdown-item">
               <span className="type-title">COURS</span>
-              <span className="type-count">{stats.documentsByType.cours}</span>
+              <span className="type-count">{docTypeCount('cours')}</span>
             </div>
             <div className="breakdown-item">
               <span className="type-title">TRAVAUX DIRIGÉS (TD)</span>
-              <span className="type-count">{stats.documentsByType.TD}</span>
+              <span className="type-count">{docTypeCount('TD')}</span>
             </div>
             <div className="breakdown-item">
               <span className="type-title">TRAVAUX PRATIQUES (TP)</span>
-              <span className="type-count">{stats.documentsByType.TP}</span>
+              <span className="type-count">{docTypeCount('TP')}</span>
             </div>
             <div className="breakdown-item">
               <span className="type-title">EXAMENS & ANNALES</span>
-              <span className="type-count">{stats.documentsByType.examen}</span>
+              <span className="type-count">{docTypeCount('examen')}</span>
             </div>
             <div className="breakdown-item">
               <span className="type-title">AUTRES DOCUMENTS</span>
-              <span className="type-count">{stats.documentsByType.autre}</span>
+              <span className="type-count">{docTypeCount('autre')}</span>
             </div>
           </div>
         </div>

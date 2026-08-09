@@ -7,6 +7,8 @@ import { FeedbackWidget } from './components/FeedbackWidget';
 import { DashboardShell } from './pages/DashboardShell';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AcademicProfilePage } from './pages/academic/AcademicProfilePage';
 import { AcademicStructurePage } from './pages/structure/AcademicStructurePage';
 import { AcademicDocumentsPage } from './pages/documents/AcademicDocumentsPage';
@@ -33,6 +35,7 @@ export const App: React.FC = () => {
  const [activeTab, setActiveTab] = useState<string>('landing');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [showTour, setShowTour] = useState<boolean>(false);
+  const [resetToken, setResetToken] = useState<string>('');
 
   const [healthData, setHealthData] = useState<HealthCheckData | null>(null);
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
@@ -122,7 +125,7 @@ export const App: React.FC = () => {
         ) : (
           <LoginPage
             onNavigateRegister={() => handleTabChange('register')}
-            onNavigateForgotPassword={() => {}}
+            onNavigateForgotPassword={() => handleTabChange('forgot-password')}
             onSuccessLogin={() => handleTabChange('dashboard')}
           />
         );
@@ -131,7 +134,7 @@ export const App: React.FC = () => {
         return (
           <LoginPage
             onNavigateRegister={() => handleTabChange('register')}
-            onNavigateForgotPassword={() => {}}
+            onNavigateForgotPassword={() => handleTabChange('forgot-password')}
             onSuccessLogin={() => handleTabChange('dashboard')}
           />
         );
@@ -141,6 +144,25 @@ export const App: React.FC = () => {
           <RegisterPage
             onNavigateLogin={() => handleTabChange('login')}
             onSuccessRegister={() => handleTabChange('academic-profile')}
+          />
+        );
+
+      case 'forgot-password':
+        return (
+          <ForgotPasswordPage
+            onNavigateLogin={() => handleTabChange('login')}
+            onNavigateResetPassword={(token) => {
+              setResetToken(token);
+              handleTabChange('reset-password');
+            }}
+          />
+        );
+
+      case 'reset-password':
+        return (
+          <ResetPasswordPage
+            token={resetToken}
+            onNavigateLogin={() => handleTabChange('login')}
           />
         );
 

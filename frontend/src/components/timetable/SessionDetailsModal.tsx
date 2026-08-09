@@ -44,7 +44,7 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
           <div className="meta-row">
             <Clock size={16} className="text-indigo" />
             <span>
-              {DAYS[session.dayOfWeek]} de {session.startTime} à {session.endTime}
+              {DAYS[session.dayOfWeek] ?? 'Jour inconnu'} de {session.startTime} à {session.endTime}
             </span>
           </div>
 

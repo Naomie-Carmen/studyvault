@@ -27,32 +27,46 @@ export const TimetableValidationModal: React.FC<TimetableValidationModalProps> =
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [subjectAssignments, setSubjectAssignments] = useState<Record<string, string>>({});
   const [validating, setValidating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && importId) {
+      setIsLoading(true);
+      setErrorMsg(null);
       Promise.all([
         ocrService.getSuggestions(importId),
         structureService.getStructureTree(),
-      ]).then(([sugRes, treeRes]) => {
-        if (sugRes.success && sugRes.data) {
-          setSuggestions(sugRes.data.suggestions);
-          setStats(sugRes.data.stats);
+      ])
+        .then(([sugRes, treeRes]) => {
+          if (sugRes.success && Array.isArray(sugRes.data?.suggestions)) {
+            setSuggestions(sugRes.data.suggestions);
+            setStats(sugRes.data.stats || null);
 
-          // Pre-select high & medium confidence suggestions
-          const initialSelected = new Set<string>();
-          const initialAssignments: Record<string, string> = {};
+            // Pre-select high & medium confidence suggestions
+            const initialSelected = new Set<string>();
+            const initialAssignments: Record<string, string> = {};
 
-          sugRes.data.suggestions.forEach((s) => {
-            if (s.confidenceScore >= 50) initialSelected.add(s.id);
-            if (s.matchedSubjectId) initialAssignments[s.id] = s.matchedSubjectId;
-          });
+            sugRes.data.suggestions.forEach((s) => {
+              if (s.confidenceScore >= 50) initialSelected.add(s.id);
+              if (s.matchedSubjectId) initialAssignments[s.id] = s.matchedSubjectId;
+            });
 
-          setSelectedIds(initialSelected);
-          setSubjectAssignments(initialAssignments);
-        }
-        if (treeRes.success && treeRes.data) setTree(treeRes.data);
-      });
+            setSelectedIds(initialSelected);
+            setSubjectAssignments(initialAssignments);
+          } else {
+            setSuggestions([]);
+            setErrorMsg('Aucune suggestion à valider pour cet import.');
+          }
+          if (treeRes.success && treeRes.data) setTree(treeRes.data);
+        })
+        .catch(() => {
+          setSuggestions([]);
+          setErrorMsg('Impossible de charger les suggestions OCR.');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, [isOpen, importId]);
 
@@ -60,13 +74,21 @@ export const TimetableValidationModal: React.FC<TimetableValidationModalProps> =
 
   // Flatten user subjects
   const allSubjects: { id: string; name: string }[] = [];
-  if (tree) {
+  if (tree && Array.isArray(tree.semesters)) {
     tree.semesters.forEach((sem) => {
+      if (!sem || !Array.isArray(sem.ues)) return;
       sem.ues.forEach((ue) => {
-        ue.directSubjects.forEach((sub) => allSubjects.push(sub));
-        ue.ecues.forEach((ecue) => {
-          ecue.subjects.forEach((sub) => allSubjects.push(sub));
-        });
+        if (!ue) return;
+        if (Array.isArray(ue.directSubjects)) {
+          ue.directSubjects.forEach((sub) => sub && allSubjects.push(sub));
+        }
+        if (Array.isArray(ue.ecues)) {
+          ue.ecues.forEach((ecue) => {
+            if (ecue && Array.isArray(ecue.subjects)) {
+              ecue.subjects.forEach((sub) => sub && allSubjects.push(sub));
+            }
+          });
+        }
       });
     });
   }
@@ -165,6 +187,14 @@ export const TimetableValidationModal: React.FC<TimetableValidationModalProps> =
 
         {/* Body: Split View / List */}
         <div className="validation-body">
+          {isLoading ? (
+            <div className="validation-loading">
+              <ShieldCheck size={22} className="spin text-indigo" />
+              <span>Chargement des séances extraites...</span>
+            </div>
+          ) : suggestions.length === 0 && !errorMsg ? (
+            <div className="validation-empty">Aucune séance à valider pour cet import.</div>
+          ) : (
           <div className="suggestions-list">
             {suggestions.map((s) => {
               const isSelected = selectedIds.has(s.id);
@@ -216,6 +246,7 @@ export const TimetableValidationModal: React.FC<TimetableValidationModalProps> =
               );
             })}
           </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -267,6 +298,14 @@ export const TimetableValidationModal: React.FC<TimetableValidationModalProps> =
 
         .validation-body { flex: 1; overflow-y: auto; padding-right: 0.25rem; }
         .suggestions-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+        .validation-loading, .validation-empty {
+          display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+          padding: 2rem; font-size: 0.85rem; color: var(--text-muted);
+        }
+
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
         .suggestion-card {
           display: flex; gap: 0.85rem; padding: 0.85rem; border-radius: var(--radius-md);

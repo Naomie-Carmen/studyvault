@@ -22,6 +22,7 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
   const [suggestion, setSuggestion] = useState<ClassificationSuggestion | null>(null);
   const [tree, setTree] = useState<AcademicStructureTree | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedDocType, setSelectedDocType] = useState('cours');
@@ -31,17 +32,26 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
 
   useEffect(() => {
     if (isOpen && document) {
+      setIsLoading(true);
+      setErrorMsg(null);
       Promise.all([
         classificationService.getClassification(document.id),
         structureService.getStructureTree(),
-      ]).then(([suggRes, treeRes]) => {
-        if (suggRes.success && suggRes.data) {
-          setSuggestion(suggRes.data);
-          setSelectedSubjectId(suggRes.data.proposedSubjectId || '');
-          setSelectedDocType(suggRes.data.proposedDocType || 'cours');
-        }
-        if (treeRes.success && treeRes.data) setTree(treeRes.data);
-      });
+      ])
+        .then(([suggRes, treeRes]) => {
+          if (suggRes.success && suggRes.data) {
+            setSuggestion(suggRes.data);
+            setSelectedSubjectId(suggRes.data.proposedSubjectId || '');
+            setSelectedDocType(suggRes.data.proposedDocType || 'cours');
+          }
+          if (treeRes.success && treeRes.data) setTree(treeRes.data);
+        })
+        .catch(() => {
+          setErrorMsg('Impossible de charger les suggestions de classement.');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, [isOpen, document]);
 
@@ -49,13 +59,21 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
 
   // Flatten all subjects for modification picker
   const allSubjects: { id: string; name: string }[] = [];
-  if (tree) {
+  if (tree && Array.isArray(tree.semesters)) {
     tree.semesters.forEach((sem) => {
+      if (!sem || !Array.isArray(sem.ues)) return;
       sem.ues.forEach((ue) => {
-        ue.directSubjects.forEach((sub) => allSubjects.push(sub));
-        ue.ecues.forEach((ecue) => {
-          ecue.subjects.forEach((sub) => allSubjects.push(sub));
-        });
+        if (!ue) return;
+        if (Array.isArray(ue.directSubjects)) {
+          ue.directSubjects.forEach((sub) => sub && allSubjects.push(sub));
+        }
+        if (Array.isArray(ue.ecues)) {
+          ue.ecues.forEach((ecue) => {
+            if (ecue && Array.isArray(ecue.subjects)) {
+              ecue.subjects.forEach((sub) => sub && allSubjects.push(sub));
+            }
+          });
+        }
       });
     });
   }
@@ -136,6 +154,13 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
             <span className="file-name">{document.originalName}</span>
           </div>
 
+          {isLoading ? (
+            <div className="classification-loading">
+              <Sparkles size={22} className="spin text-indigo" />
+              <span>Analyse intelligente en cours...</span>
+            </div>
+          ) : (
+            <>
           {errorMsg && (
             <div className="alert alert-error">
               <AlertCircle size={16} />
@@ -194,6 +219,8 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
 
         <div className="modal-footer">
@@ -238,6 +265,14 @@ export const ClassificationModal: React.FC<ClassificationModalProps> = ({
         .title-group h3 { font-size: 1.05rem; font-weight: 700; }
 
         .modal-body { display: flex; flex-direction: column; gap: 0.85rem; }
+
+        .classification-loading {
+          display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+          padding: 1.5rem; font-size: 0.85rem; color: var(--text-muted);
+        }
+
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
         .doc-name-banner {
           display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.85rem;
