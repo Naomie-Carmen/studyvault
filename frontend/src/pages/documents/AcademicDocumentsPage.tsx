@@ -42,7 +42,7 @@ export const AcademicDocumentsPage: React.FC = () => {
       ]);
 
       if (treeRes.success && treeRes.data) setTree(treeRes.data);
-      if (docsRes.success && docsRes.data) setDocuments(docsRes.data);
+      if (docsRes.success && Array.isArray(docsRes.data)) setDocuments(docsRes.data);
     } catch (err) {
       console.error('Error loading academic documents:', err);
     } finally {
@@ -96,7 +96,7 @@ export const AcademicDocumentsPage: React.FC = () => {
             <span>Toutes les matières</span>
           </button>
 
-          {tree?.semesters.map((sem) => (
+          {tree && Array.isArray(tree.semesters) && tree.semesters.map((sem) => (
             <div key={sem.id} className="semester-group">
               <span className="semester-group-label">S{sem.number} — {sem.label}</span>
               {sem.ues.map((ue) => (

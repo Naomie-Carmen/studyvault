@@ -31,7 +31,7 @@ export const AcademicProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setProfile(null);
       }
 
-      if (univRes.success && univRes.data) {
+      if (univRes.success && Array.isArray(univRes.data)) {
         setUniversities(univRes.data);
       }
     } catch (_err) {
@@ -63,7 +63,7 @@ export const AcademicProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleSemester = async (semesterId: string, isActive: boolean) => {
     const res = await academicService.patchSemester(semesterId, isActive);
-    if (res.success && profile && profile.academicYear) {
+    if (res.success && profile && profile.academicYear && Array.isArray(profile.academicYear.semesters)) {
       const updatedSemesters = profile.academicYear.semesters.map((s) =>
         s.id === semesterId ? { ...s, isActive } : s
       );

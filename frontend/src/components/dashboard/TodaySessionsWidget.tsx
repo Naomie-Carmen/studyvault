@@ -16,7 +16,7 @@ export const TodaySessionsWidget: React.FC<TodaySessionsWidgetProps> = ({
 
   useEffect(() => {
     timetableService.getTodaySessions().then((res) => {
-      if (res.success && res.data) setSessions(res.data);
+      if (res.success && Array.isArray(res.data)) setSessions(res.data);
     });
   }, []);
 

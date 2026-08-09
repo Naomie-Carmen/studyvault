@@ -1,20 +1,29 @@
-import { fetchApi } from './apiClient';
+import { fetchApi, API_BASE_URL, getClientAccessToken } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { DocumentItem, PersonalFolderItem, UserQuota } from '../types/document';
 import { DocumentUpdateInput, PersonalFolderInput } from '../types/validators';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
-
 export async function uploadFiles(
   formData: FormData
 ): Promise<ApiResponse<DocumentItem[]>> {
-  const token = localStorage.getItem('studyvault_access_token');
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  return response.json();
+  const token = getClientAccessToken();
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    return await response.json();
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: error instanceof Error ? error.message : 'Impossible de contacter l\'API backend.',
+        statusCode: 503,
+      },
+    };
+  }
 }
 
 export async function getDocuments(filters?: {
@@ -38,8 +47,8 @@ export async function getDocuments(filters?: {
 }
 
 export function getPreviewUrl(documentId: string): string {
-  const token = localStorage.getItem('studyvault_access_token');
-  return `${API_BASE_URL}/documents/${documentId}/preview?token=${token}`;
+  const token = getClientAccessToken();
+  return `${API_BASE_URL}/documents/${documentId}/preview${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
 export async function updateDocument(

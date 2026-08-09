@@ -7,6 +7,7 @@ export const PrivacySettingsPage: React.FC = () => {
   const { logout } = useAuth();
   const [analyticsOptIn, setAnalyticsOptIn] = useState(false);
   const [contentAnalysisOptIn, setContentAnalysisOptIn] = useState(false);
+  const [loadingConsent, setLoadingConsent] = useState(true);
   const [savingConsent, setSavingConsent] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -18,12 +19,17 @@ export const PrivacySettingsPage: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     rgpdService.getUserConsent().then((res) => {
-      if (res.success && res.data) {
+      if (mounted && res.success && res.data) {
         setAnalyticsOptIn(res.data.analyticsOptIn);
         setContentAnalysisOptIn(res.data.contentAnalysisOptIn);
       }
+      if (mounted) setLoadingConsent(false);
+    }).catch(() => {
+      if (mounted) setLoadingConsent(false);
     });
+    return () => { mounted = false; };
   }, []);
 
   const handleSaveConsent = async () => {
@@ -92,6 +98,10 @@ export const PrivacySettingsPage: React.FC = () => {
         <h3>1. Gestion des Consentements</h3>
 
         <div className="consent-toggle-list">
+          {loadingConsent ? (
+            <p className="consent-loading">Chargement de vos préférences de consentement…</p>
+          ) : (
+            <>
           <div className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-title">Mesure d'audience &amp; Amélioration anonyme (Opt-In)</span>
@@ -125,9 +135,11 @@ export const PrivacySettingsPage: React.FC = () => {
               <span className="slider round" />
             </label>
           </div>
+            </>
+          )}
         </div>
 
-        <button className="btn-save-consent" onClick={handleSaveConsent} disabled={savingConsent}>
+        <button className="btn-save-consent" onClick={handleSaveConsent} disabled={savingConsent || loadingConsent}>
           {savingConsent ? 'Enregistrement...' : 'Enregistrer mes préférences'}
         </button>
       </div>
@@ -207,6 +219,7 @@ export const PrivacySettingsPage: React.FC = () => {
         .settings-section h3 { font-size: 1.05rem; font-weight: 700; border-bottom: 1px solid var(--border-color); pb: 0.5rem; }
 
         .consent-toggle-list { display: flex; flex-direction: column; gap: 1rem; }
+        .consent-loading { font-size: 0.85rem; color: var(--text-muted); }
         .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
         .toggle-title { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
         .toggle-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem; }

@@ -34,6 +34,7 @@ export const PersonalVaultPage: React.FC = () => {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<PersonalFolderInput['categoryType']>('cv');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
   // Modals state
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
@@ -42,6 +43,7 @@ export const PersonalVaultPage: React.FC = () => {
   const [showFolderModal, setShowFolderModal] = useState(false);
 
   const loadVaultData = useCallback(async () => {
+    setLoading(true);
     try {
       const [foldersRes, docsRes] = await Promise.all([
         docService.getPersonalFolders(),
@@ -52,7 +54,7 @@ export const PersonalVaultPage: React.FC = () => {
         }),
       ]);
 
-      if (foldersRes.success && foldersRes.data) {
+      if (foldersRes.success && Array.isArray(foldersRes.data)) {
         setFolders(foldersRes.data);
 
         // Auto-create default category folder if empty
@@ -67,11 +69,19 @@ export const PersonalVaultPage: React.FC = () => {
         } else if (!selectedFolderId) {
           setSelectedFolderId(foldersRes.data[0].id);
         }
+      } else {
+        setFolders([]);
       }
 
-      if (docsRes.success && docsRes.data) setDocuments(docsRes.data);
+      if (docsRes.success && Array.isArray(docsRes.data)) {
+        setDocuments(docsRes.data);
+      } else {
+        setDocuments([]);
+      }
     } catch (err) {
       console.error('Error loading personal vault:', err);
+    } finally {
+      setLoading(false);
     }
   }, [selectedFolderId, searchQuery]);
 
@@ -134,7 +144,12 @@ export const PersonalVaultPage: React.FC = () => {
           </div>
 
           <div className="categories-list">
-            {folders.map((folder) => {
+            {loading ? (
+              <p className="vault-empty-folders">Chargement des dossiers…</p>
+            ) : folders.length === 0 ? (
+              <p className="vault-empty-folders">Aucun dossier personnel pour le moment.</p>
+            ) : (
+              folders.map((folder) => {
               const catConfig = CATEGORIES.find((c) => c.type === folder.categoryType) || CATEGORIES[5];
               const IconComp = catConfig.icon;
 
@@ -152,7 +167,7 @@ export const PersonalVaultPage: React.FC = () => {
                   <span className="count-pill">{folder.documentCount || 0}</span>
                 </button>
               );
-            })}
+            }))}
           </div>
         </div>
 
@@ -179,7 +194,11 @@ export const PersonalVaultPage: React.FC = () => {
           </div>
 
           {/* Grid of Documents */}
-          {documents.length > 0 ? (
+          {loading ? (
+            <div className="glass-card empty-card">
+              <p className="vault-loading-text">Chargement du coffre-fort…</p>
+            </div>
+          ) : documents.length > 0 ? (
             <div className="documents-grid">
               {documents.map((doc) => (
                 <FileCard
@@ -427,6 +446,18 @@ export const PersonalVaultPage: React.FC = () => {
           flex-direction: column;
           align-items: center;
           gap: 0.75rem;
+        }
+
+        .vault-empty-folders {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          text-align: center;
+          padding: 0.5rem 0;
+        }
+
+        .vault-loading-text {
+          font-size: 0.85rem;
+          color: var(--text-muted);
         }
 
         .modal-backdrop {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getHealthStatus } from '../controllers/healthController';
 import authRoutes from './authRoutes';
+import userRoutes from './userRoutes';
 import academicProfileRoutes from './academicProfileRoutes';
 import academicStructureRoutes from './academicStructureRoutes';
 import documentRoutes from './documentRoutes';
@@ -11,6 +12,11 @@ import versionRoutes from './versionRoutes';
 import betaRoutes from './betaRoutes';
 import feedbackRoutes from './feedbackRoutes';
 import adminRoutes from './adminRoutes';
+import dashboardRoutes from './dashboardRoutes';
+import favoriteRoutes from './favoriteRoutes';
+import quickAccessRoutes from './quickAccessRoutes';
+import tagRoutes from './tagRoutes';
+import personalFolderRoutes from './personalFolderRoutes';
 
 const router = Router();
 
@@ -19,16 +25,21 @@ router.get('/health', getHealthStatus);
 
 // Sub-routers
 router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
 router.use('/academic-profile', academicProfileRoutes);
 router.use('/academic-structure', academicStructureRoutes);
 router.use('/documents', documentRoutes);
 router.use('/search', searchRoutes);
 router.use('/timetable', timetableRoutes);
 router.use('/rgpd', rgpdRoutes);
-router.use('/user', rgpdRoutes); // Alias for RGPD user endpoints
 router.use('/version', versionRoutes); // App version & changelog
 router.use('/beta', betaRoutes); // Closed beta invitation & waitlist
 router.use('/feedback', feedbackRoutes); // Feedback widget & submission
 router.use('/admin', adminRoutes); // Admin beta metrics dashboard
+router.use('/dashboard', dashboardRoutes); // Dashboard aggregated stats
+router.use('/favorites', favoriteRoutes); // Favorite documents
+router.use('/quick-access', quickAccessRoutes); // Quick access documents
+router.use('/tags', tagRoutes); // User tags
+router.use('/personal-folders', personalFolderRoutes); // Personal vault folders
 
 export default router;

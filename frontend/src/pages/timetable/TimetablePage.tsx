@@ -57,7 +57,16 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         timetableService.getWeekSessions(),
         structureService.getStructureTree(),
       ]);
-      if (weekRes.success && weekRes.data) setWeekData(weekRes.data);
+      if (weekRes.success && weekRes.data && typeof weekRes.data === 'object') {
+        const normalized: TimetableWeekData = {};
+        for (const [k, v] of Object.entries(weekRes.data)) {
+          const key = parseInt(k, 10);
+          if (!Number.isNaN(key) && Array.isArray(v)) normalized[key] = v as TimetableSession[];
+        }
+        setWeekData(normalized);
+      } else {
+        setWeekData(null);
+      }
       if (treeRes.success && treeRes.data) setTree(treeRes.data);
     } catch (_e) {
       /* ignore */
@@ -69,6 +78,9 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   useEffect(() => {
     loadData();
   }, []);
+
+  const hasAnySession =
+    !!weekData && DAYS.some((day) => Array.isArray(weekData[day.key]) && weekData[day.key].length > 0);
 
   const handleOpenDetails = (session: TimetableSession) => {
     setSelectedSession(session);
@@ -125,6 +137,12 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
           <Clock size={24} className="animate-spin text-indigo" />
           <span>Chargement du planning hebdomadaire...</span>
         </div>
+      ) : !hasAnySession ? (
+        <div className="glass-card empty-card">
+          <CalendarIcon size={40} className="text-indigo" />
+          <h3>Aucune séance programmée</h3>
+          <p>Ajoutez vos cours et révisions manuellement, ou importez votre emploi du temps via l'OCR.</p>
+        </div>
       ) : viewMode === 'grid' ? (
         /* Grid View */
         <div className="grid-container glass-card">
@@ -143,7 +161,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
                 <div className="time-label">{time}</div>
 
                 {DAYS.map((day) => {
-                  const daySessions = weekData?.[day.key] || [];
+                  const daySessions = Array.isArray(weekData?.[day.key]) ? (weekData as TimetableWeekData)[day.key] : [];
                   const activeSessions = daySessions.filter((s: TimetableSession) => {
                     const startHour = parseInt(s.startTime.split(':')[0], 10);
                     const slotHour = parseInt(time.split(':')[0], 10);
@@ -181,7 +199,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         /* List View */
         <div className="list-container">
           {DAYS.map((day) => {
-            const daySessions = weekData?.[day.key] || [];
+            const daySessions = Array.isArray(weekData?.[day.key]) ? (weekData as TimetableWeekData)[day.key] : [];
             if (daySessions.length === 0) return null;
 
             return (
@@ -254,6 +272,10 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         .btn-add-session { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 1.15rem; border-radius: var(--radius-md); background: var(--gradient-primary); color: #ffffff; font-size: 0.825rem; font-weight: 700; box-shadow: var(--shadow-glow); }
 
         .timetable-loading { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem; font-size: 0.9rem; color: var(--text-muted); }
+
+        .empty-card { padding: 3rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+        .empty-card h3 { font-size: 1.1rem; font-weight: 700; }
+        .empty-card p { font-size: 0.85rem; color: var(--text-muted); }
 
         /* Grid Layout */
         .grid-container { display: flex; flex-direction: column; overflow-x: auto; padding: 1rem; }

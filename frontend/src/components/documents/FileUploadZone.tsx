@@ -58,7 +58,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       clearInterval(timer);
       setProgress(100);
 
-      if (res.success && res.data) {
+      if (res.success && Array.isArray(res.data)) {
         setSuccessMsg(`${res.data.length} document(s) importé(s) avec succès !`);
         onUploadSuccess(res.data);
       } else {

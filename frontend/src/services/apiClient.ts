@@ -9,7 +9,7 @@ const isTauri = typeof window !== 'undefined' && (
 );
 
 const defaultBaseUrl = isTauri ? 'http://localhost:5000/api/v1' : '/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
 
 let currentAccessToken: string | null = null;
 
@@ -37,7 +37,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       credentials: 'include', // Ensures HTTP-only cookies are included for CORS
     });
 
-    const data: ApiResponse<T> = await response.json();
+    const data = (await parseJson(response)) as ApiResponse<T>;
     return data;
   } catch (error) {
     return {
@@ -46,6 +46,23 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
         code: 'NETWORK_ERROR',
         message: error instanceof Error ? error.message : 'Impossible de contacter l\'API backend.',
         statusCode: 503,
+      },
+    };
+  }
+}
+
+async function parseJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return { success: true, data: null };
+  try {
+    return JSON.parse(text);
+  } catch (_err) {
+    return {
+      success: false,
+      error: {
+        code: 'INVALID_RESPONSE',
+        message: `Réponse inattendue du serveur (${response.status}).`,
+        statusCode: response.status,
       },
     };
   }

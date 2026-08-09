@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageSquarePlus, X, Send, Star, Bug, Lightbulb, Heart, HelpCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
+import { API_BASE_URL, getClientAccessToken } from '../services/apiClient';
 
 type FeedbackType = 'bug' | 'suggestion' | 'love' | 'question';
 
@@ -37,11 +38,11 @@ export const FeedbackWidget: React.FC = () => {
         appVersion: '1.0.0',
       };
 
-      const res = await fetch('/api/v1/feedback', {
+      const res = await fetch(`${API_BASE_URL}/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('studyvault_access_token')}`,
+          'Authorization': `Bearer ${getClientAccessToken()}`,
         },
         body: JSON.stringify(payload),
       });

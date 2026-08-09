@@ -20,7 +20,7 @@ export const ModulePlaceholderCard: React.FC<ModulePlaceholderCardProps> = ({ mo
       </div>
 
       <div className="modules-list">
-        {modules.map((m, idx) => {
+        {(Array.isArray(modules) ? modules : []).map((m, idx) => {
           const isReady = m.status === 'ready';
           return (
             <div key={idx} className={`module-item ${isReady ? 'ready' : 'pending'}`}>

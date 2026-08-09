@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Calendar, ChevronRight, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../services/apiClient';
 
 interface VersionNote {
   version: string;
@@ -37,7 +38,7 @@ const ChangelogPage: React.FC = () => {
   useEffect(() => {
     async function loadVersion() {
       try {
-        const res = await fetch('/api/v1/version');
+        const res = await fetch(`${API_BASE_URL}/version`);
         if (res.ok) {
           const json = await res.json();
           if (json?.data) {
@@ -46,7 +47,7 @@ const ChangelogPage: React.FC = () => {
               releaseDate: json.data.releaseDate,
               notes: json.data.notes,
             });
-            if (json.data.history?.length) {
+            if (Array.isArray(json.data.history) && json.data.history.length) {
               setHistory(json.data.history);
             }
           }
@@ -122,12 +123,12 @@ const ChangelogPage: React.FC = () => {
             </div>
 
             <ul className="version-notes">
-              {(v.highlights || v.notes || []).map((note, ni) => (
+              {Array.isArray(v.highlights) || Array.isArray(v.notes) ? (v.highlights || v.notes || []).map((note, ni) => (
                 <li key={ni}>
                   <ChevronRight size={14} className="note-icon" />
                   <span>{note}</span>
                 </li>
-              ))}
+              )) : null}
             </ul>
           </div>
         ))}

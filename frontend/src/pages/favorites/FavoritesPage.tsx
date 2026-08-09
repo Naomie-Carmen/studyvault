@@ -20,7 +20,7 @@ export const FavoritesPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await searchService.getFavorites();
-      if (res.success && res.data) setFavorites(res.data);
+      if (res.success && Array.isArray(res.data)) setFavorites(res.data);
     } catch (err) {
       console.error('Error loading favorites:', err);
     } finally {

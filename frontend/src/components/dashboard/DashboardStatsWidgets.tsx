@@ -145,7 +145,7 @@ export const DashboardStatsWidgets: React.FC<DashboardStatsWidgetsProps> = ({
       </div>
 
       {/* Most Used Subjects */}
-      {stats.mostUsedSubjects.length > 0 && (
+      {Array.isArray(stats.mostUsedSubjects) && stats.mostUsedSubjects.length > 0 && (
         <div className="glass-card widget-card full-width-widget">
           <div className="widget-header">
             <BookOpen size={16} className="text-indigo" />

@@ -16,7 +16,7 @@ export const UnclassifiedCounterWidget: React.FC<UnclassifiedCounterWidgetProps>
 
   const loadDocs = () => {
     classificationService.getUnclassifiedDocuments().then((res) => {
-      if (res.success && res.data) setUnclassifiedDocs(res.data);
+      if (res.success && Array.isArray(res.data)) setUnclassifiedDocs(res.data);
     });
   };
 

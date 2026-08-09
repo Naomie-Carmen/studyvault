@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Ticket, FileText, MessageSquare, Plus, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL, getClientAccessToken } from '../../services/apiClient';
 
 interface DashboardMetrics {
   users: {
@@ -52,24 +53,32 @@ export const BetaDashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('studyvault_access_token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const token = getClientAccessToken();
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [metricsRes, feedbackRes] = await Promise.all([
-        fetch('/api/v1/admin/dashboard', { headers }),
-        fetch('/api/v1/feedback', { headers }),
+        fetch(`${API_BASE_URL}/admin/dashboard`, { headers }),
+        fetch(`${API_BASE_URL}/feedback`, { headers }),
       ]);
 
       if (metricsRes.ok) {
         const json = await metricsRes.json();
-        setMetrics(json.data);
+        if (Array.isArray(json.data) && json.data.length > 0) {
+          setMetrics(json.data[0] as DashboardMetrics);
+        } else if (json.data && typeof json.data === 'object' && 'users' in json.data) {
+          setMetrics(json.data as DashboardMetrics);
+        } else {
+          setMetrics(null);
+          setError('Format de métriques inattendu du serveur.');
+        }
       } else {
         setError('Accès réservé aux administrateurs (rôle admin requis).');
       }
 
       if (feedbackRes.ok) {
         const json = await feedbackRes.json();
-        setFeedbacks(json.data?.items || []);
+        const items = Array.isArray(json.data?.items) ? json.data.items : (Array.isArray(json.data) ? json.data : []);
+        setFeedbacks(items as FeedbackItem[]);
       }
     } catch {
       setError('Impossible de joindre le serveur d\'administration.');

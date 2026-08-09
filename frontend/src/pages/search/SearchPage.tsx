@@ -70,7 +70,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = '' }) => 
 
       if (treeRes.success && treeRes.data) setTree(treeRes.data);
 
-      if (favRes.success && favRes.data) {
+      if (favRes.success && Array.isArray(favRes.data)) {
         const map: Record<string, boolean> = {};
         favRes.data.forEach((f) => {
           map[f.documentId] = true;
@@ -78,7 +78,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = '' }) => 
         setFavoritesMap(map);
       }
 
-      if (quickRes.success && quickRes.data) {
+      if (quickRes.success && Array.isArray(quickRes.data)) {
         const map: Record<string, boolean> = {};
         quickRes.data.forEach((q) => {
           map[q.documentId] = true;

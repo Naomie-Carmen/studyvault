@@ -187,7 +187,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           <RefreshCw size={24} className="spinning text-indigo" />
           <p>Chargement de la structure académique...</p>
         </div>
-      ) : tree && tree.semesters.length > 0 ? (
+      ) : tree && Array.isArray(tree.semesters) && tree.semesters.length > 0 ? (
         <TreeView
           semesters={tree.semesters}
           onAddUE={(semesterId) => {

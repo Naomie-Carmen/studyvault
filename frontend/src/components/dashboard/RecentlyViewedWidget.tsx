@@ -14,7 +14,7 @@ export const RecentlyViewedWidget: React.FC<RecentlyViewedWidgetProps> = ({
 
   useEffect(() => {
     previewService.getRecentlyViewed().then((res) => {
-      if (res.success && res.data) setDocs(res.data);
+      if (res.success && Array.isArray(res.data)) setDocs(res.data);
     });
   }, []);
 

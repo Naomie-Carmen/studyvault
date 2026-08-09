@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X, Sparkles } from 'lucide-react';
+import { API_BASE_URL } from '../services/apiClient';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DISMISS_KEY = 'studyvault_update_dismissed_until';
 
 async function fetchCurrentVersion(): Promise<string | null> {
   try {
-    const res = await fetch('/api/v1/version', { cache: 'no-store' });
+    const res = await fetch(`${API_BASE_URL}/version`, { cache: 'no-store' });
     if (!res.ok) return null;
     const json = await res.json();
     return json?.data?.version ?? null;

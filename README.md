@@ -72,6 +72,45 @@ L'application démarre simultanément :
 
 ---
 
+## 🌐 Déploiement en Production
+
+### Backend API (Render)
+
+1. Créez un **Web Service** Render pointant vers le dossier `backend/`.
+2. Build command : `npm install && npx prisma generate && npx prisma migrate deploy && npm run build`
+3. Start command : `npm run start`
+4. Variables d'environnement :
+   - `DATABASE_URL` — PostgreSQL distant (Neon, Supabase, Render Postgres…), ex. `postgresql://…?sslmode=require`
+   - `CLIENT_URL` — URL exacte du site statique frontend, ex. `https://studyvault.onrender.com`
+   - `JWT_SECRET` / `REFRESH_TOKEN_SECRET` — secrets longs et aléatoires
+   - `STORAGE_DRIVER=local` (optionnel), `NODE_ENV=production`
+5. ⚠️ **Démarrage à froid** : sur le plan gratuit, Render met l'instance en veille. Le premier appel peut prendre **30 à 60 s**. Les requêtes échouées avant le réveil doivent être rejouées.
+
+### Frontend statique (Render Static Site)
+
+1. Créez un **Static Site** Render pointant vers le dossier `frontend/`.
+2. Build command : `npm install && npm run build`
+3. Publish directory : `dist`
+4. Fichier `frontend/.env.production` (ou variables d'environnement Render) :
+   ```
+   VITE_API_BASE_URL=https://studyvault-api.onrender.com/api/v1
+   ```
+   > Le fichier `.env.production` est **ignoré par git** (ne pas le committer). `npm run build` l'utilise automatiquement en environnement de build Render.
+
+### Application desktop (Tauri)
+
+```bash
+cd desktop
+npm install
+npm run tauri dev        # développement
+npm run tauri build      # paquet de production (MSI/NSIS sous Windows)
+```
+- Le desktop pointe vers l'API **uniquement via `VITE_API_BASE_URL`** au build (défaut dev : `http://localhost:5000/api/v1`).
+- La session est persistée localement (tokens access + refresh) : l'utilisateur reste connecté après redémarrage de l'application.
+- `desktop/src-tauri/target/` est **exclu de git** (artefacts de compilation Rust).
+
+---
+
 ## 🔍 Scripts Utiles
 
 | Commande | Description |

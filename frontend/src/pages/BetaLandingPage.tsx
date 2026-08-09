@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, ShieldCheck, Search, Calendar, FolderCheck, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { BetaBadge } from '../components/common/BetaBadge';
+import { API_BASE_URL } from '../services/apiClient';
 
 interface BetaLandingPageProps {
   onNavigateLogin?: () => void;
@@ -25,7 +26,7 @@ export const BetaLandingPage: React.FC<BetaLandingPageProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/v1/beta/waitlist', {
+      const res = await fetch(`${API_BASE_URL}/beta/waitlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: waitlistEmail.trim() }),

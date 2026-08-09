@@ -17,15 +17,17 @@ export async function login(data: LoginInput): Promise<ApiResponse<AuthSuccessPa
   });
 }
 
-export async function refresh(): Promise<ApiResponse<AuthSuccessPayload>> {
+export async function refresh(refreshToken?: string): Promise<ApiResponse<AuthSuccessPayload>> {
   return fetchApi<AuthSuccessPayload>('/auth/refresh', {
     method: 'POST',
+    ...(refreshToken ? { body: JSON.stringify({ refreshToken }) } : {}),
   });
 }
 
-export async function logout(): Promise<ApiResponse<{ message: string }>> {
+export async function logout(refreshToken?: string): Promise<ApiResponse<{ message: string }>> {
   return fetchApi<{ message: string }>('/auth/logout', {
     method: 'POST',
+    ...(refreshToken ? { body: JSON.stringify({ refreshToken }) } : {}),
   });
 }
 

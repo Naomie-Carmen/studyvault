@@ -27,7 +27,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   useEffect(() => {
     try {
       const saved = localStorage.getItem(HISTORY_KEY);
-      if (saved) setHistory(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setHistory(parsed.filter((h) => typeof h === 'string'));
+      }
     } catch (_e) {
       /* ignore */
     }
@@ -66,8 +69,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
     setLoading(true);
     try {
       const res = await searchService.searchDocuments({ q, limit: 5 });
-      if (res.success && res.data) {
+      if (res.success && res.data && Array.isArray(res.data.documents)) {
         setResults(res.data.documents);
+      } else {
+        setResults([]);
       }
     } catch (_err) {
       /* ignore */

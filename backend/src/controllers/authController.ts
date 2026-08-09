@@ -42,7 +42,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const { user, accessToken, refreshToken } = await authService.registerUser(parseResult.data);
     setRefreshTokenCookie(res, refreshToken);
 
-    sendSuccess(res, { user, accessToken }, 201);
+    sendSuccess(res, { user, accessToken, refreshToken }, 201);
   } catch (error) {
     next(error);
   }
@@ -59,7 +59,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const { user, accessToken, refreshToken } = await authService.loginUser(parseResult.data);
     setRefreshTokenCookie(res, refreshToken);
 
-    sendSuccess(res, { user, accessToken }, 200);
+    sendSuccess(res, { user, accessToken, refreshToken }, 200);
   } catch (error) {
     next(error);
   }
@@ -76,7 +76,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     const { user, accessToken, refreshToken } = await authService.refreshSession(token);
     setRefreshTokenCookie(res, refreshToken);
 
-    sendSuccess(res, { user, accessToken }, 200);
+    sendSuccess(res, { user, accessToken, refreshToken }, 200);
   } catch (error) {
     clearRefreshTokenCookie(res);
     next(error);

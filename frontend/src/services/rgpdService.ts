@@ -1,4 +1,4 @@
-import { fetchApi } from './apiClient';
+import { fetchApi, API_BASE_URL, getClientAccessToken } from './apiClient';
 import { ApiResponse } from '../types/api';
 
 export interface UserConsent {
@@ -28,9 +28,9 @@ export async function deleteAccount(): Promise<ApiResponse<{ message: string; pu
 }
 
 export async function downloadDataExport(): Promise<void> {
-  const token = localStorage.getItem('studyvault_access_token');
-  const res = await fetch('/api/v1/rgpd/export', {
-    headers: { Authorization: `Bearer ${token}` },
+  const token = getClientAccessToken();
+  const res = await fetch(`${API_BASE_URL}/rgpd/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error('Échec du téléchargement de l\'export RGPD.');
   const blob = await res.blob();

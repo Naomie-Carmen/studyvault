@@ -5,33 +5,66 @@ import * as authService from '../services/authService';
 import { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from '../types/validators';
 import { AuthContext } from './AuthContextInstance';
 
+const ACCESS_TOKEN_KEY = 'studyvault_access_token';
+const REFRESH_TOKEN_KEY = 'studyvault_refresh_token';
+
+function readStoredToken(key: string): string | null {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function persistToken(key: string, value: string | null): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (value) {
+      window.localStorage.setItem(key, value);
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch (_err) {
+    // Storage unavailable (private mode, etc.) — session-only auth still works.
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const updateTokensAndUser = (newUser: User | null, newAccessToken: string | null) => {
+  const updateTokensAndUser = useCallback((newUser: User | null, newAccessToken: string | null, newRefreshToken?: string | null) => {
     setUser(newUser);
     setAccessToken(newAccessToken);
     setClientAccessToken(newAccessToken);
-  };
-
-  const refreshSession = useCallback(async () => {
-    try {
-      const res = await authService.refresh();
-      if (res.success && res.data) {
-        updateTokensAndUser(res.data.user, res.data.accessToken);
-      } else {
-        updateTokensAndUser(null, null);
-      }
-    } catch (_err) {
-      updateTokensAndUser(null, null);
-    } finally {
-      setIsLoading(false);
+    persistToken(ACCESS_TOKEN_KEY, newAccessToken);
+    if (newRefreshToken !== undefined) {
+      persistToken(REFRESH_TOKEN_KEY, newRefreshToken);
     }
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    try {
+      const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
+      const res = await authService.refresh(storedRefreshToken || undefined);
+      if (res.success && res.data) {
+        updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
+      } else {
+        updateTokensAndUser(null, null, null);
+      }
+    } catch (_err) {
+      updateTokensAndUser(null, null, null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateTokensAndUser]);
+
   useEffect(() => {
+    const storedAccessToken = readStoredToken(ACCESS_TOKEN_KEY);
+    if (storedAccessToken) {
+      setClientAccessToken(storedAccessToken);
+    }
     refreshSession();
   }, [refreshSession]);
 
@@ -41,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
 
     if (res.success && res.data) {
-      updateTokensAndUser(res.data.user, res.data.accessToken);
+      updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
       return { success: true };
     }
 
@@ -57,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
 
     if (res.success && res.data) {
-      updateTokensAndUser(res.data.user, res.data.accessToken);
+      updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
       return { success: true };
     }
 
@@ -69,18 +102,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleLogout = async () => {
     setIsLoading(true);
-    await authService.logout();
-    updateTokensAndUser(null, null);
+    try {
+      const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
+      await authService.logout(storedRefreshToken || undefined);
+    } catch (_err) {
+      // Local cleanup must happen even if the server call fails.
+    }
+    updateTokensAndUser(null, null, null);
     setIsLoading(false);
   };
 
   const handleForgotPassword = async (data: ForgotPasswordInput) => {
     const res = await authService.forgotPassword(data);
     if (res.success && res.data) {
-      return { 
-        success: true, 
-        message: res.data.message, 
-        debugToken: res.data.debugToken 
+      return {
+        success: true,
+        message: res.data.message,
+        debugToken: res.data.debugToken
       };
     }
     return {

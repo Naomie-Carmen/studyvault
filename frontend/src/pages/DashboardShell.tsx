@@ -65,7 +65,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
         searchService.getQuickAccess(),
       ]).then(([statsRes, quickRes]) => {
         if (statsRes.success && statsRes.data) setStats(statsRes.data);
-        if (quickRes.success && quickRes.data) setQuickAccessList(quickRes.data);
+        if (quickRes.success && Array.isArray(quickRes.data)) setQuickAccessList(quickRes.data);
       });
     }
   }, [isAuthenticated]);
@@ -101,7 +101,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
                         <Calendar size={16} className="text-cyan" />
                         <span>
                           {profile.academicYear.yearLabel} —{' '}
-                          {profile.academicYear.semesters.filter((s) => s.isActive).map((s) => `S${s.number}`).join(' & ')}
+                          {(Array.isArray(profile.academicYear.semesters) ? profile.academicYear.semesters : []).filter((s) => s.isActive).map((s) => `S${s.number}`).join(' & ')}
                         </span>
                       </div>
                     </>

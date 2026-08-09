@@ -21,7 +21,7 @@ export const TrashPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await docService.getTrash();
-      if (res.success && res.data) setTrashItems(res.data);
+      if (res.success && Array.isArray(res.data)) setTrashItems(res.data);
     } catch (err) {
       console.error('Error fetching trash items:', err);
     } finally {

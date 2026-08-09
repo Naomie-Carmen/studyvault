@@ -11,6 +11,7 @@ export interface User {
 export interface AuthSuccessPayload {
   user: User;
   accessToken: string;
+  refreshToken?: string;
 }
 
 export interface AuthState {

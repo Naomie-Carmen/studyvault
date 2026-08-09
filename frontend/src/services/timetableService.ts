@@ -1,9 +1,7 @@
-import { fetchApi } from './apiClient';
+import { fetchApi, API_BASE_URL, getClientAccessToken } from './apiClient';
 import { ApiResponse } from '../types/api';
 import { TimetableSession, TimetableImport, TimetableStats } from '../types/timetable';
 import { TimetableSessionInput } from '../types/validators';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export async function createSession(
   data: TimetableSessionInput
@@ -76,11 +74,22 @@ export async function uploadTimetableFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const token = localStorage.getItem('studyvault_access_token');
-  const response = await fetch(`${API_BASE_URL}/timetable/import`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  return response.json();
+  const token = getClientAccessToken();
+  try {
+    const response = await fetch(`${API_BASE_URL}/timetable/import`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    return await response.json();
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: error instanceof Error ? error.message : 'Impossible de contacter l\'API backend.',
+        statusCode: 503,
+      },
+    };
+  }
 }
