@@ -41,3 +41,5 @@ uploads/*
 *.db-journal
 # Tauri / Rust build artifacts
 desktop/src-tauri/target/
+# Tauri updater signing keys (NE JAMAIS COMMITTER)
+desktop/src-tauri/.tauri/
