@@ -62,17 +62,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Install Node dependencies
+      - name: Install ALL dependencies (root + backend + frontend + desktop)
         run: |
           npm install
-          npm --prefix backend install
-          npm --prefix frontend install
-          npm --prefix desktop install
+          cd backend && npm install
+          cd ../frontend && npm install
+          cd ../desktop && npm install
+
+      - name: Generate Prisma Client (using local version)
+        run: |
+          cd backend
+          npx --no-install prisma generate
 
       - name: Build Web Frontend
-        run: npm --prefix frontend run build
+        run: |
+          cd frontend
+          npm run build
 
-            - name: Build Tauri App
+      - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,10 +88,9 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'StudyVault v__VERSION__'
-          releaseBody: 'Mise à jour automatique StudyVault.'
+          releaseBody: 'Mise à jour StudyVault.'
           releaseId: ${{ needs.create-release.outputs.release_id }}
           projectPath: './desktop'
-          tauriScript: npm run tauri
 
   publish-release:
     needs: [create-release, build-tauri]
