@@ -34,10 +34,10 @@ export async function registerUser(input: RegisterInput): Promise<{ user: UserPr
   const existingUser = await prisma.user.findUnique({
     where: { email: input.email },
   });
-
   if (existingUser) {
     throw ApiError.badRequest('Un compte existe déjà avec cette adresse email.', 'EMAIL_EXISTS');
   }
+
   // Beta Closed validation
   const isBetaActive = true;
   if (process.env.BETA_CLOSED === 'true' && !input.inviteCode) {
@@ -57,7 +57,6 @@ export async function registerUser(input: RegisterInput): Promise<{ user: UserPr
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
-
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -97,7 +96,6 @@ export async function loginUser(input: LoginInput): Promise<{ user: UserProfileR
   const user = await prisma.user.findUnique({
     where: { email: input.email },
   });
-
   // Non-revealing error message
   if (!user) {
     throw ApiError.badRequest('Identifiants invalides.', 'INVALID_CREDENTIALS');
@@ -156,7 +154,6 @@ export async function refreshSession(refreshTokenInput: string): Promise<{ user:
     email: storedToken.user.email,
     fullName: storedToken.user.fullName,
   };
-
   const newAccessToken = generateAccessToken(authUserPayload);
   const newRefreshToken = generateRefreshToken(authUserPayload);
 
@@ -193,7 +190,6 @@ export async function requestPasswordReset(email: string): Promise<{ resetToken?
   const user = await prisma.user.findUnique({
     where: { email },
   });
-
   // Non-revealing: resolve gracefully even if user doesn't exist
   if (!user) {
     return {};
@@ -201,7 +197,7 @@ export async function requestPasswordReset(email: string): Promise<{ resetToken?
 
   // Invalidate any existing unused reset tokens for this user
   await prisma.passwordResetToken.updateMany({
-    where: { userId: user.id, isUsed: false },
+    where: { userId: user.id },
     data: { isUsed: true },
   });
 
@@ -253,10 +249,8 @@ export async function getUserProfile(userId: string): Promise<UserProfileRespons
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
-
   if (!user) {
     throw ApiError.notFound('Utilisateur introuvable.');
   }
-
   return sanitizeUser(user);
 }

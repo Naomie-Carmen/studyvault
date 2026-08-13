@@ -11,6 +11,7 @@ export interface UserProfileResponse {
   university?: string | null;
   program?: string | null;
   level?: string | null;
+  role?: string;
   createdAt: string;
 }
 

@@ -6,6 +6,29 @@ import { AcademicProfileDTO, SemesterDTO } from '../types/academic';
 const prisma = new PrismaClient();
 
 const DEFAULT_UNIVERSITIES = [
+  // 🇨🇮 Côte d'Ivoire — Universités publiques
+  'Université Félix Houphouët-Boigny (Abidjan)',
+  'Université Alassane Ouattara (Bouaké)',
+  'Université Nangui Abrogoua (Abidjan)',
+  'Université Jean Lorougnon Guédé (Daloa)',
+  'Université Peleforo Gon Coulibaly (Korhogo)',
+  'Université de Man',
+  'Université de San Pedro',
+  'Université de Bondoukou',
+  'Université Virtuelle de Côte d\'Ivoire (UVCI)',
+  'Institut National Polytechnique Félix Houphouët-Boigny (Yamoussoukro)',
+  // 🇨🇮 Côte d'Ivoire — Grandes écoles & institutions
+  'École Normale Supérieure (ENS Abidjan)',
+  'Institut National Supérieur des Arts et de l\'Action Culturelle (INSAAC)',
+  'École Supérieure Africaine des TIC (ESATIC)',
+  'Institut National Supérieur de la Jeunesse et des Sports (INSJS)',
+  'École Nationale Supérieure de Statistique et d\'Économie Appliquée (ENSEA)',
+  // 🇨 Côte d'Ivoire — Établissements privés
+  'Université Méthodiste de Côte d\'Ivoire (UMECI)',
+  'Université Internationale de Grand-Bassam (UIGB)',
+  'Institut Supérieur de Management (ISM Abidjan)',
+  'École Supérieure de Commerce d\'Abidjan (ESCA)',
+  // 🇫🇷 France & autres
   'Sorbonne Université',
   'Université Paris 1 Panthéon-Sorbonne',
   'Université Paris Cité',
@@ -39,7 +62,6 @@ export async function getAcademicProfile(userId: string): Promise<AcademicProfil
   }
 
   const currentYear = user.academicYears[0] || null;
-
   const isConfigured = !!(
     user.university &&
     user.program &&
@@ -152,7 +174,6 @@ export async function getSuggestedUniversities(): Promise<string[]> {
     select: { name: true },
     take: 50,
   });
-
   const namesSet = new Set([...DEFAULT_UNIVERSITIES, ...dbUniversities.map((u) => u.name)]);
   return Array.from(namesSet);
 }
@@ -166,7 +187,6 @@ export async function updateSemesterStatus(
     where: { id: semesterId },
     include: { academicYear: true },
   });
-
   if (!semester || semester.academicYear.userId !== userId) {
     throw ApiError.notFound('Semestre introuvable ou accès refusé.');
   }

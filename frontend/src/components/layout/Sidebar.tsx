@@ -18,6 +18,7 @@ import {
   Lock,
   HelpCircle,
   Database,
+  BarChart3,
   RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
@@ -202,6 +203,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Mes Données</span>
             </button>
           </div>
+
+          {isAuthenticated && user?.role === 'admin' && (
+            <div className="nav-section">
+              <span className="section-title">ADMINISTRATION</span>
+              <button
+                className={`nav-item ${selectedTab === 'admin-dashboard' ? 'active' : ''}`}
+                onClick={() => handleNav('admin-dashboard')}
+              >
+                <BarChart3 size={18} />
+                <span>Dashboard Bêta (Admin)</span>
+              </button>
+            </div>
+          )}
 
           <div className="nav-section">
             <span className="section-title">AIDE & RESSOURCES</span>
