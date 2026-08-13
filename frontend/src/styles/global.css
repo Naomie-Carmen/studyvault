@@ -355,3 +355,11 @@ button {
   font-size: 0.86rem !important;
   text-align: left !important;
 }
+
+/* ========================================================== */
+/* Masque les cartes de diagnostic technique (utilisateurs)   */
+/* ========================================================== */
+.health-card,
+.module-card {
+  display: none !important;
+}
