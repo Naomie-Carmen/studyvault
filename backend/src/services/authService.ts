@@ -15,6 +15,7 @@ function sanitizeUser(user: {
   university?: string | null;
   program?: string | null;
   level?: string | null;
+  role?: string | null;
   createdAt: Date;
 }): UserProfileResponse {
   return {
@@ -24,6 +25,7 @@ function sanitizeUser(user: {
     university: user.university,
     program: user.program,
     level: user.level,
+    role: user.role || 'user',
     createdAt: user.createdAt.toISOString(),
   };
 }

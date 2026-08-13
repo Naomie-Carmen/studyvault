@@ -59,9 +59,9 @@
     "security": {
       "csp": null
     },
-          "updater": {
+              "updater": {
       "active": true,
-      "dialog": true,
+      "dialog": false,
       "endpoints": [
         "https://github.com/Naomie-Carmen/studyvault/releases/latest/download/latest.json"
       ],

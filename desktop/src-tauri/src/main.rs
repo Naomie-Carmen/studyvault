@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{
-    AboutMetadata, CustomMenuItem, Menu, MenuItem, Submenu, WindowMenuEvent,
+    CustomMenuItem, Menu, MenuItem, Submenu, WindowMenuEvent,
 };
 
 fn create_app_menu() -> Menu {
@@ -75,8 +75,10 @@ fn main() {
             // Updater disabled in v1.0.0 beta — re-enable later with TAURI_PRIVATE_KEY
                        let handle = app.handle();
             tauri::async_runtime::spawn(async move {
-                if let Ok(Some(update)) = handle.updater().check().await {
-                    let _ = update.download_and_install().await;
+                if let Ok(update) = handle.updater().check().await {
+                    if update.is_update_available() {
+                        let _ = update.download_and_install().await;
+                    }
                 }
             });
             Ok(())

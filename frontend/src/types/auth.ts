@@ -5,6 +5,7 @@ export interface User {
   university?: string | null;
   program?: string | null;
   level?: string | null;
+  role?: string;
   createdAt: string;
 }
 
