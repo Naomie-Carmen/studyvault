@@ -1,5 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
 import { StructureImportItem, StructureImportSummary } from '../../types/structure';
 import { importStructureBatch } from '../../services/academicStructureService';
 import {
@@ -13,8 +18,10 @@ import {
   RefreshCw,
   Layers,
   BookOpen,
-  UserCheck
+  UserCheck,
+  FileText
 } from 'lucide-react';
+
 
 interface MaquetteImportModalProps {
   isOpen: boolean;
@@ -179,6 +186,135 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setColumnMapping(newMapping);
   };
 
+  // Extraction du texte d'un fichier PDF
+  const parsePdfFile = async (arrayBuffer: ArrayBuffer): Promise<any[][]> => {
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+    const extractedLines: string[] = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+
+      const lineMap = new Map<number, { x: number; text: string }[]>();
+
+      textContent.items.forEach((item: any) => {
+        if (!('str' in item) || !item.str.trim()) return;
+        const transform = item.transform;
+        const x = transform[4];
+        const y = Math.round(transform[5] / 5) * 5;
+
+        if (!lineMap.has(y)) {
+          lineMap.set(y, []);
+        }
+        lineMap.get(y)!.push({ x, text: item.str.trim() });
+      });
+
+      const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
+
+      sortedY.forEach((y) => {
+        const itemsInLine = lineMap.get(y)!;
+        itemsInLine.sort((a, b) => a.x - b.x);
+        const lineStr = itemsInLine.map((i) => i.text).join(' ');
+        if (lineStr.trim()) {
+          extractedLines.push(lineStr.trim());
+        }
+      });
+    }
+
+    const rows: any[][] = [];
+
+    // Ligne d'en-tête générée pour l'étape 2 (Mapping)
+    rows.push([
+      'Semestre',
+      'Code UE',
+      'Intitulé UE',
+      'ECTS',
+      'Code ECUE',
+      'Intitulé ECUE',
+      'Nom de la Matière',
+      'Enseignant'
+    ]);
+
+    let currentSemester = '1';
+    let currentUeCode = '';
+    let currentUeTitle = '';
+    let currentEcts = '';
+    let currentEcueCode = '';
+    let currentEcueTitle = '';
+
+    for (const line of extractedLines) {
+      const semMatch = line.match(/(?:Semestre|Sem|S)\s*(\d+)/i);
+      if (semMatch) {
+        currentSemester = semMatch[1];
+      }
+
+      const ectsMatch = line.match(/(\d+(?:[\.,]\d+)?)\s*(?:ECTS|crédits?)/i);
+      const lineEcts = ectsMatch ? ectsMatch[1] : '';
+
+      const isUeLine = /(?:UE\s*\d+|Unité\s+d['’]Enseignement)/i.test(line);
+      const isEcueLine = /(?:ECUE|Élément\s+Constitutif)/i.test(line);
+
+      if (isUeLine) {
+        const match = line.match(/(?:UE\s*\d*|Unité\s+d['’]Enseignement)\s*[:\-–]?\s*(.*)/i);
+        const codeMatch = line.match(/(?:UE\s*\d+)/i);
+        currentUeCode = codeMatch ? codeMatch[0] : '';
+        currentUeTitle = match && match[1] ? match[1].trim() : line;
+        if (lineEcts) currentEcts = lineEcts;
+        currentEcueCode = '';
+        currentEcueTitle = '';
+
+        rows.push([
+          `Semestre ${currentSemester}`,
+          currentUeCode,
+          currentUeTitle || line,
+          currentEcts,
+          '',
+          '',
+          '',
+          ''
+        ]);
+      } else if (isEcueLine) {
+        const match = line.match(/(?:ECUE\s*\d*|Élément\s+Constitutif)\s*[:\-–]?\s*(.*)/i);
+        const codeMatch = line.match(/(?:ECUE\s*\d+[A-Z]?)/i);
+        currentEcueCode = codeMatch ? codeMatch[0] : '';
+        currentEcueTitle = match && match[1] ? match[1].trim() : line;
+
+        rows.push([
+          `Semestre ${currentSemester}`,
+          currentUeCode,
+          currentUeTitle,
+          currentEcts,
+          currentEcueCode,
+          currentEcueTitle || line,
+          '',
+          ''
+        ]);
+      } else {
+        if (currentUeTitle) {
+          const profMatch = line.match(/(?:Prof|Dr|Mme|M\.)\s+[A-Za-z\-]+/i);
+          const instructor = profMatch ? profMatch[0] : '';
+          const subjectName = profMatch ? line.replace(profMatch[0], '').trim() : line;
+
+          rows.push([
+            `Semestre ${currentSemester}`,
+            currentUeCode,
+            currentUeTitle,
+            lineEcts || currentEcts,
+            currentEcueCode,
+            currentEcueTitle,
+            subjectName,
+            instructor
+          ]);
+        } else {
+          rows.push([line]);
+        }
+      }
+    }
+
+    return rows;
+  };
+
   // Traitement du fichier
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -186,22 +322,33 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setFile(selected);
     setError(null);
 
+    const isPdf = selected.name.toLowerCase().endsWith('.pdf') || selected.type === 'application/pdf';
+
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const buffer = evt.target?.result as ArrayBuffer;
-        const wb = XLSX.read(buffer, { type: 'array' });
-        setWorkbook(wb);
+        if (isPdf) {
+          setWorkbook(null);
+          setSelectedSheet('');
+          const pdfRows = await parsePdfFile(buffer);
+          setRawRows(pdfRows);
+          autoDetect(pdfRows);
+        } else {
+          const wb = XLSX.read(buffer, { type: 'array' });
+          setWorkbook(wb);
 
-        const firstSheetName = wb.SheetNames[0];
-        setSelectedSheet(firstSheetName);
-        loadSheetData(wb, firstSheetName);
+          const firstSheetName = wb.SheetNames[0];
+          setSelectedSheet(firstSheetName);
+          loadSheetData(wb, firstSheetName);
+        }
       } catch (err) {
-        setError("Erreur lors de la lecture du fichier Excel/CSV.");
+        setError(isPdf ? "Erreur lors de la lecture du fichier PDF texte." : "Erreur lors de la lecture du fichier Excel/CSV.");
       }
     };
     reader.readAsArrayBuffer(selected);
   };
+
 
   const loadSheetData = (wb: XLSX.WorkBook, sheetName: string) => {
     const ws = wb.Sheets[sheetName];
@@ -447,22 +594,23 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             <div className="file-dropzone">
               <Upload size={36} className="text-indigo" />
               <h4>Sélectionnez votre maquette académique</h4>
-              <p>Format accepté : Excel (.xlsx, .xls) ou CSV</p>
+              <p>Format accepté : Excel (.xlsx, .xls), CSV ou PDF texte (.pdf)</p>
               <label className="btn-browse">
                 Parcourir les fichiers
                 <input
                   type="file"
-                  accept=".csv, .xls, .xlsx"
+                  accept=".csv, .xls, .xlsx, .pdf"
                   onChange={handleFileChange}
                   style={{ display: 'none' }}
                 />
               </label>
               {file && (
                 <div className="file-selected-badge">
-                  <FileSpreadsheet size={16} />
+                  {file.name.toLowerCase().endsWith('.pdf') ? <FileText size={16} /> : <FileSpreadsheet size={16} />}
                   <span>{file.name}</span>
                 </div>
               )}
+
             </div>
 
             {workbook && workbook.SheetNames.length > 1 && (
