@@ -59,13 +59,16 @@
     "security": {
       "csp": null
     },
-    "updater": {
-      "active": false,
-      "endpoints": [
-        "https://api.studyvault.fr/api/v1/version"
-      ],
+          "updater": {
+      "active": true,
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE3RjgyNDg5RkU4NkE0RjIKUldSYVlKdm00MmRURnpwMUp1eXVkR3A3QlhDMkh1YjV6TG5rTXlhMWp6OGVqTHQ3c3VvNWdzN3IK"
+      "endpoints": [
+        "https://github.com/Naomie-Carmen/studyvault/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU1OUQwQzcxM0EwMEUyOTMKUldTVDRnQTZjUXlkVmRrSWhpa0Q5QTRDMm9sWWRLbEdSZlFDeXc2Tk93c3B5UGdCRVlEbXNqMzYK",
+      "windows": {
+        "installMode": "passive"
+      }
     },
     "windows": [
       {
