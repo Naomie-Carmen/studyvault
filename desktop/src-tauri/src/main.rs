@@ -72,11 +72,13 @@ fn main() {
         .menu(menu)
         .on_menu_event(handle_menu_event)
         .setup(|app| {
-            // Updater disabled in v1.0.0 beta — re-enable later with TAURI_PRIVATE_KEY
-                                  let handle = app.handle();
+            // Vérification silencieuse des mises à jour au démarrage
+            let handle = app.handle();
             tauri::async_runtime::spawn(async move {
-                if let Ok(Some(update)) = handle.updater().check().await {
-                    let _ = update.download_and_install().await;
+                if let Ok(update) = handle.updater().check().await {
+                    if update.is_update_available() {
+                        let _ = update.download_and_install().await;
+                    }
                 }
             });
             Ok(())
