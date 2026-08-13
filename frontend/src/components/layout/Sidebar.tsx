@@ -1,3 +1,4 @@
+import logo from '../../assets/logo.png';
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -65,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-header">
           <div className="brand-group" onClick={() => handleNav('dashboard')}>
             <div className="brand-logo">
-              <Sparkles size={20} className="logo-icon" />
+             <img src={logo} alt="StudyVault" className="logo-img" />
             </div>
             <div className="brand-text">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
