@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
-import { ueSchema, ecueSchema, subjectSchema } from '../utils/validators';
+import { ueSchema, ecueSchema, subjectSchema, structureImportBatchSchema } from '../utils/validators';
 import * as structureService from '../services/academicStructureService';
+
 
 export async function getTree(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -124,3 +125,18 @@ export async function deleteSubject(req: Request, res: Response, next: NextFunct
     next(error);
   }
 }
+
+export async function importBatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const parseResult = structureImportBatchSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw ApiError.badRequest(parseResult.error.issues[0].message);
+    }
+    const summary = await structureService.importStructureBatch(req.user.id, parseResult.data.items);
+    sendSuccess(res, summary, 201);
+  } catch (error) {
+    next(error);
+  }
+}
+

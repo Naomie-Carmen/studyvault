@@ -6,6 +6,7 @@ import { UEModal } from '../../components/structure/UEModal';
 import { ECUEModal } from '../../components/structure/ECUEModal';
 import { SubjectModal } from '../../components/structure/SubjectModal';
 import { DeleteConfirmModal } from '../../components/structure/DeleteConfirmModal';
+import { MaquetteImportModal } from '../../components/structure/MaquetteImportModal';
 import { useAcademic } from '../../context/useAcademic';
 import { 
   FolderTree, 
@@ -13,8 +14,10 @@ import {
   RefreshCw, 
   AlertCircle, 
   GraduationCap, 
-  ArrowRight
+  ArrowRight,
+  UploadCloud
 } from 'lucide-react';
+
 import { SubjectInput } from '../../types/validators';
 
 interface AcademicStructurePageProps {
@@ -33,6 +36,8 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
   const [activeUEId, setActiveUEId] = useState<string | null>(null);
   const [activeECUEId, setActiveECUEId] = useState<string | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
 
   // Editing Item States
   const [editingUE, setEditingUE] = useState<UE | null>(null);
@@ -168,10 +173,21 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           </p>
         </div>
 
-        <button className="refresh-btn" onClick={fetchTree} disabled={loading} title="Rafraîchir">
-          <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-          <span>Actualiser</span>
-        </button>
+        <div className="header-actions">
+          <button
+            className="refresh-btn import-btn"
+            onClick={() => setIsImportOpen(true)}
+            title="Importer une maquette (Excel/CSV)"
+          >
+            <UploadCloud size={16} />
+            <span>Importer maquette (Excel/CSV)</span>
+          </button>
+          <button className="refresh-btn" onClick={fetchTree} disabled={loading} title="Rafraîchir">
+            <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+            <span>Actualiser</span>
+          </button>
+        </div>
+
       </div>
 
       {error && (
@@ -284,6 +300,16 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         />
       )}
 
+      {/* Maquette Import Modal */}
+      <MaquetteImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={() => {
+          setIsImportOpen(false);
+          fetchTree();
+        }}
+      />
+
       <style>{`
         .academic-structure-container {
           max-width: 900px;
@@ -300,6 +326,12 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           justify-content: space-between;
           background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
           border-color: rgba(99, 102, 241, 0.25);
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
         }
 
         .header-badge {
@@ -336,11 +368,23 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           border: 1px solid var(--border-color);
           font-size: 0.8rem;
           font-weight: 600;
+          cursor: pointer;
         }
 
         .refresh-btn:hover {
           color: var(--text-primary);
           background: rgba(255, 255, 255, 0.1);
+        }
+
+        .import-btn {
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--primary);
+          border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .import-btn:hover {
+          background: rgba(99, 102, 241, 0.25);
+          color: #ffffff;
         }
 
         .alert-error {
@@ -377,4 +421,5 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       `}</style>
     </div>
   );
+
 };

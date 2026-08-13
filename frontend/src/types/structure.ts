@@ -38,3 +38,29 @@ export interface AcademicStructureTree {
   level: string;
   semesters: SemesterTree[];
 }
+
+export interface StructureImportItem {
+  semesterNumber: number;
+  ueTitle: string;
+  ueCode?: string;
+  ects?: number | null;
+  ecueTitle?: string;
+  ecueCode?: string;
+  subjectName?: string;
+  instructor?: string;
+}
+
+export interface StructureImportSummary {
+  created: {
+    ues: number;
+    ecues: number;
+    subjects: number;
+  };
+  skipped: {
+    ues: number;
+    ecues: number;
+    subjects: number;
+  };
+  totalRows: number;
+}
+

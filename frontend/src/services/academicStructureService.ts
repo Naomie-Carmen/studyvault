@@ -1,6 +1,6 @@
 import { fetchApi } from './apiClient';
 import { ApiResponse } from '../types/api';
-import { AcademicStructureTree, UE, ECUE, Subject } from '../types/structure';
+import { AcademicStructureTree, UE, ECUE, Subject, StructureImportItem, StructureImportSummary } from '../types/structure';
 import { UEInput, ECUEInput, SubjectInput } from '../types/validators';
 
 export async function getStructureTree(): Promise<ApiResponse<AcademicStructureTree>> {
@@ -8,6 +8,14 @@ export async function getStructureTree(): Promise<ApiResponse<AcademicStructureT
     method: 'GET',
   });
 }
+
+export async function importStructureBatch(payload: { items: StructureImportItem[] }): Promise<ApiResponse<StructureImportSummary>> {
+  return fetchApi<StructureImportSummary>('/academic-structure/import-batch', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 
 // UE API calls
 export async function createUE(data: UEInput): Promise<ApiResponse<UE>> {

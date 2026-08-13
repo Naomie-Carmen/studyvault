@@ -9,7 +9,8 @@ import {
   deleteECUE, 
   createSubject, 
   updateSubject, 
-  deleteSubject 
+  deleteSubject,
+  importBatch
 } from '../controllers/academicStructureController';
 import { requireAuth } from '../middleware/authMiddleware';
 
@@ -20,6 +21,9 @@ router.use(requireAuth);
 
 // Tree Endpoint
 router.get('/', getTree);
+
+// Bulk Import Endpoint
+router.post('/import-batch', importBatch);
 
 // UE Endpoints
 router.post('/ue', createUE);
@@ -37,3 +41,4 @@ router.put('/subject/:id', updateSubject);
 router.delete('/subject/:id', deleteSubject);
 
 export default router;
+

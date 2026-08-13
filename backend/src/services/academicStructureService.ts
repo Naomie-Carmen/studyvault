@@ -1,9 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../utils/apiError';
-import { UEInput, ECUEInput, SubjectInput } from '../utils/validators';
+import { UEInput, ECUEInput, SubjectInput, StructureImportItem } from '../utils/validators';
 import { AcademicStructureTreeDTO } from '../types/structure';
 
 const prisma = new PrismaClient();
+
+function normalize(s: string): string {
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 
 // Helper to check user ownership of a semester
 async function verifySemesterOwnership(userId: string, semesterId: string): Promise<void> {
@@ -230,3 +241,168 @@ export async function deleteSubject(userId: string, subjectId: string) {
   await verifySubjectOwnership(userId, subjectId);
   return prisma.subject.delete({ where: { id: subjectId } });
 }
+
+export async function importStructureBatch(userId: string, items: StructureImportItem[]) {
+  const academicYear = await prisma.academicYear.findFirst({
+    where: { userId, isCurrent: true },
+  });
+
+  if (!academicYear) {
+    throw ApiError.badRequest("Configurez d'abord votre profil universitaire.");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    let createdUEs = 0;
+    let skippedUEs = 0;
+    let createdECUEs = 0;
+    let skippedECUEs = 0;
+    let createdSubjects = 0;
+    let skippedSubjects = 0;
+
+    const semesterMap = new Map<number, any>();
+    const ueMap = new Map<string, { ue: any; isNew: boolean }>();
+    const ecueMap = new Map<string, { ecue: any; isNew: boolean }>();
+
+    const distinctSemesterNumbers = Array.from(new Set(items.map(it => it.semesterNumber || 1)));
+    for (const semNum of distinctSemesterNumbers) {
+      let sem = await tx.semester.findFirst({
+        where: {
+          academicYearId: academicYear.id,
+          number: semNum,
+        },
+      });
+      if (!sem) {
+        sem = await tx.semester.create({
+          data: {
+            academicYearId: academicYear.id,
+            number: semNum,
+            label: `Semestre ${semNum}`,
+            isActive: true,
+          },
+        });
+      }
+      semesterMap.set(semNum, sem);
+    }
+
+    for (const item of items) {
+      const semNum = item.semesterNumber || 1;
+      const sem = semesterMap.get(semNum);
+      if (!sem) continue;
+
+      const normUeTitle = normalize(item.ueTitle);
+      const normUeCode = item.ueCode ? normalize(item.ueCode) : '';
+      const ueKey = normUeCode || normUeTitle;
+      const ueMapKey = `${sem.id}:${ueKey}`;
+
+      let ueEntry = ueMap.get(ueMapKey);
+
+      if (!ueEntry) {
+        const existingUEs = await tx.uE.findMany({
+          where: { semesterId: sem.id },
+        });
+
+        const foundUE = existingUEs.find(u => {
+          if (normUeCode && u.code) {
+            return normalize(u.code) === normUeCode;
+          }
+          return normalize(u.title) === normUeTitle;
+        });
+
+        if (foundUE) {
+          ueEntry = { ue: foundUE, isNew: false };
+          skippedUEs++;
+        } else {
+          const newUE = await tx.uE.create({
+            data: {
+              semesterId: sem.id,
+              title: item.ueTitle,
+              code: item.ueCode || null,
+              ects: item.ects || null,
+            },
+          });
+          ueEntry = { ue: newUE, isNew: true };
+          createdUEs++;
+        }
+        ueMap.set(ueMapKey, ueEntry);
+      }
+
+      const ue = ueEntry.ue;
+
+      let ecueObj: any = null;
+      if (item.ecueTitle && item.ecueTitle.trim().length >= 2) {
+        const normEcueTitle = normalize(item.ecueTitle);
+        const normEcueCode = item.ecueCode ? normalize(item.ecueCode) : '';
+        const ecueKey = normEcueCode || normEcueTitle;
+        const ecueMapKey = `${ue.id}:${ecueKey}`;
+
+        let ecueEntry = ecueMap.get(ecueMapKey);
+
+        if (!ecueEntry) {
+          const existingECUEs = await tx.eCUE.findMany({
+            where: { ueId: ue.id },
+          });
+
+          const foundECUE = existingECUEs.find(e => {
+            if (normEcueCode && e.code) {
+              return normalize(e.code) === normEcueCode;
+            }
+            return normalize(e.title) === normEcueTitle;
+          });
+
+          if (foundECUE) {
+            ecueEntry = { ecue: foundECUE, isNew: false };
+            skippedECUEs++;
+          } else {
+            const newECUE = await tx.eCUE.create({
+              data: {
+                ueId: ue.id,
+                title: item.ecueTitle,
+                code: item.ecueCode || null,
+              },
+            });
+            ecueEntry = { ecue: newECUE, isNew: true };
+            createdECUEs++;
+          }
+          ecueMap.set(ecueMapKey, ecueEntry);
+        }
+        ecueObj = ecueEntry.ecue;
+      }
+
+      if (item.subjectName && item.subjectName.trim().length >= 2) {
+        const normSubName = normalize(item.subjectName);
+
+        const existingSubjects = await tx.subject.findMany({
+          where: ecueObj
+            ? { ecueId: ecueObj.id }
+            : { ueId: ue.id, ecueId: null },
+        });
+
+        const foundSub = existingSubjects.find(s => normalize(s.name) === normSubName);
+
+        if (foundSub) {
+          skippedSubjects++;
+        } else {
+          await tx.subject.create({
+            data: {
+              name: item.subjectName.trim(),
+              instructor: item.instructor || null,
+              color: '#6366f1',
+              ueId: ecueObj ? null : ue.id,
+              ecueId: ecueObj ? ecueObj.id : null,
+            },
+          });
+          createdSubjects++;
+        }
+      }
+    }
+
+    return {
+      created: { ues: createdUEs, ecues: createdECUEs, subjects: createdSubjects },
+      skipped: { ues: skippedUEs, ecues: skippedECUEs, subjects: skippedSubjects },
+      totalRows: items.length,
+    };
+  });
+
+  return result;
+}
+

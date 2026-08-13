@@ -146,6 +146,22 @@ export const timetableSessionSchema = z.object({
   path: ['endTime'],
 });
 
+// Structure Import Schemas
+export const structureImportItemSchema = z.object({
+  semesterNumber: z.number().int().min(1).max(12).default(1),
+  ueTitle: z.string().trim().min(2, { message: "L'intitulé de l'UE doit contenir au moins 2 caractères." }),
+  ueCode: z.string().trim().optional(),
+  ects: z.number().positive().optional().nullable(),
+  ecueTitle: z.string().trim().min(2).optional(),
+  ecueCode: z.string().trim().optional(),
+  subjectName: z.string().trim().min(2).optional(),
+  instructor: z.string().trim().optional(),
+});
+
+export const structureImportBatchSchema = z.object({
+  items: z.array(structureImportItemSchema).min(1, { message: "Le lot d'import doit contenir au moins un élément." }).max(500, { message: "Le lot d'import ne peut dépasser 500 éléments." }),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
@@ -159,3 +175,6 @@ export type SubjectInput = z.infer<typeof subjectSchema>;
 export type PersonalFolderInput = z.infer<typeof personalFolderSchema>;
 export type DocumentUpdateInput = z.infer<typeof documentUpdateSchema>;
 export type TimetableSessionInput = z.infer<typeof timetableSessionSchema>;
+export type StructureImportItem = z.infer<typeof structureImportItemSchema>;
+export type StructureImportBatch = z.infer<typeof structureImportBatchSchema>;
+
