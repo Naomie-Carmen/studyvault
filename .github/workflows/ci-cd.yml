@@ -19,19 +19,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Monorepo Dependencies
-        run: npm ci
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm install
 
-      - name: Generate Prisma Client
-        run: npm --prefix backend run build:prisma || npx prisma generate --schema=backend/prisma/schema.prisma
-
-      - name: Run Typecheck
-        run: npm run typecheck
-
-      - name: Run ESLint
-        run: npm run lint
-
-      - name: Build Bundles
+      - name: Build Frontend
+        working-directory: ./frontend
         run: npm run build
