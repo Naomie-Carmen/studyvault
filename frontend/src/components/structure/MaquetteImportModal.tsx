@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import Tesseract from 'tesseract.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -19,8 +20,10 @@ import {
   Layers,
   BookOpen,
   UserCheck,
-  FileText
+  FileText,
+  Image as ImageIcon
 } from 'lucide-react';
+
 
 
 interface MaquetteImportModalProps {
@@ -186,42 +189,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setColumnMapping(newMapping);
   };
 
-  // Extraction du texte d'un fichier PDF
-  const parsePdfFile = async (arrayBuffer: ArrayBuffer): Promise<any[][]> => {
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-    const pdf = await loadingTask.promise;
-    const extractedLines: string[] = [];
+  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
+  const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-
-      const lineMap = new Map<number, { x: number; text: string }[]>();
-
-      textContent.items.forEach((item: any) => {
-        if (!('str' in item) || !item.str.trim()) return;
-        const transform = item.transform;
-        const x = transform[4];
-        const y = Math.round(transform[5] / 5) * 5;
-
-        if (!lineMap.has(y)) {
-          lineMap.set(y, []);
-        }
-        lineMap.get(y)!.push({ x, text: item.str.trim() });
-      });
-
-      const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
-
-      sortedY.forEach((y) => {
-        const itemsInLine = lineMap.get(y)!;
-        itemsInLine.sort((a, b) => a.x - b.x);
-        const lineStr = itemsInLine.map((i) => i.text).join(' ');
-        if (lineStr.trim()) {
-          extractedLines.push(lineStr.trim());
-        }
-      });
-    }
-
+  // Helper pour convertir un tableau de lignes textuelles en tableau 2D rawRows
+  const parseTextLinesToRows = (extractedLines: string[]): any[][] => {
     const rows: any[][] = [];
 
     // Ligne d'en-tête générée pour l'étape 2 (Mapping)
@@ -315,14 +288,92 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     return rows;
   };
 
+  // Extraction du texte d'un fichier PDF
+  const parsePdfFile = async (arrayBuffer: ArrayBuffer): Promise<any[][]> => {
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+    const extractedLines: string[] = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+
+      const lineMap = new Map<number, { x: number; text: string }[]>();
+
+      textContent.items.forEach((item: any) => {
+        if (!('str' in item) || !item.str.trim()) return;
+        const transform = item.transform;
+        const x = transform[4];
+        const y = Math.round(transform[5] / 5) * 5;
+
+        if (!lineMap.has(y)) {
+          lineMap.set(y, []);
+        }
+        lineMap.get(y)!.push({ x, text: item.str.trim() });
+      });
+
+      const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
+
+      sortedY.forEach((y) => {
+        const itemsInLine = lineMap.get(y)!;
+        itemsInLine.sort((a, b) => a.x - b.x);
+        const lineStr = itemsInLine.map((i) => i.text).join(' ');
+        if (lineStr.trim()) {
+          extractedLines.push(lineStr.trim());
+        }
+      });
+    }
+
+    return parseTextLinesToRows(extractedLines);
+  };
+
+  // Extraction du texte via OCR pour les images (JPG / PNG)
+  const parseImageFile = async (imageFile: File): Promise<any[][]> => {
+    setOcrLoading(true);
+    setOcrProgress(0);
+    try {
+      const result = await Tesseract.recognize(imageFile, 'fra+eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text' && m.progress) {
+            setOcrProgress(Math.round(m.progress * 100));
+          }
+        },
+      });
+      const rawText = result.data.text || '';
+      const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+      return parseTextLinesToRows(lines);
+    } catch (_err) {
+      throw new Error("Échec de la reconnaissance OCR sur l'image.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
   // Traitement du fichier
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
     setFile(selected);
     setError(null);
 
-    const isPdf = selected.name.toLowerCase().endsWith('.pdf') || selected.type === 'application/pdf';
+    const fileName = selected.name.toLowerCase();
+    const isPdf = fileName.endsWith('.pdf') || selected.type === 'application/pdf';
+    const isImg = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png') || selected.type.startsWith('image/');
+
+    setIsImageFormat(isImg);
+
+    if (isImg) {
+      setWorkbook(null);
+      setSelectedSheet('');
+      try {
+        const imgRows = await parseImageFile(selected);
+        setRawRows(imgRows);
+        autoDetect(imgRows);
+      } catch (err) {
+        setError("Erreur lors de l'analyse OCR de l'image. Assurez-vous que l'image est lisible.");
+      }
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -348,6 +399,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     };
     reader.readAsArrayBuffer(selected);
   };
+
 
 
   const loadSheetData = (wb: XLSX.WorkBook, sheetName: string) => {
@@ -594,24 +646,44 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             <div className="file-dropzone">
               <Upload size={36} className="text-indigo" />
               <h4>Sélectionnez votre maquette académique</h4>
-              <p>Format accepté : Excel (.xlsx, .xls), CSV ou PDF texte (.pdf)</p>
+              <p>Format accepté : Excel (.xlsx, .xls), CSV, PDF (.pdf) ou Image (.jpg, .jpeg, .png)</p>
               <label className="btn-browse">
-                Parcourir les fichiers
+                {ocrLoading ? 'Analyse OCR en cours...' : 'Parcourir les fichiers'}
                 <input
                   type="file"
-                  accept=".csv, .xls, .xlsx, .pdf"
+                  accept=".csv, .xls, .xlsx, .pdf, .jpg, .jpeg, .png"
                   onChange={handleFileChange}
+                  disabled={ocrLoading}
                   style={{ display: 'none' }}
                 />
               </label>
-              {file && (
+              {ocrLoading && (
+                <div className="ocr-progress-box">
+                  <RefreshCw size={16} className="spinning text-indigo" />
+                  <span>Reconnaissance du texte en cours... {ocrProgress}%</span>
+                </div>
+              )}
+              {file && !ocrLoading && (
                 <div className="file-selected-badge">
-                  {file.name.toLowerCase().endsWith('.pdf') ? <FileText size={16} /> : <FileSpreadsheet size={16} />}
+                  {isImageFormat ? (
+                    <ImageIcon size={16} />
+                  ) : file.name.toLowerCase().endsWith('.pdf') ? (
+                    <FileText size={16} />
+                  ) : (
+                    <FileSpreadsheet size={16} />
+                  )}
                   <span>{file.name}</span>
                 </div>
               )}
-
             </div>
+
+            {isImageFormat && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={16} />
+                <span>La qualité de l'extraction dépend de la netteté de l'image. Vérifiez attentivement le résultat.</span>
+              </div>
+            )}
+
 
             {workbook && workbook.SheetNames.length > 1 && (
               <div className="form-group sheet-selector">
@@ -1013,6 +1085,18 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             cursor: pointer;
           }
 
+          .ocr-progress-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius-full);
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+          }
+
           .file-selected-badge {
             display: inline-flex;
             align-items: center;
@@ -1024,6 +1108,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             font-size: 0.8rem;
             font-weight: 500;
           }
+
 
           .preview-raw-box {
             border: 1px solid var(--border-color);
