@@ -19,7 +19,8 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       geminiSet: !!geminiKey,
     };
 
-    const dummyBase64Image = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADhWB3oAAAAB4nlVRQIy2NgGAWjAAAEwAAB02+A0QAAAABJRU5ErkJggg==';
+    // JPEG 1x1 minimal valide
+    const validJpegBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 
     const testVisionModel = async (modelName: string) => {
       if (!accountId || !apiToken) {
@@ -40,7 +41,7 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
                 role: 'user',
                 content: [
                   { type: 'text', text: 'Reply ONLY with JSON: {"status": "OK"}' },
-                  { type: 'image_url', image_url: { url: `data:image/png;base64,${dummyBase64Image}` } },
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${validJpegBase64}` } },
                 ],
               },
             ],
