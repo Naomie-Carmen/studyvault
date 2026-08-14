@@ -20,8 +20,10 @@ import {
   Database,
   BarChart3,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
 import { useAcademic } from '../../context/useAcademic';
 import { BetaBadge } from '../common/BetaBadge';
@@ -47,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { profile, hasConfiguredProfile } = useAcademic();
+  const { t } = useTranslation();
   const [hasUpdateAvailable, setHasUpdateAvailable] = useState<boolean>(false);
 
   useEffect(() => {
@@ -270,7 +273,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleNav('changelog')}
             >
               <Sparkles size={18} />
-              <span>Nouveautés</span>
+              <span>{t('nav.changelog', 'Nouveautés')}</span>
             </button>
 
             <button
@@ -278,7 +281,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleNav('help')}
             >
               <HelpCircle size={18} />
-              <span>Centre d'Aide</span>
+              <span>{t('nav.help', 'Centre d\'Aide')}</span>
+            </button>
+
+            <button
+              className={`nav-item ${selectedTab === 'settings' ? 'active' : ''}`}
+              onClick={() => handleNav('settings')}
+            >
+              <Settings size={18} />
+              <span>{t('nav.settings', 'Paramètres')}</span>
             </button>
 
             {onRestartTour && (
@@ -288,7 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 id="sidebar-restart-tour-btn"
               >
                 <RotateCcw size={18} />
-                <span>Revoir le Guide</span>
+                <span>{t('nav.restartTour', 'Revoir le Guide')}</span>
               </button>
             )}
           </div>
@@ -299,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isAuthenticated ? (
             <button className="nav-item logout-btn" onClick={logout}>
               <LogOut size={18} />
-              <span>Se Déconnecter</span>
+              <span>{t('nav.logout', 'Se Déconnecter')}</span>
             </button>
           ) : (
             <div className="auth-buttons-group">
@@ -308,14 +319,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleNav('login')}
               >
                 <LogIn size={18} />
-                <span>Se Connecter</span>
+                <span>{t('nav.login', 'Se Connecter')}</span>
               </button>
               <button
                 className="nav-item register-btn"
                 onClick={() => handleNav('register')}
               >
                 <UserPlus size={18} />
-                <span>Créer un Compte</span>
+                <span>{t('nav.register', 'Créer un Compte')}</span>
               </button>
             </div>
           )}

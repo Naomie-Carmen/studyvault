@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "general": "GÉNÉRAL",
+    "dashboard": "Tableau de Bord",
+    "search": "Recherche Globale",
+    "academicSpace": "ESPACE ACADÉMIQUE",
+    "academicProfile": "Profil Universitaire",
+    "academicStructure": "Arborescence (UE / ECUE / Matières)",
+    "academicDocuments": "Bibliothèque de Cours",
+    "timetable": "Emploi du Temps (OCR)",
+    "confidentialSpace": "ESPACE CONFIDENTIEL",
+    "personalVault": "Coffre-fort Personnel",
+    "privacySettings": "Confidentialité RGPD",
+    "myData": "Mes Données",
+    "administration": "ADMINISTRATION",
+    "adminDashboard": "Dashboard Bêta (Admin)",
+    "helpResources": "AIDE & RESSOURCES",
+    "updates": "Mises à jour",
+    "changelog": "Nouveautés",
+    "help": "Centre d'Aide",
+    "restartTour": "Revoir le Guide",
+    "settings": "Paramètres",
+    "login": "Se Connecter",
+    "register": "Créer un Compte",
+    "logout": "Se Déconnecter"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Personnalisez votre expérience et gérez vos préférences",
+    "language": {
+      "title": "Langue d'affichage",
+      "desc": "Choisissez la langue de l'interface utilisateur",
+      "fr": "Français 🇫🇷",
+      "en": "English 🇬🇧"
+    },
+    "theme": {
+      "title": "Apparence et Thème",
+      "desc": "Sélectionnez le mode d'affichage visuel de StudyVault",
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "notifications": {
+      "title": "Notifications Desktop",
+      "desc": "Recevoir des alertes de l'application sur votre système",
+      "enabled": "Notifications activées",
+      "disabled": "Notifications désactivées",
+      "webNotice": "Les notifications natives sont optimisées pour l'application Desktop StudyVault."
+    },
+    "account": {
+      "title": "Gestion du Compte et Données",
+      "desc": "Accès rapide aux paramètres de votre profil et confidentialité",
+      "profileLink": "Gérer mon profil universitaire",
+      "privacyLink": "Confidentialité & Paramètres RGPD",
+      "myDataLink": "Consulter et exporter mes données"
+    },
+    "app": {
+      "title": "À propos de l'application",
+      "version": "Version actuelle",
+      "changelogBtn": "Voir les notes de version"
+    }
+  },
+  "common": {
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "success": "Succès",
+    "error": "Erreur"
+  }
+}

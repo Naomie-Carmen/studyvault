@@ -21,12 +21,15 @@ import { HealthCheckData } from './types/api';
 import { useAuth } from './context/useAuth';
 import { TOUR_DONE_KEY } from './components/onboarding/tourConstants';
 
+import './i18n/config';
+
 // Lazy-loaded pages
 const OnboardingTour = lazy(() => import('./components/onboarding/OnboardingTour'));
 const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage'));
 const MyDataPage = lazy(() => import('./pages/MyDataPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const UpdatePage = lazy(() => import('./pages/UpdatePage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BetaLandingPage = lazy(() => import('./pages/BetaLandingPage').then(m => ({ default: m.BetaLandingPage })));
 const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').then(m => ({ default: m.BetaDashboardPage })));
 
@@ -299,6 +302,13 @@ export const App: React.FC = () => {
         return (
           <Suspense fallback={<div className="lazy-loading">Chargement du Centre de Mises à Jour…</div>}>
             <UpdatePage />
+          </Suspense>
+        );
+
+      case 'settings':
+        return (
+          <Suspense fallback={<div className="lazy-loading">Chargement des paramètres…</div>}>
+            <SettingsPage onNavigate={(tab) => handleTabChange(tab)} />
           </Suspense>
         );
 

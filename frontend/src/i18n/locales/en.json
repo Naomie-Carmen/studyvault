@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "general": "GENERAL",
+    "dashboard": "Dashboard",
+    "search": "Global Search",
+    "academicSpace": "ACADEMIC SPACE",
+    "academicProfile": "Academic Profile",
+    "academicStructure": "Course Hierarchy (UE / ECUE / Subjects)",
+    "academicDocuments": "Course Library",
+    "timetable": "Timetable (OCR)",
+    "confidentialSpace": "CONFIDENTIAL SPACE",
+    "personalVault": "Personal Vault",
+    "privacySettings": "GDPR Privacy",
+    "myData": "My Data",
+    "administration": "ADMINISTRATION",
+    "adminDashboard": "Beta Dashboard (Admin)",
+    "helpResources": "HELP & RESOURCES",
+    "updates": "Updates",
+    "changelog": "What's New",
+    "help": "Help Center",
+    "restartTour": "Replay Guide",
+    "settings": "Settings",
+    "login": "Log In",
+    "register": "Create Account",
+    "logout": "Log Out"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize your experience and manage your preferences",
+    "language": {
+      "title": "Display Language",
+      "desc": "Choose the user interface language",
+      "fr": "Français 🇫🇷",
+      "en": "English 🇬🇧"
+    },
+    "theme": {
+      "title": "Appearance & Theme",
+      "desc": "Select the visual display mode for StudyVault",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "notifications": {
+      "title": "Desktop Notifications",
+      "desc": "Receive system alerts from the application",
+      "enabled": "Notifications enabled",
+      "disabled": "Notifications disabled",
+      "webNotice": "Native notifications are optimized for the StudyVault Desktop application."
+    },
+    "account": {
+      "title": "Account & Data Management",
+      "desc": "Quick access to your profile settings and privacy",
+      "profileLink": "Manage academic profile",
+      "privacyLink": "Privacy & GDPR Settings",
+      "myDataLink": "View and export my data"
+    },
+    "app": {
+      "title": "About Application",
+      "version": "Current version",
+      "changelogBtn": "View release notes"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "success": "Success",
+    "error": "Error"
+  }
+}
