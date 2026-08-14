@@ -19,21 +19,25 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       geminiSet: !!geminiKey,
     };
 
-    const testModelCall = async (modelName: string) => {
+    const testModelCall = async (modelName: string, isVision: boolean = false) => {
       if (!accountId || !apiToken) {
         return { status: 400, body: 'CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non défini' };
       }
       try {
         const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
+        const payload: any = { prompt: 'Reply with the word OK' };
+        if (isVision) {
+          // Image 1x1 transparent GIF dummy byte array
+          payload.image = [71, 73, 70, 56, 57, 97, 1, 0, 1, 0, 128, 0, 0, 255, 255, 255, 0, 0, 0, 33, 249, 4, 1, 0, 0, 0, 0, 44, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 68, 1, 0, 59];
+        }
+
         const resp = await fetch(url, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiToken}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            prompt: 'Reply with the word OK',
-          }),
+          body: JSON.stringify(payload),
         });
 
         const text = await resp.text();
@@ -49,17 +53,19 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       }
     };
 
-    const [testLlama4Scout, testLlama32Instruct] = await Promise.all([
-      testModelCall('@cf/meta/llama-4-scout-17b-16e-instruct'),
-      testModelCall('@cf/meta/llama-3.2-11b-vision-instruct'),
+    const [testLlava, testLlama32Agree, testLlama4Scout] = await Promise.all([
+      testModelCall('@cf/llava-hf/llava-1.5-7b-hf', true),
+      testModelCall('@cf/meta/llama-3.2-11b-vision-instruct', true),
+      testModelCall('@cf/meta/llama-4-scout-17b-16e-instruct', false),
     ]);
 
     sendSuccess(
       res,
       {
         env: envInfo,
+        testLlava,
+        testLlama32Agree,
         testLlama4Scout,
-        testLlama32Instruct,
       },
       200
     );
@@ -70,7 +76,7 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
 
 /**
  * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI.
- * Modèles tentés : @cf/meta/llama-4-scout-17b-16e-instruct, @cf/meta/llama-3.2-11b-vision-instruct, @cf/llava-hf/llava-1.5-7b-hf
+ * Modèles tentés : @cf/llava-hf/llava-1.5-7b-hf, @cf/meta/llama-3.2-11b-vision-instruct
  */
 async function callCloudflareVisionApi(
   images: Express.Multer.File[],
@@ -83,10 +89,20 @@ async function callCloudflareVisionApi(
     throw new Error('Variables CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non configurées.');
   }
 
+  // Automatiquement accepter la licence Meta si requis en envoyant un pré-call d'accord
+  try {
+    await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.2-11b-vision-instruct`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'agree' }),
+    });
+  } catch (_e) {
+    // Ignoré si déjà accepté
+  }
+
   const visionModels = [
-    '@cf/meta/llama-4-scout-17b-16e-instruct',
-    '@cf/meta/llama-3.2-11b-vision-instruct',
     '@cf/llava-hf/llava-1.5-7b-hf',
+    '@cf/meta/llama-3.2-11b-vision-instruct',
   ];
 
   const file = images[0];
