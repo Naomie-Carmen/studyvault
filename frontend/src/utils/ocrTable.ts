@@ -1,7 +1,7 @@
 import Tesseract from 'tesseract.js';
 import { loadAndPrepareImage } from './ocrImage';
 
-interface WordItem {
+export interface WordItem {
   text: string;
   confidence: number;
   bbox: {
@@ -15,6 +15,14 @@ interface WordItem {
 export interface DetectedGrid {
   horizontalLines: number[];
   verticalLines: number[];
+}
+
+export interface ExtractionResult {
+  rows: string[][];
+  grid: DetectedGrid | null;
+  words: WordItem[];
+  deskewedCanvas: HTMLCanvasElement | null;
+  bestAngle: number;
 }
 
 /**
@@ -97,7 +105,7 @@ export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
 /**
  * Désinclinaison (Deskew) automatique de l'image.
  * Teste les angles de -5° à +5° par pas de 0.5° et sélectionne l'angle qui
- * meurise et maximise la variance de la projection horizontale.
+ * maximise la variance de la projection horizontale.
  */
 export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; bestAngle: number } {
   const width = canvas.width;
@@ -107,7 +115,6 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
   let bestAngle = 0;
   let maxVariance = -1;
 
-  // Test des angles de -5° à +5° avec un pas de 0.5°
   for (let angle = -5.0; angle <= 5.0; angle += 0.5) {
     const testCanvas = document.createElement('canvas');
     testCanvas.width = width;
@@ -124,7 +131,6 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
     const imgData = testCtx.getImageData(0, 0, width, height);
     const data = imgData.data;
 
-    // Projection horizontale (compte des pixels sombres par ligne Y)
     const darkCounts = new Array(height).fill(0);
     for (let y = 0; y < height; y++) {
       let count = 0;
@@ -141,7 +147,6 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
       darkCounts[y] = count;
     }
 
-    // Calcul de la variance de la projection horizontale
     const mean = darkCounts.reduce((a, b) => a + b, 0) / height;
     const variance = darkCounts.reduce((acc, val) => acc + (val - mean) ** 2, 0) / height;
 
@@ -155,7 +160,6 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
     return { canvas, bestAngle: 0 };
   }
 
-  // Application de la rotation optimale
   const resultCanvas = document.createElement('canvas');
   resultCanvas.width = width;
   resultCanvas.height = height;
@@ -174,6 +178,7 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
 
 /**
  * Détecte la grille par projection robuste sur l'image binarisée et redressée.
+ * Filtre les lignes consécutives espacées de moins de 15px pour éviter les micro-cases.
  */
 export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | null {
   const width = binarizedCanvas.width;
@@ -184,7 +189,7 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  // 1. Frontières HORIZONTALES : compte des pixels noirs (R=0) par ligne Y
+  // 1. Frontières HORIZONTALES : compte des pixels noirs par ligne Y
   const darkYCounts: number[] = new Array(height).fill(0);
   for (let y = 0; y < height; y++) {
     let count = 0;
@@ -197,7 +202,6 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     darkYCounts[y] = count;
   }
 
-  // Calcul du 95e percentile de largeur de table
   const sortedCounts = darkYCounts.filter((c) => c > 0).sort((a, b) => a - b);
   const tableWidth = sortedCounts[Math.floor(sortedCounts.length * 0.95)] || width * 0.8;
 
@@ -208,7 +212,7 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     }
   }
 
-  const horizontalLines: number[] = [];
+  const rawHorizontalLines: number[] = [];
   let tempGroup: number[] = [];
 
   for (let y = 0; y < height; y++) {
@@ -217,14 +221,27 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     } else {
       if (tempGroup.length > 0) {
         const avgY = Math.round(tempGroup.reduce((a, b) => a + b, 0) / tempGroup.length);
-        horizontalLines.push(avgY);
+        rawHorizontalLines.push(avgY);
         tempGroup = [];
       }
     }
   }
   if (tempGroup.length > 0) {
     const avgY = Math.round(tempGroup.reduce((a, b) => a + b, 0) / tempGroup.length);
-    horizontalLines.push(avgY);
+    rawHorizontalLines.push(avgY);
+  }
+
+  // Filtrage des lignes horizontales trop proches (< 15px)
+  const horizontalLines: number[] = [];
+  for (const y of rawHorizontalLines) {
+    if (horizontalLines.length === 0) {
+      horizontalLines.push(y);
+    } else {
+      const prevY = horizontalLines[horizontalLines.length - 1];
+      if (y - prevY >= 15) {
+        horizontalLines.push(y);
+      }
+    }
   }
 
   if (horizontalLines.length < 3) return null;
@@ -252,7 +269,7 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     }
   }
 
-  const verticalLines: number[] = [];
+  const rawVerticalLines: number[] = [];
   let tempXGroup: number[] = [];
 
   for (let x = 0; x < width; x++) {
@@ -261,14 +278,27 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     } else {
       if (tempXGroup.length > 0) {
         const avgX = Math.round(tempXGroup.reduce((a, b) => a + b, 0) / tempXGroup.length);
-        verticalLines.push(avgX);
+        rawVerticalLines.push(avgX);
         tempXGroup = [];
       }
     }
   }
   if (tempXGroup.length > 0) {
     const avgX = Math.round(tempXGroup.reduce((a, b) => a + b, 0) / tempXGroup.length);
-    verticalLines.push(avgX);
+    rawVerticalLines.push(avgX);
+  }
+
+  // Filtrage des lignes verticales trop proches (< 15px)
+  const verticalLines: number[] = [];
+  for (const x of rawVerticalLines) {
+    if (verticalLines.length === 0) {
+      verticalLines.push(x);
+    } else {
+      const prevX = verticalLines[verticalLines.length - 1];
+      if (x - prevX >= 15) {
+        verticalLines.push(x);
+      }
+    }
   }
 
   if (verticalLines.length < 3) return null;
@@ -277,13 +307,66 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
 }
 
 /**
- * Reconstruit la structure 2D (tableau 2D string[][]) d'une image de maquette.
- * Effectue la désinclinaison automatique, la binarisation d'Otsu et l'OCR sur le canvas redressé.
+ * Reconstruit un tableau 2D string[][] à partir d'une grille (lignes H et V) et des mots extraits par OCR.
  */
-export async function extractTableFromImage(
+export function reconstructRowsFromGrid(grid: DetectedGrid, words: WordItem[]): string[][] {
+  const numRows = grid.horizontalLines.length - 1;
+  const numCols = grid.verticalLines.length - 1;
+  if (numRows <= 0 || numCols <= 0) return [];
+
+  const gridMatrix: WordItem[][][] = Array.from({ length: numRows }, () =>
+    Array.from({ length: numCols }, () => [])
+  );
+
+  for (const word of words) {
+    const centerX = (word.bbox.x0 + word.bbox.x1) / 2;
+    const centerY = (word.bbox.y0 + word.bbox.y1) / 2;
+
+    let r = -1;
+    for (let i = 0; i < numRows; i++) {
+      if (centerY >= grid.horizontalLines[i] && centerY < grid.horizontalLines[i + 1]) {
+        r = i;
+        break;
+      }
+    }
+
+    let c = -1;
+    for (let j = 0; j < numCols; j++) {
+      if (centerX >= grid.verticalLines[j] && centerX < grid.verticalLines[j + 1]) {
+        c = j;
+        break;
+      }
+    }
+
+    if (r >= 0 && c >= 0) {
+      gridMatrix[r][c].push(word);
+    }
+  }
+
+  const rawRows: string[][] = [];
+  for (let r = 0; r < numRows; r++) {
+    const rowCells: string[] = [];
+    for (let c = 0; c < numCols; c++) {
+      const cellWords = gridMatrix[r][c];
+      cellWords.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+      const cellText = cellWords.map((w) => w.text.trim()).join(' ');
+      rowCells.push(cellText);
+    }
+    if (rowCells.some((cell) => cell.length > 0)) {
+      rawRows.push(rowCells);
+    }
+  }
+
+  return cleanSemanticRows(rawRows);
+}
+
+/**
+ * Reconstruit la structure 2D (tableau 2D string[][]) d'une image de maquette avec détails d'extraction.
+ */
+export async function extractTableWithDetails(
   file: File,
   onProgress?: (message: string, progressPercent: number) => void
-): Promise<string[][]> {
+): Promise<ExtractionResult> {
   onProgress?.('Préparation et optimisation de l\'image...', 10);
   const preparedCanvas = await loadAndPrepareImage(file);
 
@@ -294,13 +377,11 @@ export async function extractTableFromImage(
   const otsuCanvas = binarizeOtsu(deskewedCanvas);
   const grid = detectGrid(otsuCanvas);
 
-  // Ignorer l'OCR si les dimensions sont inférieures à 40px (évite les avertissements WASM)
   if (deskewedCanvas.width < 40 || deskewedCanvas.height < 40) {
     console.warn('[ocrTable] Image trop petite (< 40px), passage d\'OCR ignoré.');
-    return [];
+    return { rows: [], grid: null, words: [], deskewedCanvas: null, bestAngle: 0 };
   }
 
-  // IMPORTANT : OCR exécuté sur le canvas REDRESSÉ pour correspondance exacte des bounding boxes
   onProgress?.('Reconnaissance OCR sur l\'image redressée...', 45);
   const res = await Tesseract.recognize(deskewedCanvas, 'fra+eng', {
     logger: (m) => {
@@ -315,7 +396,13 @@ export async function extractTableFromImage(
 
   if (!wordsRaw || !Array.isArray(wordsRaw) || wordsRaw.length === 0) {
     onProgress?.('Utilisation du fallback texte brut...', 90);
-    return cleanSemanticRows(fallbackRawTextToRows(rawText));
+    return {
+      rows: cleanSemanticRows(fallbackRawTextToRows(rawText)),
+      grid: null,
+      words: [],
+      deskewedCanvas,
+      bestAngle,
+    };
   }
 
   const words = wordsRaw.filter(
@@ -323,57 +410,19 @@ export async function extractTableFromImage(
   );
 
   if (words.length === 0) {
-    return cleanSemanticRows(fallbackRawTextToRows(rawText));
+    return {
+      rows: cleanSemanticRows(fallbackRawTextToRows(rawText)),
+      grid: null,
+      words: [],
+      deskewedCanvas,
+      bestAngle,
+    };
   }
 
-  let rawRows: string[][] = [];
+  let rows: string[][] = [];
 
   if (grid) {
-    console.log(`[ocrTable] Grille détectée : ${grid.horizontalLines.length - 1} lignes x ${grid.verticalLines.length - 1} colonnes (Angle ${bestAngle}°).`);
-    const numRows = grid.horizontalLines.length - 1;
-    const numCols = grid.verticalLines.length - 1;
-
-    const gridMatrix: WordItem[][][] = Array.from({ length: numRows }, () =>
-      Array.from({ length: numCols }, () => [])
-    );
-
-    for (const word of words) {
-      const centerX = (word.bbox.x0 + word.bbox.x1) / 2;
-      const centerY = (word.bbox.y0 + word.bbox.y1) / 2;
-
-      let r = -1;
-      for (let i = 0; i < numRows; i++) {
-        if (centerY >= grid.horizontalLines[i] && centerY < grid.horizontalLines[i + 1]) {
-          r = i;
-          break;
-        }
-      }
-
-      let c = -1;
-      for (let j = 0; j < numCols; j++) {
-        if (centerX >= grid.verticalLines[j] && centerX < grid.verticalLines[j + 1]) {
-          c = j;
-          break;
-        }
-      }
-
-      if (r >= 0 && c >= 0) {
-        gridMatrix[r][c].push(word);
-      }
-    }
-
-    for (let r = 0; r < numRows; r++) {
-      const rowCells: string[] = [];
-      for (let c = 0; c < numCols; c++) {
-        const cellWords = gridMatrix[r][c];
-        cellWords.sort((a, b) => a.bbox.x0 - b.bbox.x0);
-        const cellText = cellWords.map((w) => w.text.trim()).join(' ');
-        rowCells.push(cellText);
-      }
-      if (rowCells.some((cell) => cell.length > 0)) {
-        rawRows.push(rowCells);
-      }
-    }
+    rows = reconstructRowsFromGrid(grid, words);
   } else {
     console.log('[ocrTable] Grille non détectée. Passage au fallback par clustering spatiale.');
     const heights = words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
@@ -412,6 +461,7 @@ export async function extractTableFromImage(
       }
     }
 
+    const rawRows: string[][] = [];
     for (const line of lines) {
       line.words.sort((a, b) => a.bbox.x0 - b.bbox.x0);
 
@@ -442,18 +492,34 @@ export async function extractTableFromImage(
         rawRows.push(rowCells);
       }
     }
+    rows = cleanSemanticRows(rawRows);
   }
 
-  const cleanedRows = cleanSemanticRows(rawRows);
-
-  const maxCols = Math.max(...cleanedRows.map((r) => r.length), 0);
+  const maxCols = Math.max(...rows.map((r) => r.length), 0);
   if (maxCols < 2) {
     onProgress?.('Structure peu marquée, passage au fallback texte brut...', 95);
-    return cleanSemanticRows(fallbackRawTextToRows(rawText));
+    rows = cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
   onProgress?.('Reconstruction du tableau terminée !', 100);
-  return cleanedRows;
+  return {
+    rows,
+    grid,
+    words,
+    deskewedCanvas,
+    bestAngle,
+  };
+}
+
+/**
+ * Reconstruit la structure 2D (tableau 2D string[][]) d'une image de maquette.
+ */
+export async function extractTableFromImage(
+  file: File,
+  onProgress?: (message: string, progressPercent: number) => void
+): Promise<string[][]> {
+  const result = await extractTableWithDetails(file, onProgress);
+  return result.rows;
 }
 
 /**
@@ -483,9 +549,9 @@ export async function extractTableFromMultipleImages(
 }
 
 /**
- * Nettoie les lignes parasites et répétitives spécifiques aux maquettes (en-têtes répétées, crédits, mentions).
+ * Nettoie les lignes parasites et répétitives spécifiques aux maquettes.
  */
-function cleanSemanticRows(rows: string[][]): string[][] {
+export function cleanSemanticRows(rows: string[][]): string[][] {
   const result: string[][] = [];
 
   for (const row of rows) {

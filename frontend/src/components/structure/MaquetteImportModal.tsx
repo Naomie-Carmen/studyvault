@@ -1,8 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { extractTableFromMultipleImages } from '../../utils/ocrTable';
+import {
+  extractTableFromMultipleImages,
+  extractTableWithDetails,
+  reconstructRowsFromGrid,
+  DetectedGrid,
+  WordItem,
+} from '../../utils/ocrTable';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -21,7 +27,10 @@ import {
   BookOpen,
   UserCheck,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sliders,
+  Plus,
+  Check,
 } from 'lucide-react';
 
 
@@ -124,9 +133,26 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [importSummary, setImportSummary] = useState<StructureImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState<number>(0);
   const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
+
+  const [extractedGrid, setExtractedGrid] = useState<DetectedGrid | null>(null);
+  const [extractedWords, setExtractedWords] = useState<WordItem[]>([]);
+  const [deskewedCanvas, setDeskewedCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [showGridEditor, setShowGridEditor] = useState<boolean>(false);
+  const [editableGrid, setEditableGrid] = useState<DetectedGrid | null>(null);
+
+  useEffect(() => {
+    if (rawRows.length > 0) {
+      const timer = setTimeout(() => {
+        previewContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [rawRows.length, step]);
 
   useEffect(() => {
     if (isOpen) {
@@ -136,6 +162,14 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setWorkbook(null);
       setSelectedSheet('');
       setRawRows([]);
+      setExtractedGrid(null);
+      setExtractedWords([]);
+      setDeskewedCanvas(null);
+      setShowGridEditor(false);
+      setEditableGrid(null);
+      setOcrLoading(false);
+      setOcrProgress(0);
+      setIsImageFormat(false);
       setHeaderIndex(0);
       setColumnMapping({
         ue_title: -1,
@@ -357,6 +391,40 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
 
 
+  const handleApplyCustomGrid = () => {
+    if (!editableGrid || extractedWords.length === 0) return;
+    const newRows = reconstructRowsFromGrid(editableGrid, extractedWords);
+    setRawRows(newRows);
+    autoDetect(newRows);
+    setShowGridEditor(false);
+  };
+
+  const handleAddHorizontalLine = () => {
+    if (!editableGrid || !deskewedCanvas) return;
+    const midY = Math.round((deskewedCanvas.height || 600) / 2);
+    const updatedH = [...editableGrid.horizontalLines, midY].sort((a, b) => a - b);
+    setEditableGrid({ ...editableGrid, horizontalLines: updatedH });
+  };
+
+  const handleAddVerticalLine = () => {
+    if (!editableGrid || !deskewedCanvas) return;
+    const midX = Math.round((deskewedCanvas.width || 800) / 2);
+    const updatedV = [...editableGrid.verticalLines, midX].sort((a, b) => a - b);
+    setEditableGrid({ ...editableGrid, verticalLines: updatedV });
+  };
+
+  const handleDeleteHorizontalLine = (index: number) => {
+    if (!editableGrid) return;
+    const updatedH = editableGrid.horizontalLines.filter((_, i) => i !== index);
+    setEditableGrid({ ...editableGrid, horizontalLines: updatedH });
+  };
+
+  const handleDeleteVerticalLine = (index: number) => {
+    if (!editableGrid) return;
+    const updatedV = editableGrid.verticalLines.filter((_, i) => i !== index);
+    setEditableGrid({ ...editableGrid, verticalLines: updatedV });
+  };
+
   // Traitement du fichier (support multi-images)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filesList = Array.from(e.target.files || []);
@@ -379,11 +447,25 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setOcrLoading(true);
       setOcrProgress(0);
       try {
-        const imgRows = await extractTableFromMultipleImages(filesList, (_msg, pct) => {
+        const details = await extractTableWithDetails(filesList[0], (_msg, pct) => {
           setOcrProgress(pct);
         });
-        setRawRows(imgRows);
-        autoDetect(imgRows);
+
+        let combinedRows = details.rows;
+        if (filesList.length > 1) {
+          const restRows = await extractTableFromMultipleImages(filesList.slice(1), (_msg, pct) => {
+            const totalPct = Math.min(99, Math.round(50 + pct * 0.5));
+            setOcrProgress(totalPct);
+          });
+          combinedRows = [...combinedRows, ...restRows];
+        }
+
+        setExtractedGrid(details.grid);
+        setEditableGrid(details.grid);
+        setExtractedWords(details.words);
+        setDeskewedCanvas(details.deskewedCanvas);
+        setRawRows(combinedRows);
+        autoDetect(combinedRows);
       } catch (_err) {
         setError("Erreur lors de l'analyse OCR du tableau. Assurez-vous que les images sont lisibles.");
       } finally {
@@ -712,6 +794,23 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               </div>
             )}
 
+            {isImageFormat && extractedWords.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setEditableGrid(extractedGrid || { horizontalLines: [100, 200, 300], verticalLines: [100, 300, 500] });
+                    setShowGridEditor(true);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem' }}
+                >
+                  <Sliders size={15} className="text-indigo" />
+                  <span>Ajuster la grille manuellement</span>
+                </button>
+              </div>
+            )}
+
             {!ocrLoading && rawRows.length > 0 && rawRows.length < 3 && (
               <div className="alert alert-warning">
                 <AlertTriangle size={16} />
@@ -737,7 +836,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             )}
 
             {rawRows.length > 0 && (
-              <div className="preview-raw-box">
+              <div className="preview-raw-box" ref={previewContainerRef}>
                 <div className="preview-raw-header">
                   <span>Aperçu des 8 premières lignes :</span>
                   <span className="rows-count">{rawRows.length} lignes trouvées</span>
@@ -1381,7 +1480,117 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           .text-red { color: #ef4444; }
           .text-indigo { color: var(--primary); }
           .text-emerald { color: #10b981; }
+
+          .grid-editor-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+          }
+          .grid-editor-card {
+            width: 900px;
+            max-width: 95vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem;
+            gap: 1rem;
+            background: var(--bg-primary, #0f172a);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+          }
+          .grid-editor-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+          .grid-editor-header .title-box { display: flex; align-items: center; gap: 0.5rem; font-weight: bold; }
+          .grid-editor-toolbar { display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; }
+          .btn-small { padding: 0.35rem 0.65rem; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; }
+          .btn-small:hover { background: rgba(99,102,241,0.2); }
+          .toolbar-info { margin-left: auto; color: var(--text-muted); font-weight: 600; }
+          .grid-editor-canvas-wrap { flex: 1; overflow: auto; text-align: center; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 1rem; }
+          .grid-editor-footer { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; }
         `}</style>
+
+        {/* Interactive Grid Editor Overlay Modal */}
+        {showGridEditor && deskewedCanvas && (
+          <div className="grid-editor-backdrop">
+            <div className="grid-editor-card glass-card">
+              <div className="grid-editor-header">
+                <div className="title-box">
+                  <Sliders className="text-indigo" size={20} />
+                  <h4>Correction Manuelle de la Grille (OCR)</h4>
+                </div>
+                <button type="button" className="close-btn" onClick={() => setShowGridEditor(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid-editor-toolbar">
+                <button type="button" className="btn-small" onClick={handleAddHorizontalLine}>
+                  <Plus size={14} /> + Ligne Horizontale (Y)
+                </button>
+                <button type="button" className="btn-small" onClick={handleAddVerticalLine}>
+                  <Plus size={14} /> + Ligne Verticale (X)
+                </button>
+                <span className="toolbar-info">
+                  {editableGrid?.horizontalLines.length || 0} H × {editableGrid?.verticalLines.length || 0} V
+                </span>
+              </div>
+
+              <div className="grid-editor-canvas-wrap">
+                <div className="grid-canvas-container" style={{ position: 'relative', display: 'inline-block' }}>
+                  <img
+                    src={deskewedCanvas.toDataURL()}
+                    alt="Aperçu pour grille"
+                    className="grid-canvas-img"
+                    style={{ maxWidth: '100%', maxHeight: '60vh', display: 'block', borderRadius: '4px' }}
+                  />
+                  <svg
+                    className="grid-svg-overlay"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                    }}
+                    viewBox={`0 0 ${deskewedCanvas.width} ${deskewedCanvas.height}`}
+                  >
+                    {/* Lignes Horizontales */}
+                    {editableGrid?.horizontalLines.map((y, idx) => (
+                      <g key={`h-${idx}`}>
+                        <line x1="0" y1={y} x2={deskewedCanvas.width} y2={y} stroke="#06b6d4" strokeWidth="4" strokeDasharray="6 3" />
+                        <circle cx="24" cy={y} r="10" fill="#06b6d4" cursor="pointer" onClick={() => handleDeleteHorizontalLine(idx)} />
+                        <text x="40" y={y + 5} fill="#06b6d4" fontSize="14" fontWeight="bold">H{idx + 1}</text>
+                      </g>
+                    ))}
+
+                    {/* Lignes Verticales */}
+                    {editableGrid?.verticalLines.map((x, idx) => (
+                      <g key={`v-${idx}`}>
+                        <line x1={x} y1="0" x2={x} y2={deskewedCanvas.height} stroke="#f59e0b" strokeWidth="4" strokeDasharray="6 3" />
+                        <circle cx={x} cy="24" r="10" fill="#f59e0b" cursor="pointer" onClick={() => handleDeleteVerticalLine(idx)} />
+                        <text x={x + 5} y="40" fill="#f59e0b" fontSize="14" fontWeight="bold">V{idx + 1}</text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+
+              <div className="grid-editor-footer">
+                <button type="button" className="btn-secondary" onClick={() => setShowGridEditor(false)}>
+                  Annuler
+                </button>
+                <button type="button" className="btn-primary" onClick={handleApplyCustomGrid}>
+                  <Check size={16} /> Appliquer et Reconstruire le Tableau
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
