@@ -26,8 +26,56 @@ export interface ExtractionResult {
 }
 
 /**
+ * Calcule la largeur et la hauteur des cases de la grille et FILTRE
+ * toutes les lignes/colonnes qui créent des cases < 30px de large ou < 30px de haut.
+ */
+export function filterGridMicroCells(grid: DetectedGrid): {
+  filteredGrid: DetectedGrid;
+  filteredColsCount: number;
+  filteredRowsCount: number;
+} {
+  if (!grid) {
+    return { filteredGrid: grid, filteredColsCount: 0, filteredRowsCount: 0 };
+  }
+
+  const hLines = [...grid.horizontalLines].sort((a, b) => a - b);
+  const vLines = [...grid.verticalLines].sort((a, b) => a - b);
+
+  const initialHCount = hLines.length;
+  const initialVCount = vLines.length;
+
+  // 1. Filtrage des lignes horizontales créant des hauteurs < 30px
+  const filteredH: number[] = [hLines[0]];
+  for (let i = 1; i < hLines.length; i++) {
+    const prevY = filteredH[filteredH.length - 1];
+    const height = hLines[i] - prevY;
+    if (height >= 30) {
+      filteredH.push(hLines[i]);
+    }
+  }
+
+  // 2. Filtrage des lignes verticales créant des largeurs < 30px
+  const filteredV: number[] = [vLines[0]];
+  for (let j = 1; j < vLines.length; j++) {
+    const prevX = filteredV[filteredV.length - 1];
+    const width = vLines[j] - prevX;
+    if (width >= 30) {
+      filteredV.push(vLines[j]);
+    }
+  }
+
+  const filteredRowsCount = Math.max(0, initialHCount - filteredH.length);
+  const filteredColsCount = Math.max(0, initialVCount - filteredV.length);
+
+  return {
+    filteredGrid: { horizontalLines: filteredH, verticalLines: filteredV },
+    filteredColsCount,
+    filteredRowsCount,
+  };
+}
+
+/**
  * Binarisation adaptative selon la méthode d'Otsu.
- * Transforme le canvas en image binaire (noir et blanc purs).
  */
 export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const width = canvas.width;
@@ -42,7 +90,6 @@ export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  // 1. Calcul de l'histogramme à 256 niveaux de gris
   const histogram = new Array(256).fill(0);
   const grays = new Uint8Array(width * height);
 
@@ -55,7 +102,6 @@ export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
     histogram[gray]++;
   }
 
-  // 2. Calcul du seuil optimal d'Otsu
   const totalPixels = width * height;
   let sum = 0;
   for (let t = 0; t < 256; t++) {
@@ -85,7 +131,6 @@ export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
     }
   }
 
-  // 3. Application du seuil binaire
   const outImgData = outCtx.createImageData(width, height);
   const outData = outImgData.data;
 
@@ -104,8 +149,6 @@ export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
 
 /**
  * Désinclinaison (Deskew) automatique de l'image.
- * Teste les angles de -5° à +5° par pas de 0.5° et sélectionne l'angle qui
- * maximise la variance de la projection horizontale.
  */
 export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; bestAngle: number } {
   const width = canvas.width;
@@ -178,7 +221,6 @@ export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; 
 
 /**
  * Détecte la grille par projection robuste sur l'image binarisée et redressée.
- * Filtre les lignes consécutives espacées de moins de 15px pour éviter les micro-cases.
  */
 export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | null {
   const width = binarizedCanvas.width;
@@ -231,14 +273,13 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     rawHorizontalLines.push(avgY);
   }
 
-  // Filtrage des lignes horizontales trop proches (< 15px)
   const horizontalLines: number[] = [];
   for (const y of rawHorizontalLines) {
     if (horizontalLines.length === 0) {
       horizontalLines.push(y);
     } else {
       const prevY = horizontalLines[horizontalLines.length - 1];
-      if (y - prevY >= 15) {
+      if (y - prevY >= 20) {
         horizontalLines.push(y);
       }
     }
@@ -288,14 +329,13 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
     rawVerticalLines.push(avgX);
   }
 
-  // Filtrage des lignes verticales trop proches (< 15px)
   const verticalLines: number[] = [];
   for (const x of rawVerticalLines) {
     if (verticalLines.length === 0) {
       verticalLines.push(x);
     } else {
       const prevX = verticalLines[verticalLines.length - 1];
-      if (x - prevX >= 15) {
+      if (x - prevX >= 20) {
         verticalLines.push(x);
       }
     }
@@ -308,10 +348,14 @@ export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | n
 
 /**
  * Reconstruit un tableau 2D string[][] à partir d'une grille (lignes H et V) et des mots extraits par OCR.
+ * Filtre hermétiquement les cases < 30px de haut ou < 30px de large.
  */
 export function reconstructRowsFromGrid(grid: DetectedGrid, words: WordItem[]): string[][] {
-  const numRows = grid.horizontalLines.length - 1;
-  const numCols = grid.verticalLines.length - 1;
+  const { filteredGrid, filteredColsCount, filteredRowsCount } = filterGridMicroCells(grid);
+  console.log(`[ocrTable] Cases filtrées : ${filteredColsCount} colonnes < 30px, ${filteredRowsCount} lignes < 30px`);
+
+  const numRows = filteredGrid.horizontalLines.length - 1;
+  const numCols = filteredGrid.verticalLines.length - 1;
   if (numRows <= 0 || numCols <= 0) return [];
 
   const gridMatrix: WordItem[][][] = Array.from({ length: numRows }, () =>
@@ -324,7 +368,7 @@ export function reconstructRowsFromGrid(grid: DetectedGrid, words: WordItem[]): 
 
     let r = -1;
     for (let i = 0; i < numRows; i++) {
-      if (centerY >= grid.horizontalLines[i] && centerY < grid.horizontalLines[i + 1]) {
+      if (centerY >= filteredGrid.horizontalLines[i] && centerY < filteredGrid.horizontalLines[i + 1]) {
         r = i;
         break;
       }
@@ -332,7 +376,7 @@ export function reconstructRowsFromGrid(grid: DetectedGrid, words: WordItem[]): 
 
     let c = -1;
     for (let j = 0; j < numCols; j++) {
-      if (centerX >= grid.verticalLines[j] && centerX < grid.verticalLines[j + 1]) {
+      if (centerX >= filteredGrid.verticalLines[j] && centerX < filteredGrid.verticalLines[j + 1]) {
         c = j;
         break;
       }
@@ -345,8 +389,17 @@ export function reconstructRowsFromGrid(grid: DetectedGrid, words: WordItem[]): 
 
   const rawRows: string[][] = [];
   for (let r = 0; r < numRows; r++) {
+    const rowHeight = filteredGrid.horizontalLines[r + 1] - filteredGrid.horizontalLines[r];
+    if (rowHeight < 30) continue; // Garde < 30px pour les lignes
+
     const rowCells: string[] = [];
     for (let c = 0; c < numCols; c++) {
+      const colWidth = filteredGrid.verticalLines[c + 1] - filteredGrid.verticalLines[c];
+      if (colWidth < 30) {
+        rowCells.push(''); // Garde < 30px pour les colonnes
+        continue;
+      }
+
       const cellWords = gridMatrix[r][c];
       cellWords.sort((a, b) => a.bbox.x0 - b.bbox.x0);
       const cellText = cellWords.map((w) => w.text.trim()).join(' ');
@@ -375,13 +428,20 @@ export async function extractTableWithDetails(
 
   onProgress?.('Binarisation d\'Otsu et détection de grille...', 30);
   const otsuCanvas = binarizeOtsu(deskewedCanvas);
-  const grid = detectGrid(otsuCanvas);
+  let grid = detectGrid(otsuCanvas);
+
+  if (grid) {
+    const { filteredGrid, filteredColsCount, filteredRowsCount } = filterGridMicroCells(grid);
+    grid = filteredGrid;
+    console.log(`[ocrTable] Cases filtrées : ${filteredColsCount} colonnes < 30px, ${filteredRowsCount} lignes < 30px`);
+  }
 
   if (deskewedCanvas.width < 40 || deskewedCanvas.height < 40) {
     console.warn('[ocrTable] Image trop petite (< 40px), passage d\'OCR ignoré.');
     return { rows: [], grid: null, words: [], deskewedCanvas: null, bestAngle: 0 };
   }
 
+  console.log(`[ocrTable] Lancement OCR Tesseract sur canvas : ${deskewedCanvas.width} x ${deskewedCanvas.height}`);
   onProgress?.('Reconnaissance OCR sur l\'image redressée...', 45);
   const res = await Tesseract.recognize(deskewedCanvas, 'fra+eng', {
     logger: (m) => {
@@ -589,7 +649,7 @@ export function cleanSemanticRows(rows: string[][]): string[][] {
 }
 
 /**
- * Fallback : découpe le texte brut en lignes et sépare par espaces multiples ou tabulations.
+ * Fallback : découpe le texte brut en lignes.
  */
 function fallbackRawTextToRows(rawText: string): string[][] {
   if (!rawText) return [];

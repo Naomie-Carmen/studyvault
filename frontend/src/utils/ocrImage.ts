@@ -22,7 +22,6 @@ export async function loadAndPrepareImage(file: File): Promise<HTMLCanvasElement
 
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
-  // Prétraitement pixel par pixel (Grayscale + Contraste 1.4) pour compatibilité maximale
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
 
@@ -31,10 +30,8 @@ export async function loadAndPrepareImage(file: File): Promise<HTMLCanvasElement
     const g = data[i + 1];
     const b = data[i + 2];
 
-    // Conversion Niveaux de Gris (luminance)
     let gray = 0.299 * r + 0.587 * g + 0.114 * b;
 
-    // Augmentation du contraste (facteur 1.4)
     gray = (gray - 128) * 1.4 + 128;
     gray = Math.max(0, Math.min(255, gray));
 
@@ -110,7 +107,11 @@ export async function processMultiOrientationOCR(
   onProgress?.('Préparation et optimisation de l\'image...', 5);
   const preparedCanvas = await loadAndPrepareImage(file);
 
-  // Test à 0°
+  if (preparedCanvas.width < 40 || preparedCanvas.height < 40) {
+    console.warn('[ocrImage] Image trop petite (< 40px), passage d\'OCR annulé.');
+    return '';
+  }
+
   onProgress?.('Analyse OCR à 0°...', 15);
   const res0 = await Tesseract.recognize(rotatedCanvas(preparedCanvas, 0), 'fra+eng', {
     logger: (m) => {
@@ -124,13 +125,11 @@ export async function processMultiOrientationOCR(
   const conf0 = res0.data.confidence || 0;
   const score0 = scoreText(text0, conf0);
 
-  // Si le score à 0° est déjà suffisant (>= 3), on conserve directement le texte
   if (score0 >= 3) {
     onProgress?.('Extraction réussie (0°)', 100);
     return text0;
   }
 
-  // Sinon, on teste les autres orientations (90°, 270°, 180°)
   let bestText = text0;
   let bestScore = score0;
 
@@ -159,13 +158,8 @@ export async function processMultiOrientationOCR(
       bestScore = score;
       bestText = text;
     }
-
-    // Si on trouve une excellente orientation en cours de route (score >= 5), on s'arrête
-    if (bestScore >= 5) {
-      break;
-    }
   }
 
-  onProgress?.('Extraction OCR terminée', 100);
+  onProgress?.('Extraction multi-orientations terminée !', 100);
   return bestText;
 }
