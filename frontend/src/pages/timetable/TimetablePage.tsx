@@ -8,6 +8,8 @@ import * as structureService from '../../services/academicStructureService';
 import { SessionFormModal } from '../../components/timetable/SessionFormModal';
 import { SessionDetailsModal } from '../../components/timetable/SessionDetailsModal';
 import { TimetableImportModal } from '../../components/timetable/TimetableImportModal';
+import { useTranslation } from 'react-i18next';
+import { PrintWeeklySheet } from '../../components/timetable/PrintWeeklySheet';
 import { 
   Calendar as CalendarIcon, 
   Plus, 
@@ -16,7 +18,8 @@ import {
   List, 
   Clock, 
   MapPin, 
-  AlertTriangle
+  AlertTriangle,
+  Printer
 } from 'lucide-react';
 
 interface TimetablePageProps {
@@ -39,6 +42,7 @@ const TIME_SLOTS = [
 ];
 
 export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocuments }) => {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [weekData, setWeekData] = useState<TimetableWeekData | null>(null);
   const [tree, setTree] = useState<AcademicStructureTree | null>(null);
@@ -118,6 +122,11 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
               <span>Liste</span>
             </button>
           </div>
+
+          <button className="btn-print-week" onClick={() => window.print()} title={t('timetable.printWeek', 'Imprimer ma semaine')}>
+            <Printer size={16} />
+            <span>{t('timetable.printWeek', 'Imprimer ma semaine')}</span>
+          </button>
 
           <button className="btn-import-file" onClick={() => setIsImportOpen(true)}>
             <UploadCloud size={16} />
@@ -256,6 +265,9 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         onSuccess={loadData}
       />
 
+      {/* Printable Weekly Sheet (hidden on screen, visible on print) */}
+      <PrintWeeklySheet weekData={weekData} />
+
       <style>{`
         .timetable-page { display: flex; flex-direction: column; gap: 1.25rem; }
         .timetable-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -263,10 +275,13 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         .title-group h2 { font-size: 1.35rem; font-weight: 800; }
         .sub-title { font-size: 0.8rem; color: var(--text-muted); }
 
-        .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+        .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .view-toggle { display: flex; padding: 0.2rem; gap: 0.2rem; }
         .toggle-btn { display: flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.775rem; font-weight: 600; color: var(--text-muted); }
         .toggle-btn.active { background: var(--gradient-primary); color: #ffffff; }
+
+        .btn-print-week { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 0.95rem; border-radius: var(--radius-md); background: rgba(232, 201, 192, 0.18); color: #e8c9c0; font-size: 0.825rem; font-weight: 600; border: 1px solid rgba(232, 201, 192, 0.35); cursor: pointer; transition: all 0.2s ease; }
+        .btn-print-week:hover { background: rgba(232, 201, 192, 0.28); transform: translateY(-1px); }
 
         .btn-import-file { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 0.95rem; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.15); color: var(--primary); font-size: 0.825rem; font-weight: 600; border: 1px solid rgba(99, 102, 241, 0.3); }
         .btn-add-session { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 1.15rem; border-radius: var(--radius-md); background: var(--gradient-primary); color: #ffffff; font-size: 0.825rem; font-weight: 700; box-shadow: var(--shadow-glow); }

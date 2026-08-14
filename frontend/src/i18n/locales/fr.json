@@ -60,6 +60,29 @@
       "changelogBtn": "Voir les notes de version"
     }
   },
+  "timetable": {
+    "title": "Planning & Emploi du Temps",
+    "subtitle": "Gérez vos séances hebdomadaires et vos révisions.",
+    "printWeek": "Imprimer ma semaine"
+  },
+  "print": {
+    "title": "Ma Semaine",
+    "from": "DU :",
+    "to": "AU :",
+    "doNotForget": "NE PAS OUBLIER",
+    "printedOn": "StudyVault — imprimé le",
+    "noSessions": "Aucun cours",
+    "room": "Salle",
+    "days": {
+      "monday": "Lundi",
+      "tuesday": "Mardi",
+      "wednesday": "Mercredi",
+      "thursday": "Jeudi",
+      "friday": "Vendredi",
+      "saturday": "Samedi",
+      "sunday": "Dimanche"
+    }
+  },
   "common": {
     "loading": "Chargement...",
     "save": "Enregistrer",

@@ -60,6 +60,29 @@
       "changelogBtn": "View release notes"
     }
   },
+  "timetable": {
+    "title": "Schedule & Timetable",
+    "subtitle": "Manage your weekly classes and revisions.",
+    "printWeek": "Print My Week"
+  },
+  "print": {
+    "title": "My Week",
+    "from": "FROM:",
+    "to": "TO:",
+    "doNotForget": "DO NOT FORGET",
+    "printedOn": "StudyVault — printed on",
+    "noSessions": "No classes",
+    "room": "Room",
+    "days": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    }
+  },
   "common": {
     "loading": "Loading...",
     "save": "Save",
