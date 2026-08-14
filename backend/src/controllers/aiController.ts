@@ -49,19 +49,17 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       }
     };
 
-    const [testLlama32Instruct, testLlama32Preview, testLlama4Scout] = await Promise.all([
-      testModelCall('@cf/meta/llama-3.2-11b-vision-instruct'),
-      testModelCall('@cf/meta/llama-3.2-11b-vision-preview'),
+    const [testLlama4Scout, testLlama32Instruct] = await Promise.all([
       testModelCall('@cf/meta/llama-4-scout-17b-16e-instruct'),
+      testModelCall('@cf/meta/llama-3.2-11b-vision-instruct'),
     ]);
 
     sendSuccess(
       res,
       {
         env: envInfo,
-        testLlama32Instruct,
-        testLlama32Preview,
         testLlama4Scout,
+        testLlama32Instruct,
       },
       200
     );
@@ -72,7 +70,7 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
 
 /**
  * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI.
- * Modèles tentés : @cf/meta/llama-3.2-11b-vision-instruct, @cf/meta/llama-4-scout-17b-16e-instruct, @cf/meta/llama-3.2-11b-vision-preview, @cf/llava-hf/llava-1.5-7b-hf
+ * Modèles tentés : @cf/meta/llama-4-scout-17b-16e-instruct, @cf/meta/llama-3.2-11b-vision-instruct, @cf/llava-hf/llava-1.5-7b-hf
  */
 async function callCloudflareVisionApi(
   images: Express.Multer.File[],
@@ -86,9 +84,8 @@ async function callCloudflareVisionApi(
   }
 
   const visionModels = [
-    '@cf/meta/llama-3.2-11b-vision-instruct',
     '@cf/meta/llama-4-scout-17b-16e-instruct',
-    '@cf/meta/llama-3.2-11b-vision-preview',
+    '@cf/meta/llama-3.2-11b-vision-instruct',
     '@cf/llava-hf/llava-1.5-7b-hf',
   ];
 
