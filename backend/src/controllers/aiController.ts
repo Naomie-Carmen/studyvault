@@ -23,9 +23,19 @@ export async function structureTextWithAi(req: Request, res: Response, next: Nex
 
     let prompt = '';
     if (kind === 'timetable') {
-      prompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Voici le texte brut extrait par OCR d'un emploi du temps, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP). Corrige les mots déformés par le sens. Un objet par séance. Ne rien inventer ; recopier et corriger fidèlement.`;
+      prompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Voici le texte brut extrait par OCR. Réponds EXCLUSIVEMENT par un tableau JSON d'objets strict (sans explications, sans markdown).
+Format JSON strict :
+[
+  { "jour": "lundi", "startTime": "08:00", "endTime": "10:00", "matiere": "nom", "salle": "salle", "enseignant": "nom", "groupe": "groupe", "type": "CM" }
+]
+Corrige les fautes d'orthographe et mots déformés par le sens. Un objet par séance.`;
     } else {
-      prompt = `Voici le texte brut extrait par OCR d'une maquette académique, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés {semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant}. Corrige les mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.`;
+      prompt = `Tu es un assistant d'extraction de maquette académique. Voici le texte brut extrait par OCR d'une maquette. Réponds EXCLUSIVEMENT par un tableau JSON d'objets strict (sans explications, sans markdown).
+Format JSON strict :
+[
+  { "semestre": 1, "codeUE": "MIF4116", "intituleUE": "Microéconomie Financière 1", "codeECUE": "MIF41151", "intituleECUE": "Décision dans l'Incertain", "ects": "24", "enseignant": "" }
+]
+Corrige les fautes d'orthographe et mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.`;
     }
 
     const truncatedText = text.slice(0, 12000);
@@ -78,6 +88,7 @@ export async function structureTextWithAi(req: Request, res: Response, next: Nex
     }
 
     if (!structuredData) {
+      console.error('[Cloudflare AI JSON Parse Failed]', rawText);
       throw ApiError.badGateway('La réponse générée par l\'IA n\'est pas un JSON valide.', 'INVALID_JSON');
     }
 
@@ -86,15 +97,18 @@ export async function structureTextWithAi(req: Request, res: Response, next: Nex
     if (kind !== 'timetable') {
       let rows: string[][] = [];
       if (Array.isArray(structuredData)) {
-        rows = structuredData.map((item: any) => [
-          item.semestre || '',
-          item.codeUE || '',
-          item.intituleUE || '',
-          item.codeECUE || '',
-          item.intituleECUE || '',
-          String(item.ects || ''),
-          item.enseignant || '',
-        ]);
+        rows = structuredData.map((item: any) => {
+          if (Array.isArray(item)) return item.map((v) => String(v));
+          return [
+            String(item.semestre || item.Semester || ''),
+            String(item.codeUE || item.CodeUE || ''),
+            String(item.intituleUE || item.IntituleUE || ''),
+            String(item.codeECUE || item.CodeECUE || ''),
+            String(item.intituleECUE || item.IntituleECUE || ''),
+            String(item.ects || item.ECTS || ''),
+            String(item.enseignant || item.Enseignant || ''),
+          ];
+        });
       } else if (structuredData && Array.isArray(structuredData.rows)) {
         rows = structuredData.rows;
       }
@@ -135,7 +149,7 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
 
     if (accountId && apiToken) {
       try {
-        const testPrompt = `Voici le texte brut extrait par OCR d'une maquette académique, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés {semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant}. Corrige les mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.\n\nTEXTE BRUT OCR :\nMacoscommoie (MART| MIF4116 | Microéconomie Financière 1 | MIF41151 | Décision dans l'Incertain | 24 | 12`;
+        const testPrompt = `Tu es un assistant d'extraction de maquette académique. Réponds EXCLUSIVEMENT par un tableau JSON d'objets strict.\n\nTEXTE BRUT OCR :\nMacoscommoie (MART| MIF4116 | Microéconomie Financière 1 | MIF41151 | Décision dans l'Incertain | 24 | 12`;
 
         const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-4-scout-17b-16e-instruct`;
         const resp = await fetch(url, {
