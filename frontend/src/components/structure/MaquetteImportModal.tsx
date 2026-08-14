@@ -31,6 +31,7 @@ import {
   Sliders,
   Plus,
   Check,
+  Info,
 } from 'lucide-react';
 
 
@@ -748,6 +749,27 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
         {step === 1 && (
           <div className="step-content">
+            {/* Bannière d'information recommandation Excel/PDF */}
+            <div
+              className="excel-recommendation-banner"
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #93c5fd',
+                color: '#1e3a8a',
+                padding: '12px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                fontSize: '0.85rem',
+                marginBottom: '1rem',
+                fontWeight: 500,
+              }}
+            >
+              <Info size={20} style={{ flexShrink: 0, color: '#2563eb' }} />
+              <span>💡 Pour de meilleurs résultats, utilisez le fichier Excel ou PDF officiel de votre maquette. Les photos peuvent nécessiter un ajustement manuel.</span>
+            </div>
+
             <div className="file-dropzone">
               <Upload size={36} className="text-indigo" />
               <h4>Sélectionnez votre maquette académique</h4>
@@ -788,9 +810,9 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             </div>
 
             {isImageFormat && (
-              <div className="alert alert-warning">
+              <div className="alert alert-warning" style={{ marginTop: '1rem' }}>
                 <AlertTriangle size={16} />
-                <span>La qualité de l'extraction dépend de la netteté de l'image. Les colonnes ont été reconstruites à partir des coordonnées graphiques des mots.</span>
+                <span>⚠️ L'extraction automatique peut être imparfaite. Utilisez le bouton « Ajuster la grille manuellement » pour corriger les colonnes/lignes si nécessaire.</span>
               </div>
             )}
 

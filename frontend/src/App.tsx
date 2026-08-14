@@ -3,6 +3,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { CookieConsentBanner } from './components/common/CookieConsentBanner';
 import { UpdateBanner } from './components/UpdateBanner';
+import { DebugOcrPage } from './pages/DebugOcrPage';
 import { FeedbackWidget } from './components/FeedbackWidget';
 import { DashboardShell } from './pages/DashboardShell';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -43,6 +44,12 @@ export const App: React.FC = () => {
   const [showTour, setShowTour] = useState<boolean>(false);
   const [resetToken, setResetToken] = useState<string>('');
   const [showDesktopUpdateBanner, setShowDesktopUpdateBanner] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/debug-ocr' || window.location.hash === '#debug-ocr')) {
+      setActiveTab('debug-ocr');
+    }
+  }, []);
 
   const [healthData, setHealthData] = useState<HealthCheckData | null>(null);
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
@@ -313,6 +320,9 @@ export const App: React.FC = () => {
             <UpdatePage />
           </Suspense>
         );
+
+      case 'debug-ocr':
+        return <DebugOcrPage />;
 
       case 'settings':
         return (
