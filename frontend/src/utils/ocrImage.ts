@@ -8,20 +8,34 @@ import Tesseract from 'tesseract.js';
 export async function loadAndPrepareImage(file: File): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
 
-  const maxDim = Math.max(bitmap.width, bitmap.height);
-  const scale = maxDim < 1500 ? 2 : 1;
+  // 1. Upscale vers ~2400 px si largeur < 2400 px
+  const targetWidth = 2400;
+  const scale = bitmap.width < targetWidth ? targetWidth / bitmap.width : 1;
+
+  const padding = 20; // 20px de padding blanc autour
+  const scaledWidth = Math.round(bitmap.width * scale);
+  const scaledHeight = Math.round(bitmap.height * scale);
 
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width * scale;
-  canvas.height = bitmap.height * scale;
+  canvas.width = scaledWidth + padding * 2;
+  canvas.height = scaledHeight + padding * 2;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     throw new Error('Impossible d\'obtenir le contexte 2D du canvas.');
   }
 
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  // Fond blanc pur
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Redimensionnement haute qualité (smoothing)
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.drawImage(bitmap, padding, padding, scaledWidth, scaledHeight);
+
+  // Prétraitement pixel par pixel (Niveaux de gris + augmentation de contraste x1.4)
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
 

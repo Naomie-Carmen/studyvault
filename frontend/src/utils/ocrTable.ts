@@ -441,10 +441,11 @@ export async function extractTableWithDetails(
     return { rows: [], grid: null, words: [], deskewedCanvas: null, bestAngle: 0 };
   }
 
-  console.log(`[ocrTable] Lancement OCR Tesseract sur canvas : ${deskewedCanvas.width} x ${deskewedCanvas.height}`);
-  onProgress?.('Reconnaissance OCR sur l\'image redressée...', 45);
-  const res = await Tesseract.recognize(deskewedCanvas, 'fra+eng', {
-    logger: (m) => {
+  console.log(`[ocrTable] Lancement OCR Tesseract sur canvas Otsu binarisé : ${otsuCanvas.width} x ${otsuCanvas.height}`);
+  onProgress?.('Reconnaissance OCR sur l\'image binarisée...', 45);
+  const res = await (Tesseract.recognize as any)(otsuCanvas, 'fra+eng', {
+    tessedit_pageseg_mode: '6',
+    logger: (m: any) => {
       if (m.status === 'recognizing text' && m.progress) {
         onProgress?.('Reconnaissance des mots et coordonnées...', Math.round(45 + m.progress * 40));
       }
