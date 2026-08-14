@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import Tesseract from 'tesseract.js';
+import { processMultiOrientationOCR } from '../../utils/ocrImage';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -353,19 +353,14 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     return parseTextLinesToRows(extractedLines);
   };
 
-  // Extraction du texte via OCR pour les images (JPG / PNG)
+  // Extraction du texte via OCR multi-orientations pour les images (JPG / PNG)
   const parseImageFile = async (imageFile: File): Promise<any[][]> => {
     setOcrLoading(true);
     setOcrProgress(0);
     try {
-      const result = await Tesseract.recognize(imageFile, 'fra+eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text' && m.progress) {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        },
+      const rawText = await processMultiOrientationOCR(imageFile, (_msg, progressPct) => {
+        setOcrProgress(progressPct);
       });
-      const rawText = result.data.text || '';
       const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
       return parseTextLinesToRows(lines);
     } catch (_err) {

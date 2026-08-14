@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import * as timetableService from '../../services/timetableService';
 import * as ocrService from '../../services/ocrService';
+import { processMultiOrientationOCR } from '../../utils/ocrImage';
 import { ImportProgress } from './ImportProgress';
 import { TimetableValidationModal } from './TimetableValidationModal';
-import { X, UploadCloud, FileCheck, AlertCircle, Cpu } from 'lucide-react';
+import { X, UploadCloud, FileCheck, AlertCircle, Cpu, RefreshCw } from 'lucide-react';
 
 interface TimetableImportModalProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
 
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
 
   if (!isOpen) return null;
 
@@ -36,22 +39,42 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     if (!file) return;
     setUploading(true);
     setErrorMsg(null);
+    setOcrStatus(null);
+    setOcrProgress(0);
 
     try {
-      const res = await timetableService.uploadTimetableFile(file);
+      let fileToUpload: File = file;
+
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
+      if (isImage) {
+        setOcrStatus('Préparation et extraction OCR...');
+        const extractedText = await processMultiOrientationOCR(file, (msg, pct) => {
+          setOcrStatus(msg);
+          setOcrProgress(pct);
+        });
+
+        // Convert extracted text into a text File for timetable parsing
+        const textFileName = file.name.replace(/\.[^/.]+$/, '') + '.txt';
+        fileToUpload = new File([extractedText], textFileName, { type: 'text/plain' });
+      }
+
+      setOcrStatus('Téléversement et analyse du planning...');
+      const res = await timetableService.uploadTimetableFile(fileToUpload);
       if (res.success && res.data) {
         setImportedId(res.data.id);
-        // Trigger OCR process
         await ocrService.processImport(res.data.id);
         setUploading(false);
+        setOcrStatus(null);
         setIsProcessing(true);
       } else {
         setErrorMsg(res.error?.message || 'Erreur lors du téléversement.');
         setUploading(false);
+        setOcrStatus(null);
       }
     } catch (_err) {
       setErrorMsg('Échec du traitement du fichier.');
       setUploading(false);
+      setOcrStatus(null);
     }
   };
 
@@ -66,7 +89,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
         <div className="glass-card import-modal-card">
           <div className="modal-header">
             <h3>Importer un Emploi du Temps Officiel</h3>
-            <button className="btn-close" onClick={onClose}>
+            <button className="btn-close" onClick={onClose} disabled={uploading}>
               <X size={18} />
             </button>
           </div>
@@ -87,12 +110,20 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                   </div>
                 )}
 
+                {ocrStatus && (
+                  <div className="alert alert-info">
+                    <RefreshCw size={16} className="spinning text-indigo" />
+                    <span>{ocrStatus} ({ocrProgress}%)</span>
+                  </div>
+                )}
+
                 <div className="dropzone-container">
                   <input
                     type="file"
                     id="timetable-file-input"
                     accept="application/pdf,image/png,image/jpeg"
                     onChange={handleFileChange}
+                    disabled={uploading}
                     className="file-input-hidden"
                   />
 
