@@ -70,7 +70,7 @@ async function callCloudflareVisionApi(
 }
 
 /**
- * Fallback de secours sur l'API Google Gemini avec un MODÈLE UNIQUE (gemini-2.5-flash).
+ * Fallback de secours sur l'API Google Gemini avec le modèle officiel valide gemini-1.5-flash.
  */
 async function callGeminiSingleModelApi(images: Express.Multer.File[], prompt: string): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
@@ -78,9 +78,9 @@ async function callGeminiSingleModelApi(images: Express.Multer.File[], prompt: s
     throw new Error('Clé API Gemini non configurée (GEMINI_API_KEY).');
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-  console.log(`[Gemini] Tentative fallback modèle unique : ${model}`);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const modelCandidates = Array.from(
+    new Set([process.env.GEMINI_MODEL || 'gemini-1.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'])
+  );
 
   const parts: any[] = [{ text: prompt }];
 
@@ -104,34 +104,50 @@ async function callGeminiSingleModelApi(images: Express.Multer.File[], prompt: s
     },
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastError = '';
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`[Gemini API Error ${response.status}]`, errText);
-    throw new Error(`Gemini API Error (${response.status}) : ${errText}`);
+  for (const model of modelCandidates) {
+    console.log(`[Gemini] Tentative modèle : ${model}`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[Gemini API Error ${response.status} avec ${model}]`, errText);
+        lastError = `Gemini API (${response.status}) : ${errText}`;
+        continue;
+      }
+
+      const result = (await response.json()) as any;
+      const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!rawJsonText) continue;
+
+      try {
+        return JSON.parse(rawJsonText);
+      } catch (parseErr) {
+        console.error('[Gemini JSON Parse Error]', rawJsonText);
+        const jsonMatch = rawJsonText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        continue;
+      }
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+    }
   }
 
-  const result = (await response.json()) as any;
-  const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  if (!rawJsonText) {
-    throw new Error('Aucune réponse textuelle générée par Gemini.');
-  }
-
-  try {
-    return JSON.parse(rawJsonText);
-  } catch (parseErr) {
-    console.error('[Gemini JSON Parse Error]', rawJsonText);
-    throw new Error('La réponse générée par Gemini n\'est pas un JSON valide.');
-  }
+  throw new Error(`Tous les modèles Gemini ont échoué. ${lastError}`);
 }
 
 export async function extractMaquette(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -169,7 +185,7 @@ export async function extractMaquette(req: Request, res: Response, next: NextFun
       console.error('[Cloudflare] Erreur :', cfErr?.message || cfErr);
     }
 
-    // 2. Fallback Gemini (modèle unique)
+    // 2. Fallback Gemini (modèle gemini-1.5-flash valide)
     try {
       const geminiData = await callGeminiSingleModelApi(files, geminiPrompt);
       sendSuccess(res, geminiData, 200);
@@ -180,7 +196,7 @@ export async function extractMaquette(req: Request, res: Response, next: NextFun
 
     // 3. Si les 2 ont échoué -> 502 Bad Gateway
     throw ApiError.badGateway(
-      'L\'extraction IA est momentanément indisponible. Réessayez dans quelques minutes.',
+      'L\'extraction IA est momentanément indisponible. Utilisez l\'extraction locale ou réessayez dans 1-2 minutes.',
       'AI_EXTRACTION_UNAVAILABLE'
     );
   } catch (error) {
@@ -207,7 +223,7 @@ export async function extractTimetable(req: Request, res: Response, next: NextFu
       console.error('[Cloudflare] Erreur :', cfErr?.message || cfErr);
     }
 
-    // 2. Fallback Gemini (modèle unique)
+    // 2. Fallback Gemini (modèle gemini-1.5-flash valide)
     try {
       const geminiData = await callGeminiSingleModelApi(files, geminiPrompt);
       sendSuccess(res, geminiData, 200);
@@ -218,7 +234,7 @@ export async function extractTimetable(req: Request, res: Response, next: NextFu
 
     // 3. Si les 2 ont échoué -> 502 Bad Gateway
     throw ApiError.badGateway(
-      'L\'extraction IA est momentanément indisponible. Réessayez dans quelques minutes.',
+      'L\'extraction IA est momentanément indisponible. Utilisez l\'extraction locale ou réessayez dans 1-2 minutes.',
       'AI_EXTRACTION_UNAVAILABLE'
     );
   } catch (error) {
