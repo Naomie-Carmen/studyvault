@@ -28,7 +28,8 @@ export async function structureTextWithAi(req: Request, res: Response, next: Nex
       prompt = `Voici le texte brut extrait par OCR d'une maquette académique, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés {semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant}. Corrige les mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.`;
     }
 
-    const fullPrompt = `${prompt}\n\nTEXTE BRUT OCR :\n${text}`;
+    const truncatedText = text.slice(0, 12000);
+    const fullPrompt = `${prompt}\n\nTEXTE BRUT OCR :\n${truncatedText}`;
 
     console.log(`[Cloudflare AI] Structure de texte (${kind || 'maquette'})...`);
 
@@ -80,19 +81,32 @@ export async function structureTextWithAi(req: Request, res: Response, next: Nex
       throw ApiError.badGateway('La réponse générée par l\'IA n\'est pas un JSON valide.', 'INVALID_JSON');
     }
 
-    if (kind !== 'timetable' && Array.isArray(structuredData)) {
-      const rows = structuredData.map((item: any) => [
-        item.codeUE || '',
-        item.intituleUE || '',
-        item.codeECUE || '',
-        item.intituleECUE || '',
-        '',
-        '',
-        '',
-        '',
-        String(item.ects || ''),
-      ]);
-      sendSuccess(res, { rows: rows.length > 0 ? rows : structuredData }, 200);
+    const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
+
+    if (kind !== 'timetable') {
+      let rows: string[][] = [];
+      if (Array.isArray(structuredData)) {
+        rows = structuredData.map((item: any) => [
+          item.semestre || '',
+          item.codeUE || '',
+          item.intituleUE || '',
+          item.codeECUE || '',
+          item.intituleECUE || '',
+          String(item.ects || ''),
+          item.enseignant || '',
+        ]);
+      } else if (structuredData && Array.isArray(structuredData.rows)) {
+        rows = structuredData.rows;
+      }
+
+      const firstRowStr = (rows[0] || []).join(' ').toLowerCase();
+      const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
+
+      if (!hasHeaderKeywords) {
+        rows.unshift(defaultHeader);
+      }
+
+      sendSuccess(res, { rows }, 200);
       return;
     }
 

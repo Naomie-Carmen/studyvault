@@ -5,13 +5,13 @@ import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
 
 const router = Router();
 
-// Endpoint de diagnostic sans authentification
+// Endpoints publics (diagnostic et structuration texte IA)
 router.get('/debug', debugAiConfig);
+router.post('/structure', structureTextWithAi);
 
-// Endpoints authentifiés
+// Endpoints authentifiés avec upload multipart
 router.use(requireAuth);
 
-router.post('/structure', structureTextWithAi);
 router.post('/extract-maquette', uploadMiddleware.array('images', 10), extractMaquette);
 router.post('/extract-timetable', uploadMiddleware.array('images', 10), extractTimetable);
 
