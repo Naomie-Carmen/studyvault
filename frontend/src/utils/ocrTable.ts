@@ -18,39 +18,196 @@ export interface DetectedGrid {
 }
 
 /**
- * Détecte la grille (traits horizontaux et verticaux noirs/sombres) sur le canvas d'une maquette.
- * Retourne les coordonnées des frontières horizontales et verticales, ou null si aucune grille explicite.
+ * Binarisation adaptative selon la méthode d'Otsu.
+ * Transforme le canvas en image binaire (noir et blanc purs).
  */
-export function detectGrid(canvas: HTMLCanvasElement): DetectedGrid | null {
+export function binarizeOtsu(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const width = canvas.width;
   const height = canvas.height;
   const ctx = canvas.getContext('2d');
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = width;
+  outCanvas.height = height;
+  const outCtx = outCanvas.getContext('2d');
+  if (!ctx || !outCtx || width === 0 || height === 0) return canvas;
+
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+
+  // 1. Calcul de l'histogramme à 256 niveaux de gris
+  const histogram = new Array(256).fill(0);
+  const grays = new Uint8Array(width * height);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    grays[i / 4] = gray;
+    histogram[gray]++;
+  }
+
+  // 2. Calcul du seuil optimal d'Otsu
+  const totalPixels = width * height;
+  let sum = 0;
+  for (let t = 0; t < 256; t++) {
+    sum += t * histogram[t];
+  }
+
+  let sumB = 0;
+  let wB = 0;
+  let wF = 0;
+  let maxVar = 0;
+  let threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    wB += histogram[t];
+    if (wB === 0) continue;
+    wF = totalPixels - wB;
+    if (wF === 0) break;
+
+    sumB += t * histogram[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+
+    const varBetween = wB * wF * (mB - mF) * (mB - mF);
+    if (varBetween > maxVar) {
+      maxVar = varBetween;
+      threshold = t;
+    }
+  }
+
+  // 3. Application du seuil binaire
+  const outImgData = outCtx.createImageData(width, height);
+  const outData = outImgData.data;
+
+  for (let i = 0; i < grays.length; i++) {
+    const val = grays[i] < threshold ? 0 : 255;
+    const idx = i * 4;
+    outData[idx] = val;
+    outData[idx + 1] = val;
+    outData[idx + 2] = val;
+    outData[idx + 3] = 255;
+  }
+
+  outCtx.putImageData(outImgData, 0, 0);
+  return outCanvas;
+}
+
+/**
+ * Désinclinaison (Deskew) automatique de l'image.
+ * Teste les angles de -5° à +5° par pas de 0.5° et sélectionne l'angle qui
+ * meurise et maximise la variance de la projection horizontale.
+ */
+export function deskew(canvas: HTMLCanvasElement): { canvas: HTMLCanvasElement; bestAngle: number } {
+  const width = canvas.width;
+  const height = canvas.height;
+  if (width === 0 || height === 0) return { canvas, bestAngle: 0 };
+
+  let bestAngle = 0;
+  let maxVariance = -1;
+
+  // Test des angles de -5° à +5° avec un pas de 0.5°
+  for (let angle = -5.0; angle <= 5.0; angle += 0.5) {
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = width;
+    testCanvas.height = height;
+    const testCtx = testCanvas.getContext('2d');
+    if (!testCtx) continue;
+
+    testCtx.save();
+    testCtx.translate(width / 2, height / 2);
+    testCtx.rotate((angle * Math.PI) / 180);
+    testCtx.drawImage(canvas, -width / 2, -height / 2);
+    testCtx.restore();
+
+    const imgData = testCtx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    // Projection horizontale (compte des pixels sombres par ligne Y)
+    const darkCounts = new Array(height).fill(0);
+    for (let y = 0; y < height; y++) {
+      let count = 0;
+      const rowOffset = y * width * 4;
+      for (let x = 0; x < width; x++) {
+        const idx = rowOffset + x * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        if (0.299 * r + 0.587 * g + 0.114 * b < 128) {
+          count++;
+        }
+      }
+      darkCounts[y] = count;
+    }
+
+    // Calcul de la variance de la projection horizontale
+    const mean = darkCounts.reduce((a, b) => a + b, 0) / height;
+    const variance = darkCounts.reduce((acc, val) => acc + (val - mean) ** 2, 0) / height;
+
+    if (variance > maxVariance) {
+      maxVariance = variance;
+      bestAngle = angle;
+    }
+  }
+
+  if (bestAngle === 0) {
+    return { canvas, bestAngle: 0 };
+  }
+
+  // Application de la rotation optimale
+  const resultCanvas = document.createElement('canvas');
+  resultCanvas.width = width;
+  resultCanvas.height = height;
+  const resCtx = resultCanvas.getContext('2d');
+  if (!resCtx) return { canvas, bestAngle: 0 };
+
+  resCtx.save();
+  resCtx.translate(width / 2, height / 2);
+  resCtx.rotate((bestAngle * Math.PI) / 180);
+  resCtx.drawImage(canvas, -width / 2, -height / 2);
+  resCtx.restore();
+
+  console.log(`[ocrTable] Angle de désinclinaison optimal détecté: ${bestAngle}° (Variance: ${Math.round(maxVariance)})`);
+  return { canvas: resultCanvas, bestAngle };
+}
+
+/**
+ * Détecte la grille par projection robuste sur l'image binarisée et redressée.
+ */
+export function detectGrid(binarizedCanvas: HTMLCanvasElement): DetectedGrid | null {
+  const width = binarizedCanvas.width;
+  const height = binarizedCanvas.height;
+  const ctx = binarizedCanvas.getContext('2d');
   if (!ctx || width === 0 || height === 0) return null;
 
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  // 1. Frontières HORIZONTALES : pour chaque y, ratio de pixels sombres sur la largeur
-  const darkYCandidates: boolean[] = new Array(height).fill(false);
+  // 1. Frontières HORIZONTALES : compte des pixels noirs (R=0) par ligne Y
+  const darkYCounts: number[] = new Array(height).fill(0);
   for (let y = 0; y < height; y++) {
-    let darkCount = 0;
+    let count = 0;
     const rowOffset = y * width * 4;
     for (let x = 0; x < width; x++) {
-      const idx = rowOffset + x * 4;
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-      if (luminance < 128) {
-        darkCount++;
+      if (data[rowOffset + x * 4] === 0) {
+        count++;
       }
     }
-    if (darkCount / width > 0.5) {
+    darkYCounts[y] = count;
+  }
+
+  // Calcul du 95e percentile de largeur de table
+  const sortedCounts = darkYCounts.filter((c) => c > 0).sort((a, b) => a - b);
+  const tableWidth = sortedCounts[Math.floor(sortedCounts.length * 0.95)] || width * 0.8;
+
+  const darkYCandidates: boolean[] = new Array(height).fill(false);
+  for (let y = 0; y < height; y++) {
+    if (darkYCounts[y] > 0.6 * tableWidth) {
       darkYCandidates[y] = true;
     }
   }
 
-  // Regrouper les y consécutifs (±3 px) en une frontière unique
   const horizontalLines: number[] = [];
   let tempGroup: number[] = [];
 
@@ -72,30 +229,29 @@ export function detectGrid(canvas: HTMLCanvasElement): DetectedGrid | null {
 
   if (horizontalLines.length < 3) return null;
 
-  // 2. Frontières VERTICALES : calculées entre la première et la dernière frontière horizontale
+  // 2. Frontières VERTICALES : calculées entre la première et la dernière ligne horizontale
   const minY = horizontalLines[0];
   const maxY = horizontalLines[horizontalLines.length - 1];
-  const spanY = Math.max(1, maxY - minY);
+  const tableHeight = Math.max(1, maxY - minY);
+
+  const darkXCounts: number[] = new Array(width).fill(0);
+  for (let x = 0; x < width; x++) {
+    let count = 0;
+    for (let y = minY; y <= maxY; y++) {
+      if (data[(y * width + x) * 4] === 0) {
+        count++;
+      }
+    }
+    darkXCounts[x] = count;
+  }
 
   const darkXCandidates: boolean[] = new Array(width).fill(false);
   for (let x = 0; x < width; x++) {
-    let darkCount = 0;
-    for (let y = minY; y <= maxY; y++) {
-      const idx = (y * width + x) * 4;
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-      if (luminance < 128) {
-        darkCount++;
-      }
-    }
-    if (darkCount / spanY > 0.5) {
+    if (darkXCounts[x] > 0.5 * tableHeight) {
       darkXCandidates[x] = true;
     }
   }
 
-  // Regrouper les x consécutifs (±3 px) en une frontière unique
   const verticalLines: number[] = [];
   let tempXGroup: number[] = [];
 
@@ -122,21 +278,28 @@ export function detectGrid(canvas: HTMLCanvasElement): DetectedGrid | null {
 
 /**
  * Reconstruit la structure 2D (tableau 2D string[][]) d'une image de maquette.
- * Utilise en priorité la détection de grille (bordures sombres).
- * Si aucune grille n'est trouvée, utilise le clustering par bounding boxes.
+ * Effectue la désinclinaison automatique, la binarisation d'Otsu et l'OCR sur le canvas redressé.
  */
 export async function extractTableFromImage(
   file: File,
   onProgress?: (message: string, progressPercent: number) => void
 ): Promise<string[][]> {
   onProgress?.('Préparation et optimisation de l\'image...', 10);
-  const canvas = await loadAndPrepareImage(file);
+  const preparedCanvas = await loadAndPrepareImage(file);
 
-  onProgress?.('Analyse de la grille et extraction OCR...', 30);
-  const res = await Tesseract.recognize(canvas, 'fra+eng', {
+  onProgress?.('Désinclinaison automatique de l\'image...', 20);
+  const { canvas: deskewedCanvas, bestAngle } = deskew(preparedCanvas);
+
+  onProgress?.('Binarisation d\'Otsu et détection de grille...', 30);
+  const otsuCanvas = binarizeOtsu(deskewedCanvas);
+  const grid = detectGrid(otsuCanvas);
+
+  // IMPORTANT : OCR exécuté sur le canvas REDRESSÉ pour correspondance exacte des bounding boxes
+  onProgress?.('Reconnaissance OCR sur l\'image redressée...', 45);
+  const res = await Tesseract.recognize(deskewedCanvas, 'fra+eng', {
     logger: (m) => {
       if (m.status === 'recognizing text' && m.progress) {
-        onProgress?.('Reconnaissance des mots et coordonnées...', Math.round(30 + m.progress * 50));
+        onProgress?.('Reconnaissance des mots et coordonnées...', Math.round(45 + m.progress * 40));
       }
     },
   });
@@ -144,13 +307,11 @@ export async function extractTableFromImage(
   const rawText = res.data.text || '';
   const wordsRaw = (res.data as any).words as WordItem[] | undefined;
 
-  // Fallback si aucun mot utilisable
   if (!wordsRaw || !Array.isArray(wordsRaw) || wordsRaw.length === 0) {
     onProgress?.('Utilisation du fallback texte brut...', 90);
     return cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
-  // Filtrage : confiance > 30 et texte non vide
   const words = wordsRaw.filter(
     (w) => w.confidence > 30 && w.text && w.text.trim().length > 0
   );
@@ -159,16 +320,10 @@ export async function extractTableFromImage(
     return cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
-  // Tentative de détection de la grille binaire
-  onProgress?.('Détection de la grille du tableau...', 85);
-  const grid = detectGrid(canvas);
-
   let rawRows: string[][] = [];
 
   if (grid) {
-    // -------------------------------------------------------------
-    // OPTION A : Extraction basée sur la grille détectée
-    // -------------------------------------------------------------
+    console.log(`[ocrTable] Grille détectée : ${grid.horizontalLines.length - 1} lignes x ${grid.verticalLines.length - 1} colonnes (Angle ${bestAngle}°).`);
     const numRows = grid.horizontalLines.length - 1;
     const numCols = grid.verticalLines.length - 1;
 
@@ -214,9 +369,7 @@ export async function extractTableFromImage(
       }
     }
   } else {
-    // -------------------------------------------------------------
-    // OPTION B (Fallback) : Clustering par Bounding Boxes
-    // -------------------------------------------------------------
+    console.log('[ocrTable] Grille non détectée. Passage au fallback par clustering spatiale.');
     const heights = words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
     const medianHeight = heights[Math.floor(heights.length / 2)] || 20;
 
@@ -285,7 +438,6 @@ export async function extractTableFromImage(
     }
   }
 
-  // 3. Nettoyage sémantique des lignes parasites
   const cleanedRows = cleanSemanticRows(rawRows);
 
   const maxCols = Math.max(...cleanedRows.map((r) => r.length), 0);
