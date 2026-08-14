@@ -25,7 +25,7 @@ function persistToken(key: string, value: string | null): void {
       window.localStorage.removeItem(key);
     }
   } catch (_err) {
-    // Storage unavailable (private mode, etc.) — session-only auth still works.
+    // Storage unavailable (private mode, etc.)
   }
 }
 
@@ -48,15 +48,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
       if (!storedRefreshToken) {
+        console.log('[AuthContext] Aucun refresh token dans le localStorage.');
         updateTokensAndUser(null, null, null);
         return;
       }
 
+      console.log('[AuthContext] Tentative de rafraîchissement de la session 7j...');
       const res = await authService.refresh(storedRefreshToken);
       if (res.success && res.data) {
         const { accessToken: newAccessToken, refreshToken: newRefreshToken, user: refreshedUser } = res.data;
         
-        // Save tokens in client and localStorage
+        console.log('[AuthContext] Session rafraîchie avec succès.');
         setClientAccessToken(newAccessToken);
         persistToken(ACCESS_TOKEN_KEY, newAccessToken);
         if (newRefreshToken) {
@@ -64,19 +66,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setAccessToken(newAccessToken);
 
-        // Charger le profil via GET /auth/me
+        // Charger le profil utilisateur le plus récent via GET /users/me
         const meRes = await authService.getMe();
         if (meRes.success && meRes.data) {
+          console.log('[AuthContext] Profil utilisateur restauré :', meRes.data.email);
           setUser(meRes.data);
         } else if (refreshedUser) {
+          console.log('[AuthContext] Profil secours restauré :', refreshedUser.email);
           setUser(refreshedUser);
         } else {
+          console.warn('[AuthContext] Échec de la récupération du profil utilisateur.');
           updateTokensAndUser(null, null, null);
         }
       } else {
+        console.warn('[AuthContext] Le jeton de rafraîchissement est invalide ou expiré :', res.error?.message);
         updateTokensAndUser(null, null, null);
       }
-    } catch (_err) {
+    } catch (err) {
+      console.error('[AuthContext] Erreur critique lors du rafraîchissement de session :', err);
       updateTokensAndUser(null, null, null);
     } finally {
       setIsLoading(false);
@@ -93,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      console.warn('[AuthContext] Événement 401 studyvault:unauthorized reçu, réinitialisation de la session.');
       updateTokensAndUser(null, null, null);
     };
 
@@ -104,47 +112,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleLogin = async (data: LoginInput) => {
     setIsLoading(true);
-    const res = await authService.login(data);
-    setIsLoading(false);
-
-    if (res.success && res.data) {
-      updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
-      return { success: true };
+    try {
+      const res = await authService.login(data);
+      if (res.success && res.data) {
+        console.log('[AuthContext] Connexion réussie. Stockage des jetons 7 jours.');
+        updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: res.error?.message || 'Identifiants invalides.',
+      };
+    } finally {
+      setIsLoading(false);
     }
-
-    return {
-      success: false,
-      error: res.error?.message || 'Identifiants invalides.',
-    };
   };
 
   const handleRegister = async (data: RegisterInput) => {
     setIsLoading(true);
-    const res = await authService.register(data);
-    setIsLoading(false);
-
-    if (res.success && res.data) {
-      updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
-      return { success: true };
+    try {
+      const res = await authService.register(data);
+      if (res.success && res.data) {
+        console.log('[AuthContext] Inscription réussie. Stockage des jetons 7 jours.');
+        updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: res.error?.message || 'Erreur lors de l\'inscription.',
+      };
+    } finally {
+      setIsLoading(false);
     }
-
-    return {
-      success: false,
-      error: res.error?.message || 'Erreur lors de l\'inscription.',
-    };
   };
 
   const handleLogout = async () => {
     setIsLoading(true);
     const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
-    // DELETE localStorage & reset state first
+    // Vider immédiatement l'état et localStorage
     updateTokensAndUser(null, null, null);
 
     if (storedRefreshToken) {
       try {
         await authService.logout(storedRefreshToken);
       } catch (_err) {
-        // Ignore if logout API call fails
+        // Ignorer l'erreur réseau éventuelle à la déconnexion
       }
     }
     setIsLoading(false);

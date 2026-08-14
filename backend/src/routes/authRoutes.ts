@@ -7,6 +7,8 @@ import {
   forgotPassword, 
   resetPassword 
 } from '../controllers/authController';
+import { getMe } from '../controllers/userController';
+import { requireAuth } from '../middleware/authMiddleware';
 import { authRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
@@ -15,6 +17,7 @@ router.post('/register', authRateLimiter, register);
 router.post('/login', authRateLimiter, login);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
+router.get('/me', requireAuth, getMe);
 router.post('/forgot-password', passwordResetRateLimiter, forgotPassword);
 router.post('/reset-password', passwordResetRateLimiter, resetPassword);
 
