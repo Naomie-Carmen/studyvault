@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "releaseDate": "2026-08-07",
   "channel": "stable",
   "notes": [
@@ -16,7 +16,7 @@
   ],
   "history": [
     {
-      "version": "1.0.1",
+      "version": "1.0.2",
       "releaseDate": "2026-08-07",
       "highlights": [
         "Lancement de StudyVault — version complète",
@@ -25,4 +25,5 @@
     }
   ]
 }
+
 
