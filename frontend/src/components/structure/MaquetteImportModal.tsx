@@ -516,7 +516,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       }
     } catch (_err) {
       setAiFailed(true);
-      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou vérifiez la clé GEMINI_API_KEY.");
+      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
     } finally {
       setAiLoading(false);
     }

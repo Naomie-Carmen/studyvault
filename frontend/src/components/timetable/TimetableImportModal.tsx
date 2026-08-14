@@ -141,7 +141,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
       }
     } catch (_err) {
       setAiFailed(true);
-      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou vérifiez la clé GEMINI_API_KEY.");
+      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
       setAiLoading(false);
     }
   };
