@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -123,7 +123,37 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [importSummary, setImportSummary] = useState<StructureImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
+  const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setFile(null);
+      setWorkbook(null);
+      setSelectedSheet('');
+      setRawRows([]);
+      setHeaderIndex(0);
+      setColumnMapping({
+        ue_title: -1,
+        ue_code: -1,
+        ects: -1,
+        semester: -1,
+        ecue_title: -1,
+        ecue_code: -1,
+        subject_name: -1,
+        instructor: -1,
+      });
+      setExcludedUEKeys(new Set());
+      setSubmitting(false);
+      setImportSummary(null);
+      setError(null);
+      setOcrLoading(false);
+      setOcrProgress(0);
+      setIsImageFormat(false);
+    }
+  }, [isOpen]);
 
   // Ligne d'en-tête actuelle
   const headers = useMemo(() => {
@@ -188,10 +218,6 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
     setColumnMapping(newMapping);
   };
-
-  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
-  const [ocrProgress, setOcrProgress] = useState<number>(0);
-  const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
 
   // Helper pour convertir un tableau de lignes textuelles en tableau 2D rawRows
   const parseTextLinesToRows = (extractedLines: string[]): any[][] => {
@@ -600,6 +626,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-backdrop">
