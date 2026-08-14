@@ -5,9 +5,6 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-
 jobs:
   create-release:
     runs-on: ubuntu-latest
@@ -16,44 +13,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create Clean GitHub Release
+      - name: Create GitHub Release (draft)
         id: create_release
         uses: actions/github-script@v7
         with:
           script: |
-            const tag = context.ref.replace('refs/tags/', '');
-            try {
-              const { data: releases } = await github.rest.repos.listReleases({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                per_page: 100
-              });
-              for (const rel of releases) {
-                if (rel.tag_name === tag) {
-                  console.log(`Deleting existing release ID ${rel.id} for tag ${tag}`);
-                  await github.rest.repos.deleteRelease({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    release_id: rel.id
-                  });
-                }
-              }
-            } catch (err) {
-              console.log('No prior release cleanup needed:', err.message);
-            }
-
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: tag,
-              name: `StudyVault Desktop ${tag}`,
-              body: 'Mise à jour StudyVault Desktop.',
+              tag_name: context.ref.replace('refs/tags/', ''),
+              name: `StudyVault Desktop ${context.ref.replace('refs/tags/', '')}`,
+              body: 'Mise à jour automatique StudyVault.',
               draft: true,
               prerelease: false
             });
             return data.id;
 
-  build-tauri:
+  build-windows:
     needs: create-release
     runs-on: windows-latest
     steps:
@@ -66,141 +42,37 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
 
       - name: Install frontend dependencies
-        working-directory: ./frontend
+        working-directory: frontend
         run: npm install
 
       - name: Install desktop dependencies
-        working-directory: ./desktop
+        working-directory: desktop
         run: npm install
 
-      - name: Build Tauri App
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build + sign Tauri + upload assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
+          projectPath: './desktop'
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           tagName: v__VERSION__
           releaseName: 'StudyVault v__VERSION__'
-          releaseBody: 'Mise à jour StudyVault Desktop.'
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          projectPath: './desktop'
-
-      - name: Generate and Upload latest.json
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            const bundleDir = path.join(process.cwd(), 'desktop', 'src-tauri', 'target', 'release', 'bundle');
-            console.log('Searching for .sig files in:', bundleDir);
-
-            function findFiles(dir, filter) {
-              let results = [];
-              if (!fs.existsSync(dir)) return results;
-              const list = fs.readdirSync(dir);
-              for (const file of list) {
-                const filePath = path.join(dir, file);
-                const stat = fs.statSync(filePath);
-                if (stat && stat.isDirectory()) {
-                  results = results.concat(findFiles(filePath, filter));
-                } else if (filter.test(file)) {
-                  results.push(filePath);
-                }
-              }
-              return results;
-            }
-
-            const sigFiles = findFiles(bundleDir, /\.sig$/i);
-            console.log('Found sig files:', sigFiles);
-
-            let signature = '';
-            let zipName = '';
-
-            if (sigFiles.length > 0) {
-              const sigFilePath = sigFiles[0];
-              signature = fs.readFileSync(sigFilePath, 'utf8').trim();
-              const zipFilePath = sigFilePath.replace(/\.sig$/i, '');
-              zipName = path.basename(zipFilePath);
-            }
-
-            const tag = context.ref.replace('refs/tags/', '');
-            const version = tag.replace(/^v/, '');
-
-            if (!zipName) {
-              zipName = `StudyVault_${version}_x64-setup.nsis.zip`;
-            }
-
-            const downloadUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/download/${tag}/${zipName}`;
-
-            const latestContent = {
-              version: version,
-              notes: `Mise à jour StudyVault ${tag}`,
-              pub_date: new Date().toISOString(),
-              platforms: {
-                "windows-x86_64": {
-                  signature: signature,
-                  url: downloadUrl
-                },
-                "win64": {
-                  signature: signature,
-                  url: downloadUrl
-                }
-              }
-            };
-
-            const latestJsonPath = path.join(process.cwd(), 'latest.json');
-            fs.writeFileSync(latestJsonPath, JSON.stringify(latestContent, null, 2), 'utf8');
-            console.log('Generated latest.json:', JSON.stringify(latestContent, null, 2));
-
-            const releaseId = Number('${{ needs.create-release.outputs.release_id }}');
-            console.log('Uploading latest.json to release ID:', releaseId);
-
-            const fileData = fs.readFileSync(latestJsonPath);
-
-            try {
-              const assets = await github.rest.repos.listReleaseAssets({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: releaseId,
-              });
-              const existingAsset = assets.data.find(a => a.name === 'latest.json');
-              if (existingAsset) {
-                console.log('Deleting existing latest.json asset id:', existingAsset.id);
-                await github.rest.repos.deleteReleaseAsset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  asset_id: existingAsset.id,
-                });
-              }
-            } catch (e) {
-              console.log('Error checking existing assets:', e.message);
-            }
-
-            await github.rest.repos.uploadReleaseAsset({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: releaseId,
-              name: 'latest.json',
-              data: fileData,
-              headers: {
-                'content-type': 'application/json',
-                'content-length': fileData.length
-              }
-            });
-            console.log('latest.json uploaded successfully!');
+          releaseBody: 'Mise à jour automatique StudyVault.'
 
   publish-release:
-    needs: [create-release, build-tauri]
+    needs: [create-release, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - name: Publish Release
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         with:
           script: |
             await github.rest.repos.updateRelease({
