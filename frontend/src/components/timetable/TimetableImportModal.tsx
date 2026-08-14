@@ -7,6 +7,8 @@ import { ImportProgress } from './ImportProgress';
 import { TimetableValidationModal } from './TimetableValidationModal';
 import { X, UploadCloud, FileCheck, AlertCircle, Cpu, RefreshCw, Sparkles } from 'lucide-react';
 
+import { extractTableWithDetails, WordItem } from '../../utils/ocrTable';
+
 interface TimetableImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -84,16 +86,24 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const formData = new FormData();
-      formData.append('images', file);
+      // 1. Lance l'OCR Tesseract local pour extraire le texte brut
+      setOcrStatus('Extraction locale du texte brut...');
+      const details = await extractTableWithDetails(file);
+      const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ');
 
+      // 2. Envoie le texte brut à POST /api/v1/ai/structure
+      setOcrStatus('Analyse et structuration IA...');
       const token = localStorage.getItem('studyvault_access_token') || '';
-      const response = await fetch(`${API_BASE_URL}/ai/extract-timetable`, {
+      const response = await fetch(`${API_BASE_URL}/ai/structure`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: formData,
+        body: JSON.stringify({
+          text: rawOcrText,
+          kind: 'timetable',
+        }),
       });
 
       if (!response.ok) {
@@ -140,9 +150,14 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
         throw new Error(res.error?.message || 'Erreur lors de la préparation des séances.');
       }
     } catch (_err) {
-      setAiFailed(true);
-      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
-      setAiLoading(false);
+      console.warn('[Timetable AI Error] Fallback sur l\'OCR local autonome...');
+      try {
+        await handleUploadAndRunOCR();
+      } catch (_localErr) {
+        setAiFailed(true);
+        setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
+        setAiLoading(false);
+      }
     }
   };
 

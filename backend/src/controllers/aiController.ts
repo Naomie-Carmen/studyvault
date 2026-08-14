@@ -4,8 +4,106 @@ import { ApiError } from '../utils/apiError';
 import { env } from '../config/env';
 
 /**
- * Endpoint de diagnostic non authentifié pour vérifier la configuration des clés IA
- * et tester l'exécution vision réelle de Cloudflare Workers AI.
+ * Reconstruire et corriger un texte brut OCR déformé sous forme de JSON structuré
+ * à l'aide de Cloudflare Workers AI (Llama-4 Scout en mode texte pur).
+ */
+export async function structureTextWithAi(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { text, kind } = req.body;
+    if (!text || typeof text !== 'string') {
+      throw ApiError.badRequest('Le texte brut OCR (text) est requis.', 'MISSING_TEXT');
+    }
+
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN || '';
+
+    if (!accountId || !apiToken) {
+      throw ApiError.badGateway('Variables CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non configurées.', 'NO_CLOUDFLARE_KEY');
+    }
+
+    let prompt = '';
+    if (kind === 'timetable') {
+      prompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Voici le texte brut extrait par OCR d'un emploi du temps, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP). Corrige les mots déformés par le sens. Un objet par séance. Ne rien inventer ; recopier et corriger fidèlement.`;
+    } else {
+      prompt = `Voici le texte brut extrait par OCR d'une maquette académique, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés {semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant}. Corrige les mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.`;
+    }
+
+    const fullPrompt = `${prompt}\n\nTEXTE BRUT OCR :\n${text}`;
+
+    console.log(`[Cloudflare AI] Structure de texte (${kind || 'maquette'})...`);
+
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-4-scout-17b-16e-instruct`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: fullPrompt,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[Cloudflare Text API Error ${response.status}]`, errText);
+      throw ApiError.badGateway(`Erreur Cloudflare AI (${response.status}) : ${errText}`, 'CLOUDFLARE_ERROR');
+    }
+
+    const result = (await response.json()) as any;
+    const rawText =
+      result.result?.response ||
+      result.result?.description ||
+      result.result?.text ||
+      (Array.isArray(result.result?.choices) ? result.result.choices[0]?.text : '');
+
+    if (!rawText) {
+      throw ApiError.badGateway('Aucune réponse générée par Cloudflare AI.', 'EMPTY_AI_RESPONSE');
+    }
+
+    const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+
+    let structuredData: any = null;
+    try {
+      structuredData = JSON.parse(cleanedText);
+    } catch (_parseErr) {
+      const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          structuredData = JSON.parse(jsonMatch[0]);
+        } catch (_innerErr) {}
+      }
+    }
+
+    if (!structuredData) {
+      throw ApiError.badGateway('La réponse générée par l\'IA n\'est pas un JSON valide.', 'INVALID_JSON');
+    }
+
+    if (kind !== 'timetable' && Array.isArray(structuredData)) {
+      const rows = structuredData.map((item: any) => [
+        item.codeUE || '',
+        item.intituleUE || '',
+        item.codeECUE || '',
+        item.intituleECUE || '',
+        '',
+        '',
+        '',
+        '',
+        String(item.ects || ''),
+      ]);
+      sendSuccess(res, { rows: rows.length > 0 ? rows : structuredData }, 200);
+      return;
+    }
+
+    sendSuccess(res, structuredData, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Endpoint de diagnostic non authentifié pour vérifier la configuration des clés IA.
  */
 export async function debugAiConfig(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -19,61 +117,43 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       geminiSet: !!geminiKey,
     };
 
-    // JPEG 1x1 minimal valide
-    const validJpegBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+    let testStructure = { status: 400, body: 'Non exécuté' };
 
-    const testVisionModel = async (modelName: string) => {
-      if (!accountId || !apiToken) {
-        return { status: 400, body: 'CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non défini' };
-      }
+    if (accountId && apiToken) {
       try {
-        const chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
-        const resp = await fetch(chatUrl, {
+        const testPrompt = `Voici le texte brut extrait par OCR d'une maquette académique, souvent déformé. Reconstruis le tableau en JSON strict (sans markdown) : tableau d'objets avec les clés {semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant}. Corrige les mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.\n\nTEXTE BRUT OCR :\nMacoscommoie (MART| MIF4116 | Microéconomie Financière 1 | MIF41151 | Décision dans l'Incertain | 24 | 12`;
+
+        const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-4-scout-17b-16e-instruct`;
+        const resp = await fetch(url, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: modelName,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: 'Reply ONLY with JSON: {"status": "OK"}' },
-                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${validJpegBase64}` } },
-                ],
-              },
-            ],
+            prompt: testPrompt,
             max_tokens: 4096,
           }),
         });
 
         const text = await resp.text();
-        return {
+        testStructure = {
           status: resp.status,
           body: text.slice(0, 300),
         };
       } catch (err: any) {
-        return {
+        testStructure = {
           status: 500,
           body: (err?.message || String(err)).slice(0, 300),
         };
       }
-    };
-
-    const [testVisionLlama4Scout, testVisionLlama32Instruct] = await Promise.all([
-      testVisionModel('@cf/meta/llama-4-scout-17b-16e-instruct'),
-      testVisionModel('@cf/meta/llama-3.2-11b-vision-instruct'),
-    ]);
+    }
 
     sendSuccess(
       res,
       {
         env: envInfo,
-        testVision: testVisionLlama4Scout.status === 200 ? testVisionLlama4Scout : testVisionLlama32Instruct,
-        testVisionLlama4Scout,
-        testVisionLlama32Instruct,
+        testStructure,
       },
       200
     );
@@ -82,310 +162,10 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
   }
 }
 
-/**
- * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI (format OpenAI-compatible).
- */
-async function callCloudflareVisionApi(
-  images: Express.Multer.File[],
-  prompt: string
-): Promise<any> {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN || '';
-
-  if (!accountId || !apiToken) {
-    throw new Error('Variables CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non configurées.');
-  }
-
-  const file = images[0];
-  const base64Data = file && file.buffer ? file.buffer.toString('base64') : '';
-  if (!base64Data) {
-    throw new Error('Aucune image valide fournie pour Cloudflare Workers AI.');
-  }
-
-  const mimeType = (file && file.mimetype) || 'image/jpeg';
-  const dataUrl = `data:${mimeType};base64,${base64Data}`;
-
-  const visionModels = [
-    '@cf/meta/llama-4-scout-17b-16e-instruct',
-    '@cf/meta/llama-3.2-11b-vision-instruct',
-    '@cf/llava-hf/llava-1.5-7b-hf',
-  ];
-
-  let lastErrorMsg = '';
-
-  for (const model of visionModels) {
-    console.log(`[Cloudflare] Tentative Chat Completions Vision sur le modèle : ${model}`);
-    const chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
-    const chatBody = {
-      model: model,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-      max_tokens: 4096,
-    };
-
-    try {
-      const response = await fetch(chatUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chatBody),
-      });
-
-      if (response.ok) {
-        const result = (await response.json()) as any;
-        const rawText =
-          result.choices?.[0]?.message?.content ||
-          result.result?.choices?.[0]?.message?.content ||
-          result.result?.response ||
-          '';
-
-        if (rawText) {
-          const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
-          try {
-            return JSON.parse(cleanedText);
-          } catch (_pErr) {
-            const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-            if (jsonMatch) return JSON.parse(jsonMatch[0]);
-          }
-        }
-      } else {
-        const errText = await response.text();
-        console.warn(`[Cloudflare Chat API status ${response.status} avec ${model}]`, errText);
-        lastErrorMsg = `Chat API (${response.status}) : ${errText}`;
-      }
-    } catch (err: any) {
-      console.warn(`[Cloudflare Chat API Error avec ${model}]`, err?.message);
-      lastErrorMsg = err?.message || String(err);
-    }
-
-    // Fallback /ai/run/${model}
-    console.log(`[Cloudflare] Fallback /ai/run/ sur le modèle : ${model}`);
-    const runUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
-    const imageByteArray = Array.from(Buffer.from(base64Data, 'base64'));
-
-    try {
-      const response = await fetch(runUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: prompt,
-          image: imageByteArray,
-          max_tokens: 4096,
-        }),
-      });
-
-      if (response.ok) {
-        const result = (await response.json()) as any;
-        const rawText =
-          result.result?.response ||
-          result.result?.description ||
-          result.result?.text ||
-          (Array.isArray(result.result?.choices) ? result.result.choices[0]?.text : '');
-
-        if (rawText) {
-          const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
-          try {
-            return JSON.parse(cleanedText);
-          } catch (_pErr) {
-            const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-            if (jsonMatch) return JSON.parse(jsonMatch[0]);
-          }
-        }
-      } else {
-        const errText = await response.text();
-        console.error(`[Cloudflare /ai/run Error ${response.status} avec ${model}]`, errText);
-        lastErrorMsg = `/ai/run (${response.status}) : ${errText}`;
-      }
-    } catch (err: any) {
-      console.error(`[Cloudflare /ai/run Error avec ${model}]`, err);
-      lastErrorMsg = err?.message || String(err);
-    }
-  }
-
-  throw new Error(`Tous les modèles et endpoints Cloudflare Workers AI Vision ont échoué. Dernier détail : ${lastErrorMsg}`);
-}
-
-/**
- * Fallback de secours sur l'API Google Gemini avec le modèle officiel valide gemini-1.5-flash.
- */
-async function callGeminiSingleModelApi(images: Express.Multer.File[], prompt: string): Promise<any> {
-  const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
-  if (!apiKey) {
-    throw new Error('Clé API Gemini non configurée (GEMINI_API_KEY).');
-  }
-
-  const modelCandidates = Array.from(
-    new Set([process.env.GEMINI_MODEL || 'gemini-1.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'])
-  );
-
-  const parts: any[] = [{ text: prompt }];
-
-  for (const file of images) {
-    const base64Data = file.buffer ? file.buffer.toString('base64') : '';
-    if (!base64Data) continue;
-    const mimeType = file.mimetype || 'image/jpeg';
-    parts.push({
-      inline_data: {
-        mime_type: mimeType,
-        data: base64Data,
-      },
-    });
-  }
-
-  const payload = {
-    contents: [{ parts }],
-    generationConfig: {
-      temperature: 0,
-      response_mime_type: 'application/json',
-    },
-  };
-
-  let lastError = '';
-
-  for (const model of modelCandidates) {
-    console.log(`[Gemini] Tentative modèle : ${model}`);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[Gemini API Error ${response.status} avec ${model}]`, errText);
-        lastError = `Gemini API (${response.status}) : ${errText}`;
-        continue;
-      }
-
-      const result = (await response.json()) as any;
-      const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      if (!rawJsonText) continue;
-
-      try {
-        return JSON.parse(rawJsonText);
-      } catch (parseErr) {
-        console.error('[Gemini JSON Parse Error]', rawJsonText);
-        const jsonMatch = rawJsonText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-        continue;
-      }
-    } catch (err: any) {
-      lastError = err?.message || String(err);
-    }
-  }
-
-  throw new Error(`Tous les modèles Gemini ont échoué. ${lastError}`);
-}
-
 export async function extractMaquette(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const files = (req.files as Express.Multer.File[]) || [];
-    if (!files || files.length === 0) {
-      throw ApiError.badRequest('Aucune photo de maquette envoyée.', 'NO_IMAGES');
-    }
-
-    const cfPrompt = `Extract this academic curriculum table into JSON: array of objects with keys semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant. One object per ECUE row. Return ONLY valid JSON, no markdown.`;
-    const geminiPrompt = `Tu es un assistant d'extraction de maquette pédagogique universitaire. Extrais la structure de cette image sous forme de tableau JSON strict : { "rows": [ ["CODE_UE", "INTITULE_UE", "CODE_ECUE", "INTITULE_ECUE", "CM", "TD", "TP", "TPE", "ECTS"], ... ] }. Ne rien inventer ; recopier exactement les textes et nombres.`;
-
-    // 1. Cloudflare Workers AI en PREMIER
-    try {
-      const cfData = await callCloudflareVisionApi(files, cfPrompt);
-      let rows: string[][] = [];
-      if (Array.isArray(cfData)) {
-        rows = cfData.map((item: any) => [
-          item.codeUE || '',
-          item.intituleUE || '',
-          item.codeECUE || '',
-          item.intituleECUE || '',
-          '',
-          '',
-          '',
-          '',
-          String(item.ects || ''),
-        ]);
-      } else if (cfData && Array.isArray(cfData.rows)) {
-        rows = cfData.rows;
-      }
-      sendSuccess(res, { rows: rows.length > 0 ? rows : cfData }, 200);
-      return;
-    } catch (cfErr: any) {
-      console.error('[Cloudflare] Erreur :', cfErr?.message || cfErr);
-    }
-
-    // 2. Fallback Gemini (modèle gemini-1.5-flash valide)
-    try {
-      const geminiData = await callGeminiSingleModelApi(files, geminiPrompt);
-      sendSuccess(res, geminiData, 200);
-      return;
-    } catch (geminiErr: any) {
-      console.error('[Gemini] Erreur :', geminiErr?.message || geminiErr);
-    }
-
-    // 3. Si les 2 ont échoué -> 502 Bad Gateway
-    throw ApiError.badGateway(
-      'L\'extraction IA est momentanément indisponible. Utilisez l\'extraction locale ou réessayez dans 1-2 minutes.',
-      'AI_EXTRACTION_UNAVAILABLE'
-    );
-  } catch (error) {
-    next(error);
-  }
+  structureTextWithAi(req, res, next);
 }
 
 export async function extractTimetable(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const files = (req.files as Express.Multer.File[]) || [];
-    if (!files || files.length === 0) {
-      throw ApiError.badRequest('Aucune photo d\'emploi du temps envoyée.', 'NO_IMAGES');
-    }
-
-    const cfPrompt = `Extract this timetable table into JSON: array of objects with keys jour, startTime, endTime, matiere, salle, enseignant, groupe, type. One object per session. Return ONLY valid JSON, no markdown.`;
-    const geminiPrompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Extrais le tableau de cette image en JSON strict, sans markdown : un tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP) (chaînes vides si absentes). Un objet par séance. Ne rien inventer ; recopier exactement.`;
-
-    // 1. Cloudflare Workers AI en PREMIER
-    try {
-      const cfData = await callCloudflareVisionApi(files, cfPrompt);
-      sendSuccess(res, cfData, 200);
-      return;
-    } catch (cfErr: any) {
-      console.error('[Cloudflare] Erreur :', cfErr?.message || cfErr);
-    }
-
-    // 2. Fallback Gemini (modèle gemini-1.5-flash valide)
-    try {
-      const geminiData = await callGeminiSingleModelApi(files, geminiPrompt);
-      sendSuccess(res, geminiData, 200);
-      return;
-    } catch (geminiErr: any) {
-      console.error('[Gemini] Erreur :', geminiErr?.message || geminiErr);
-    }
-
-    // 3. Si les 2 ont échoué -> 502 Bad Gateway
-    throw ApiError.badGateway(
-      'L\'extraction IA est momentanément indisponible. Utilisez l\'extraction locale ou réessayez dans 1-2 minutes.',
-      'AI_EXTRACTION_UNAVAILABLE'
-    );
-  } catch (error) {
-    next(error);
-  }
+  structureTextWithAi(req, res, next);
 }

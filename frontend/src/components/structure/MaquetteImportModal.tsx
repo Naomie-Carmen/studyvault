@@ -491,32 +491,52 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setAiError(null);
     setError(null);
     try {
-      const formData = new FormData();
-      selectedFiles.forEach((f) => formData.append('images', f));
+      // 1. Lance l'OCR Tesseract local existant pour extraire le texte brut
+      let allWordsText: string[] = [];
+      for (const fileItem of selectedFiles) {
+        const details = await extractTableWithDetails(fileItem);
+        allWordsText.push((details.words || []).map((w: WordItem) => w.text).join(' '));
+      }
+      const rawOcrText = allWordsText.join('\n');
 
+      // 2. Envoie le texte brut à POST /api/v1/ai/structure
       const token = localStorage.getItem('studyvault_access_token') || '';
-      const response = await fetch(`${API_BASE_URL}/ai/extract-maquette`, {
+      const response = await fetch(`${API_BASE_URL}/ai/structure`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: formData,
+        body: JSON.stringify({
+          text: rawOcrText,
+          kind: 'maquette',
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Status ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data?.rows)) {
+          setRawRows(data.data.rows);
+          autoDetect(data.data.rows);
+          return;
+        }
       }
 
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data?.rows)) {
-        setRawRows(data.data.rows);
-        autoDetect(data.data.rows);
-      } else {
-        throw new Error(data.message || 'Format de données IA invalide');
-      }
+      // 3. Fallback : Si /ai/structure échoue, utiliser le tableau OCR local autonome
+      console.warn('[AI Structure] Fallback sur l\'OCR local autonome...');
+      const rows = await extractTableFromMultipleImages(selectedFiles);
+      setRawRows(rows);
+      autoDetect(rows);
     } catch (_err) {
-      setAiFailed(true);
-      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
+      console.warn('[AI Structure Error] Fallback sur l\'OCR local autonome...');
+      try {
+        const rows = await extractTableFromMultipleImages(selectedFiles);
+        setRawRows(rows);
+        autoDetect(rows);
+      } catch (_localErr) {
+        setAiFailed(true);
+        setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
+      }
     } finally {
       setAiLoading(false);
     }
