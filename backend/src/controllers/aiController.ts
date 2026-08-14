@@ -49,7 +49,8 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       }
     };
 
-    const [testLlama32, testLlama4Scout] = await Promise.all([
+    const [testLlama32Instruct, testLlama32Preview, testLlama4Scout] = await Promise.all([
+      testModelCall('@cf/meta/llama-3.2-11b-vision-instruct'),
       testModelCall('@cf/meta/llama-3.2-11b-vision-preview'),
       testModelCall('@cf/meta/llama-4-scout-17b-16e-instruct'),
     ]);
@@ -58,7 +59,8 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
       res,
       {
         env: envInfo,
-        testLlama32,
+        testLlama32Instruct,
+        testLlama32Preview,
         testLlama4Scout,
       },
       200
@@ -69,8 +71,8 @@ export async function debugAiConfig(_req: Request, res: Response, next: NextFunc
 }
 
 /**
- * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI
- * (@cf/meta/llama-3.2-11b-vision-preview).
+ * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI.
+ * Modèles tentés : @cf/meta/llama-3.2-11b-vision-instruct, @cf/meta/llama-4-scout-17b-16e-instruct, @cf/meta/llama-3.2-11b-vision-preview, @cf/llava-hf/llava-1.5-7b-hf
  */
 async function callCloudflareVisionApi(
   images: Express.Multer.File[],
@@ -83,7 +85,12 @@ async function callCloudflareVisionApi(
     throw new Error('Variables CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non configurées.');
   }
 
-  console.log('[Cloudflare] Appel Workers AI en cours...');
+  const visionModels = [
+    '@cf/meta/llama-3.2-11b-vision-instruct',
+    '@cf/meta/llama-4-scout-17b-16e-instruct',
+    '@cf/meta/llama-3.2-11b-vision-preview',
+    '@cf/llava-hf/llava-1.5-7b-hf',
+  ];
 
   const file = images[0];
   const base64Data = file && file.buffer ? file.buffer.toString('base64') : '';
@@ -92,46 +99,64 @@ async function callCloudflareVisionApi(
   }
 
   const imageByteArray = Array.from(Buffer.from(base64Data, 'base64'));
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.2-11b-vision-preview`;
+  let lastErrorMsg = '';
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt: prompt,
-      image: imageByteArray,
-      max_tokens: 4096,
-    }),
-  });
+  for (const model of visionModels) {
+    console.log(`[Cloudflare] Tentative Workers AI sur le modèle : ${model}`);
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`[Cloudflare API Error ${response.status}]`, errText);
-    throw new Error(`Cloudflare AI (${response.status}) : ${errText}`);
-  }
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          image: imageByteArray,
+          max_tokens: 4096,
+        }),
+      });
 
-  const result = (await response.json()) as any;
-  const rawText = result.result?.response || result.result?.description || result.result?.text || '';
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[Cloudflare API Error ${response.status} avec ${model}]`, errText);
+        lastErrorMsg = `Cloudflare AI (${response.status}) avec ${model} : ${errText}`;
+        continue;
+      }
 
-  if (!rawText) {
-    throw new Error('Aucune réponse textuelle reçue de Cloudflare Workers AI.');
-  }
+      const result = (await response.json()) as any;
+      const rawText =
+        result.result?.response ||
+        result.result?.description ||
+        result.result?.text ||
+        (Array.isArray(result.result?.choices) ? result.result.choices[0]?.text : '');
 
-  const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+      if (!rawText) {
+        console.warn(`[Cloudflare] Modèle ${model} a renvoyé un texte vide.`);
+        continue;
+      }
 
-  try {
-    return JSON.parse(cleanedText);
-  } catch (parseErr) {
-    console.error('[Cloudflare AI JSON Parse Error]', rawText);
-    const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+
+      try {
+        return JSON.parse(cleanedText);
+      } catch (parseErr) {
+        console.error('[Cloudflare AI JSON Parse Error]', rawText);
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        continue;
+      }
+    } catch (err: any) {
+      console.error(`[Cloudflare Error avec ${model}]`, err);
+      lastErrorMsg = err?.message || String(err);
     }
-    throw new Error('Format JSON invalide retourné par Cloudflare Workers AI.');
   }
+
+  throw new Error(`Tous les modèles Cloudflare Workers AI ont échoué. Dernier détail : ${lastErrorMsg}`);
 }
 
 /**
