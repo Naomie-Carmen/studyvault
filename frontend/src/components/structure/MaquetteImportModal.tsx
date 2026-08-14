@@ -32,6 +32,8 @@ import {
   Plus,
   Check,
   Info,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 
 
@@ -134,11 +136,17 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [importSummary, setImportSummary] = useState<StructureImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const modalCardRef = useRef<HTMLDivElement>(null);
+  const actionBlockRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState<number>(0);
   const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
+
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiFailed, setAiFailed] = useState<boolean>(false);
 
   const [extractedGrid, setExtractedGrid] = useState<DetectedGrid | null>(null);
   const [extractedWords, setExtractedWords] = useState<WordItem[]>([]);
@@ -156,7 +164,20 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   }, [rawRows.length, step]);
 
   useEffect(() => {
+    if (isImageFormat && selectedFiles.length > 0 && rawRows.length === 0) {
+      const timer = setTimeout(() => {
+        actionBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isImageFormat, selectedFiles.length, rawRows.length]);
+
+  useEffect(() => {
     if (isOpen) {
+      if (modalCardRef.current) {
+        modalCardRef.current.scrollTop = 0;
+        modalCardRef.current.focus();
+      }
       setStep(1);
       setFile(null);
       setSelectedFiles([]);
@@ -171,6 +192,9 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setOcrLoading(false);
       setOcrProgress(0);
       setIsImageFormat(false);
+      setAiLoading(false);
+      setAiError(null);
+      setAiFailed(false);
       setHeaderIndex(0);
       setColumnMapping({
         ue_title: -1,
@@ -426,6 +450,76 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setEditableGrid({ ...editableGrid, verticalLines: updatedV });
   };
 
+  const handleRunLocalOcr = async () => {
+    if (selectedFiles.length === 0) return;
+    setWorkbook(null);
+    setSelectedSheet('');
+    setOcrLoading(true);
+    setOcrProgress(0);
+    setError(null);
+    try {
+      const details = await extractTableWithDetails(selectedFiles[0], (_msg, pct) => {
+        setOcrProgress(pct);
+      });
+
+      let combinedRows = details.rows;
+      if (selectedFiles.length > 1) {
+        const restRows = await extractTableFromMultipleImages(selectedFiles.slice(1), (_msg, pct) => {
+          const totalPct = Math.min(99, Math.round(50 + pct * 0.5));
+          setOcrProgress(totalPct);
+        });
+        combinedRows = [...combinedRows, ...restRows];
+      }
+
+      setExtractedGrid(details.grid);
+      setEditableGrid(details.grid);
+      setExtractedWords(details.words);
+      setDeskewedCanvas(details.deskewedCanvas);
+      setRawRows(combinedRows);
+      autoDetect(combinedRows);
+    } catch (_err) {
+      setError("Erreur lors de l'analyse OCR locale. Assurez-vous que les images sont lisibles.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleRunAiExtraction = async () => {
+    if (selectedFiles.length === 0) return;
+    setAiLoading(true);
+    setAiError(null);
+    setError(null);
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach((f) => formData.append('files', f));
+
+      const response = await fetch('/api/academic-structure/extract-ai', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('studyvault_access_token') || ''}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data?.rows)) {
+        setRawRows(data.data.rows);
+        autoDetect(data.data.rows);
+      } else {
+        throw new Error(data.message || 'Format de données IA invalide');
+      }
+    } catch (_err) {
+      setAiFailed(true);
+      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou vérifiez la clé GEMINI_API_KEY.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Traitement du fichier (support multi-images)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filesList = Array.from(e.target.files || []);
@@ -434,6 +528,9 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setSelectedFiles(filesList);
     setFile(filesList[0]);
     setError(null);
+    setAiError(null);
+    setAiFailed(false);
+    setRawRows([]);
 
     const isAllImages = filesList.every((f) => {
       const name = f.name.toLowerCase();
@@ -445,33 +542,6 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     if (isAllImages) {
       setWorkbook(null);
       setSelectedSheet('');
-      setOcrLoading(true);
-      setOcrProgress(0);
-      try {
-        const details = await extractTableWithDetails(filesList[0], (_msg, pct) => {
-          setOcrProgress(pct);
-        });
-
-        let combinedRows = details.rows;
-        if (filesList.length > 1) {
-          const restRows = await extractTableFromMultipleImages(filesList.slice(1), (_msg, pct) => {
-            const totalPct = Math.min(99, Math.round(50 + pct * 0.5));
-            setOcrProgress(totalPct);
-          });
-          combinedRows = [...combinedRows, ...restRows];
-        }
-
-        setExtractedGrid(details.grid);
-        setEditableGrid(details.grid);
-        setExtractedWords(details.words);
-        setDeskewedCanvas(details.deskewedCanvas);
-        setRawRows(combinedRows);
-        autoDetect(combinedRows);
-      } catch (_err) {
-        setError("Erreur lors de l'analyse OCR du tableau. Assurez-vous que les images sont lisibles.");
-      } finally {
-        setOcrLoading(false);
-      }
       return;
     }
 
@@ -709,7 +779,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-card maquette-import-modal">
+      <div className="modal-card maquette-import-modal" ref={modalCardRef} tabIndex={-1}>
         <div className="modal-header">
           <div className="modal-title-box">
             <FileSpreadsheet className="modal-icon text-indigo" size={22} />
@@ -808,6 +878,112 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                 </div>
               )}
             </div>
+
+            {isImageFormat && selectedFiles.length > 0 && rawRows.length === 0 && (
+              <div
+                className="extraction-mode-block"
+                ref={actionBlockRef}
+                style={{
+                  marginTop: '1.25rem',
+                  padding: '1.25rem',
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ImageIcon size={18} className="text-indigo" />
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                    {selectedFiles.length === 1 ? selectedFiles[0].name : `${selectedFiles.length} photos sélectionnées`}
+                  </span>
+                </div>
+
+                {aiError && (
+                  <div className="alert alert-error" style={{ fontSize: '0.825rem', padding: '0.65rem 0.85rem' }}>
+                    <AlertTriangle size={16} />
+                    <span>{aiError}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {/* Gros bouton violet Extraction IA (recommandé) */}
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleRunAiExtraction}
+                    disabled={aiLoading || ocrLoading}
+                    style={{
+                      flex: 1,
+                      minWidth: '220px',
+                      padding: '0.75rem 1.25rem',
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      cursor: aiLoading || ocrLoading ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                    }}
+                  >
+                    {aiLoading ? (
+                      <>
+                        <RefreshCw size={18} className="spinning" />
+                        <span>Analyse IA en cours…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        <span>✨ Extraction IA (recommandé)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Bouton secondaire Extraction locale (sans internet) */}
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleRunLocalOcr}
+                    disabled={aiLoading || ocrLoading}
+                    style={{
+                      flex: 1,
+                      minWidth: '220px',
+                      padding: '0.75rem 1.25rem',
+                      background: aiFailed ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                      border: aiFailed ? '1px solid #818cf8' : '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      cursor: aiLoading || ocrLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {ocrLoading ? (
+                      <>
+                        <RefreshCw size={18} className="spinning text-indigo" />
+                        <span>OCR local ({ocrProgress}%)…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Cpu size={18} className="text-indigo" />
+                        <span>Extraction locale (sans internet)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isImageFormat && (
               <div className="alert alert-warning" style={{ marginTop: '1rem' }}>
