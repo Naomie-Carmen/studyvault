@@ -1,5 +1,5 @@
 import logo from '../../assets/logo.png';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   GraduationCap, 
@@ -52,7 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useTranslation();
   const [hasUpdateAvailable, setHasUpdateAvailable] = useState<boolean>(false);
 
+  const hasCheckedUpdateRef = useRef(false);
+
   useEffect(() => {
+    if (hasCheckedUpdateRef.current) return;
+    hasCheckedUpdateRef.current = true;
+
     const isTauri = typeof window !== 'undefined' && Boolean(
       (window as any).__TAURI__ ||
       (window as any).__TAURI_IPC__ ||

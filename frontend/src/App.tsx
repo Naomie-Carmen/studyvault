@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { CookieConsentBanner } from './components/common/CookieConsentBanner';
@@ -46,7 +46,29 @@ export const App: React.FC = () => {
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
   const [errorHealth, setErrorHealth] = useState<string | null>(null);
 
+  const loadHealthStatus = async () => {
+    setLoadingHealth(true);
+    setErrorHealth(null);
+    try {
+      const result = await getHealthCheck();
+      if (result.success && result.data) {
+        setHealthData(result.data);
+      } else {
+        setErrorHealth(result.error?.message || 'Impossible de joindre le serveur API.');
+      }
+    } catch (_err) {
+      setErrorHealth('Erreur de connexion au serveur backend.');
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  const hasCheckedUpdateRef = useRef(false);
+
   useEffect(() => {
+    if (hasCheckedUpdateRef.current) return;
+    hasCheckedUpdateRef.current = true;
+
     const isTauri = typeof window !== 'undefined' && Boolean(
       (window as any).__TAURI__ ||
       (window as any).__TAURI_IPC__ ||
@@ -66,6 +88,23 @@ export const App: React.FC = () => {
         .catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    loadHealthStatus();
+  }, []);
+
+  // Accueil par défaut : page d'accueil si non connecté, dashboard si connecté
+  useEffect(() => {
+    setActiveTab(isAuthenticated ? 'dashboard' : 'landing');
+  }, [isAuthenticated]);
+
+  // Show onboarding tour for new users after login
+  useEffect(() => {
+    if (isAuthenticated && !localStorage.getItem(TOUR_DONE_KEY)) {
+      const timer = setTimeout(() => setShowTour(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
 
   if (authLoading) {
     return (
@@ -121,38 +160,6 @@ export const App: React.FC = () => {
       </div>
     );
   }
-
-  const loadHealthStatus = async () => {
-    setLoadingHealth(true);
-    setErrorHealth(null);
-    try {
-      const result = await getHealthCheck();
-      if (result.success && result.data) {
-        setHealthData(result.data);
-      } else {
-        setErrorHealth(result.error?.message || 'Impossible de joindre le serveur API.');
-      }
-    } catch (_err) {
-      setErrorHealth('Erreur de connexion au serveur backend.');
-    } finally {
-      setLoadingHealth(false);
-    }
-  };
-
-  useEffect(() => {
-    loadHealthStatus();
-  }, []);
-  // Accueil par défaut : page d'accueil si non connecté, dashboard si connecté
-  useEffect(() => {
-    setActiveTab(isAuthenticated ? 'dashboard' : 'landing');
-  }, [isAuthenticated]);
-  // Show onboarding tour for new users after login
-  useEffect(() => {
-    if (isAuthenticated && !localStorage.getItem(TOUR_DONE_KEY)) {
-      const timer = setTimeout(() => setShowTour(true), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [isAuthenticated]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
