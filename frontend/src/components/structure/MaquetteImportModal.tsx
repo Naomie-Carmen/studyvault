@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { processMultiOrientationOCR } from '../../utils/ocrImage';
+import { extractTableFromMultipleImages } from '../../utils/ocrTable';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -100,6 +100,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [rawRows, setRawRows] = useState<any[][]>([]);
@@ -131,6 +132,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     if (isOpen) {
       setStep(1);
       setFile(null);
+      setSelectedFiles([]);
       setWorkbook(null);
       setSelectedSheet('');
       setRawRows([]);
@@ -353,48 +355,46 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     return parseTextLinesToRows(extractedLines);
   };
 
-  // Extraction du texte via OCR multi-orientations pour les images (JPG / PNG)
-  const parseImageFile = async (imageFile: File): Promise<any[][]> => {
-    setOcrLoading(true);
-    setOcrProgress(0);
-    try {
-      const rawText = await processMultiOrientationOCR(imageFile, (_msg, progressPct) => {
-        setOcrProgress(progressPct);
-      });
-      const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-      return parseTextLinesToRows(lines);
-    } catch (_err) {
-      throw new Error("Échec de la reconnaissance OCR sur l'image.");
-    } finally {
-      setOcrLoading(false);
-    }
-  };
 
-  // Traitement du fichier
+
+  // Traitement du fichier (support multi-images)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-    setFile(selected);
+    const filesList = Array.from(e.target.files || []);
+    if (filesList.length === 0) return;
+
+    setSelectedFiles(filesList);
+    setFile(filesList[0]);
     setError(null);
 
-    const fileName = selected.name.toLowerCase();
-    const isPdf = fileName.endsWith('.pdf') || selected.type === 'application/pdf';
-    const isImg = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png') || selected.type.startsWith('image/');
+    const isAllImages = filesList.every((f) => {
+      const name = f.name.toLowerCase();
+      return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || f.type.startsWith('image/');
+    });
 
-    setIsImageFormat(isImg);
+    setIsImageFormat(isAllImages);
 
-    if (isImg) {
+    if (isAllImages) {
       setWorkbook(null);
       setSelectedSheet('');
+      setOcrLoading(true);
+      setOcrProgress(0);
       try {
-        const imgRows = await parseImageFile(selected);
+        const imgRows = await extractTableFromMultipleImages(filesList, (_msg, pct) => {
+          setOcrProgress(pct);
+        });
         setRawRows(imgRows);
         autoDetect(imgRows);
-      } catch (err) {
-        setError("Erreur lors de l'analyse OCR de l'image. Assurez-vous que l'image est lisible.");
+      } catch (_err) {
+        setError("Erreur lors de l'analyse OCR du tableau. Assurez-vous que les images sont lisibles.");
+      } finally {
+        setOcrLoading(false);
       }
       return;
     }
+
+    const selected = filesList[0];
+    const fileName = selected.name.toLowerCase();
+    const isPdf = fileName.endsWith('.pdf') || selected.type === 'application/pdf';
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -671,9 +671,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               <h4>Sélectionnez votre maquette académique</h4>
               <p>Format accepté : Excel (.xlsx, .xls), CSV, PDF (.pdf) ou Image (.jpg, .jpeg, .png)</p>
               <label className="btn-browse">
-                {ocrLoading ? 'Analyse OCR en cours...' : 'Parcourir les fichiers'}
+                {ocrLoading ? 'Analyse OCR du tableau...' : 'Parcourir les fichiers'}
                 <input
                   type="file"
+                  multiple
                   accept=".csv, .xls, .xlsx, .pdf, .jpg, .jpeg, .png"
                   onChange={handleFileChange}
                   disabled={ocrLoading}
@@ -683,7 +684,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               {ocrLoading && (
                 <div className="ocr-progress-box">
                   <RefreshCw size={16} className="spinning text-indigo" />
-                  <span>Reconnaissance du texte en cours... {ocrProgress}%</span>
+                  <span>Reconstruction 2D du tableau en cours... {ocrProgress}%</span>
                 </div>
               )}
               {file && !ocrLoading && (
@@ -695,7 +696,11 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                   ) : (
                     <FileSpreadsheet size={16} />
                   )}
-                  <span>{file.name}</span>
+                  <span>
+                    {selectedFiles.length > 1
+                      ? `${selectedFiles.length} photos sélectionnées (${selectedFiles.map((f) => f.name).join(', ')})`
+                      : file.name}
+                  </span>
                 </div>
               )}
             </div>
@@ -703,7 +708,14 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             {isImageFormat && (
               <div className="alert alert-warning">
                 <AlertTriangle size={16} />
-                <span>La qualité de l'extraction dépend de la netteté de l'image. Vérifiez attentivement le résultat.</span>
+                <span>La qualité de l'extraction dépend de la netteté de l'image. Les colonnes ont été reconstruites à partir des coordonnées graphiques des mots.</span>
+              </div>
+            )}
+
+            {!ocrLoading && rawRows.length > 0 && rawRows.length < 3 && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={16} />
+                <span>Résultat insuffisant ? Utilisez de préférence le fichier Excel ou PDF officiel de votre maquette si vous l'avez.</span>
               </div>
             )}
 
