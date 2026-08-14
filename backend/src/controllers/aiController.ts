@@ -4,6 +4,71 @@ import { ApiError } from '../utils/apiError';
 import { env } from '../config/env';
 
 /**
+ * Endpoint de diagnostic non authentifié pour vérifier la configuration des clés IA
+ * et tester la réponse des modèles Cloudflare Workers AI.
+ */
+export async function debugAiConfig(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN || '';
+    const geminiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
+
+    const envInfo = {
+      accountIdSet: !!accountId,
+      tokenSet: !!apiToken,
+      geminiSet: !!geminiKey,
+    };
+
+    const testModelCall = async (modelName: string) => {
+      if (!accountId || !apiToken) {
+        return { status: 400, body: 'CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN non défini' };
+      }
+      try {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: 'Reply with the word OK',
+          }),
+        });
+
+        const text = await resp.text();
+        return {
+          status: resp.status,
+          body: text.slice(0, 300),
+        };
+      } catch (err: any) {
+        return {
+          status: 500,
+          body: (err?.message || String(err)).slice(0, 300),
+        };
+      }
+    };
+
+    const [testLlama32, testLlama4Scout] = await Promise.all([
+      testModelCall('@cf/meta/llama-3.2-11b-vision-preview'),
+      testModelCall('@cf/meta/llama-4-scout-17b-16e-instruct'),
+    ]);
+
+    sendSuccess(
+      res,
+      {
+        env: envInfo,
+        testLlama32,
+        testLlama4Scout,
+      },
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Exécute l'extraction Vision en premier choix via Cloudflare Workers AI
  * (@cf/meta/llama-3.2-11b-vision-preview).
  */
