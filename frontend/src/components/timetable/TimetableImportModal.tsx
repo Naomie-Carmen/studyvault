@@ -87,12 +87,12 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
 
     try {
       // 1. Lance l'OCR Tesseract local pour extraire le texte brut
-      setOcrStatus('Extraction locale du texte brut...');
+      setOcrStatus('1/2 Lecture locale de la photo…');
       const details = await extractTableWithDetails(file);
-      const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ');
+      const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
 
       // 2. Envoie le texte brut à POST /api/v1/ai/structure
-      setOcrStatus('Analyse et structuration IA...');
+      setOcrStatus('2/2 Reconstruction par IA…');
       const token = localStorage.getItem('studyvault_access_token') || '';
       const response = await fetch(`${API_BASE_URL}/ai/structure`, {
         method: 'POST',

@@ -145,7 +145,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [ocrProgress, setOcrProgress] = useState<number>(0);
   const [isImageFormat, setIsImageFormat] = useState<boolean>(false);
 
-  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStepMessage, setAiStepMessage] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiFailed, setAiFailed] = useState<boolean>(false);
 
@@ -490,14 +491,19 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setAiLoading(true);
     setAiError(null);
     setError(null);
+    setAiStepMessage("1/2 Lecture locale de la photo…");
+
     try {
       // 1. Lance l'OCR Tesseract local existant pour extraire le texte brut
       let allWordsText: string[] = [];
       for (const fileItem of selectedFiles) {
         const details = await extractTableWithDetails(fileItem);
-        allWordsText.push((details.words || []).map((w: WordItem) => w.text).join(' '));
+        const imgText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
+        allWordsText.push(imgText);
       }
       const rawOcrText = allWordsText.join('\n');
+
+      setAiStepMessage("2/2 Reconstruction par IA…");
 
       // 2. Envoie le texte brut à POST /api/v1/ai/structure
       const token = localStorage.getItem('studyvault_access_token') || '';
@@ -515,9 +521,19 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && Array.isArray(data.data?.rows)) {
-          setRawRows(data.data.rows);
-          autoDetect(data.data.rows);
+        let extractedRows: string[][] = Array.isArray(data.data?.rows) ? data.data.rows : [];
+
+        if (extractedRows.length > 0) {
+          const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
+          const firstRowStr = (extractedRows[0] || []).join(' ').toLowerCase();
+          const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
+
+          if (!hasHeaderKeywords) {
+            extractedRows = [defaultHeader, ...extractedRows];
+          }
+
+          setRawRows(extractedRows);
+          autoDetect(extractedRows);
           return;
         }
       }
@@ -539,6 +555,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       }
     } finally {
       setAiLoading(false);
+      setAiStepMessage(null);
     }
   };
 
@@ -1004,6 +1021,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                     )}
                   </button>
                 </div>
+                {aiLoading && aiStepMessage && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#a5b4fc', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.25rem' }}>
+                    <RefreshCw size={14} className="spinning" />
+                    <span>{aiStepMessage}</span>
+                  </div>
+                )}
               </div>
             )}
 
