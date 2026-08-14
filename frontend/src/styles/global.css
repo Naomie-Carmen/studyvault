@@ -148,22 +148,40 @@ button {
   background: var(--bg-sidebar, rgba(12, 12, 20, 0.88));
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  transform: translateX(0);
+  transform: translateX(-100%);
   transition: transform 0.3s ease;
 }
 
-.sidebar-backdrop { display: none; }
+.sidebar.open {
+  transform: translateX(0);
+}
 
-.mobile-close-btn {
-  display: none;
-  background: none;
-  border: none;
+.sidebar-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+}
+
+.sidebar-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
   color: var(--text-muted, #9ca3af);
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
+  transition: all 0.2s ease;
 }
-.mobile-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.sidebar-close-btn:hover {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
 
 .sidebar-header {
   display: flex;
@@ -294,10 +312,11 @@ button {
 /* ---------- Layout principal ---------- */
 .main-layout {
   flex: 1;
-  margin-left: 280px;
+  margin-left: 0;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  transition: margin-left 0.3s ease;
 }
 .content-area {
   flex: 1;
@@ -305,20 +324,27 @@ button {
   width: 100%;
 }
 
-/* ---------- Responsive mobile / tablette ---------- */
-@media (max-width: 1023px) {
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); }
+/* Desktop layout (>= 1024px) */
+@media (min-width: 1024px) {
   .sidebar-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
+    display: none !important;
   }
-  .mobile-close-btn { display: inline-flex; }
-  .main-layout { margin-left: 0; }
-  .content-area { padding: 1rem; }
+  .main-layout:not(.sidebar-closed) {
+    margin-left: 280px;
+  }
+  .main-layout.sidebar-closed {
+    margin-left: 0 !important;
+  }
+}
+
+/* Mobile/Tablette layout (< 1024px) */
+@media (max-width: 1023px) {
+  .main-layout {
+    margin-left: 0 !important;
+  }
+  .content-area {
+    padding: 1rem;
+  }
 }
 
 .brand-logo {

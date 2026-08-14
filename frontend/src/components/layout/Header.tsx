@@ -1,11 +1,13 @@
 import React from 'react';
-import { LogIn, User, LogOut, GraduationCap } from 'lucide-react';
+import { LogIn, User, LogOut, GraduationCap, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useAcademic } from '../../context/useAcademic';
 import { GlobalSearch } from '../search/GlobalSearch';
 import { DocumentItem } from '../../types/document';
 
 interface HeaderProps {
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   onNavigateLogin?: () => void;
   onNavigateRegister?: () => void;
   onNavigateAcademicProfile?: () => void;
@@ -14,6 +16,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  sidebarOpen,
+  onToggleSidebar,
   onNavigateLogin,
   onNavigateRegister,
   onNavigateAcademicProfile,
@@ -26,6 +30,16 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="app-header">
       <div className="header-brand">
+        {!sidebarOpen && onToggleSidebar && (
+          <button
+            className="sidebar-toggle-btn"
+            onClick={onToggleSidebar}
+            aria-label="Ouvrir le menu"
+            title="Ouvrir le menu"
+          >
+            <PanelLeftOpen size={20} />
+          </button>
+        )}
         <div className="brand-logo">SV</div>
         <span className="brand-title">StudyVault</span>
         <span className="brand-badge">SaaS</span>
@@ -99,6 +113,28 @@ export const Header: React.FC<HeaderProps> = ({
           display: flex;
           align-items: center;
           gap: var(--space-sm);
+        }
+
+        .sidebar-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.45rem;
+          border-radius: var(--radius-md, 8px);
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+          color: var(--text-primary, #ffffff);
+          transition: all 0.2s ease;
+          cursor: pointer;
+          margin-right: 0.2rem;
+        }
+
+        .sidebar-toggle-btn:hover {
+          background: rgba(99, 102, 241, 0.2);
+          border-color: rgba(99, 102, 241, 0.4);
+          color: #818cf8;
+          transform: translateY(-1px);
+          box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
         }
 
         .brand-logo {

@@ -37,7 +37,9 @@ export const App: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('landing');
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
+  });
   const [showTour, setShowTour] = useState<boolean>(false);
   const [resetToken, setResetToken] = useState<string>('');
   const [showDesktopUpdateBanner, setShowDesktopUpdateBanner] = useState<boolean>(false);
@@ -361,8 +363,10 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="main-layout">
+      <div className={`main-layout ${!sidebarOpen ? 'sidebar-closed' : ''}`}>
         <Header
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onNavigateLogin={() => handleTabChange('login')}
           onNavigateRegister={() => handleTabChange('register')}
           onNavigateAcademicProfile={() => handleTabChange('academic-profile')}

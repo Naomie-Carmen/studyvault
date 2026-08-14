@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {onToggle && (
-            <button className="mobile-close-btn" onClick={onToggle}>
+            <button className="sidebar-close-btn" onClick={onToggle} aria-label="Fermer le menu" title="Fermer le menu">
               <X size={20} />
             </button>
           )}
