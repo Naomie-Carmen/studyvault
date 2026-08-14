@@ -30,9 +30,9 @@ const BetaLandingPage = lazy(() => import('./pages/BetaLandingPage').then(m => (
 const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').then(m => ({ default: m.BetaDashboardPage })));
 
 export const App: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
- const [activeTab, setActiveTab] = useState<string>('landing');
+  const [activeTab, setActiveTab] = useState<string>('landing');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [showTour, setShowTour] = useState<boolean>(false);
   const [resetToken, setResetToken] = useState<string>('');
@@ -40,6 +40,61 @@ export const App: React.FC = () => {
   const [healthData, setHealthData] = useState<HealthCheckData | null>(null);
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
   const [errorHealth, setErrorHealth] = useState<string | null>(null);
+
+  if (authLoading) {
+    return (
+      <div className="session-loading-screen">
+        <div className="session-loading-content">
+          <div className="session-loading-spinner" />
+          <h2 className="session-loading-title">StudyVault</h2>
+          <p className="session-loading-sub">Chargement de la session...</p>
+        </div>
+        <style>{`
+          .session-loading-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-primary, #0f172a);
+            color: var(--text-primary, #f8fafc);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          .session-loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            text-align: center;
+          }
+          .session-loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(99, 102, 241, 0.2);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: session-spin 1s linear infinite;
+          }
+          .session-loading-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            margin: 0;
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          .session-loading-sub {
+            font-size: 0.9rem;
+            color: var(--text-muted, #94a3b8);
+            margin: 0;
+          }
+          @keyframes session-spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   const loadHealthStatus = async () => {
     setLoadingHealth(true);

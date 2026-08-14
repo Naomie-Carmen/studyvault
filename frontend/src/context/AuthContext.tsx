@@ -47,9 +47,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshSession = useCallback(async () => {
     try {
       const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
-      const res = await authService.refresh(storedRefreshToken || undefined);
+      if (!storedRefreshToken) {
+        updateTokensAndUser(null, null, null);
+        return;
+      }
+
+      const res = await authService.refresh(storedRefreshToken);
       if (res.success && res.data) {
-        updateTokensAndUser(res.data.user, res.data.accessToken, res.data.refreshToken);
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken, user: refreshedUser } = res.data;
+        
+        // Save tokens in client and localStorage
+        setClientAccessToken(newAccessToken);
+        persistToken(ACCESS_TOKEN_KEY, newAccessToken);
+        if (newRefreshToken) {
+          persistToken(REFRESH_TOKEN_KEY, newRefreshToken);
+        }
+        setAccessToken(newAccessToken);
+
+        // Charger le profil via GET /auth/me
+        const meRes = await authService.getMe();
+        if (meRes.success && meRes.data) {
+          setUser(meRes.data);
+        } else if (refreshedUser) {
+          setUser(refreshedUser);
+        } else {
+          updateTokensAndUser(null, null, null);
+        }
       } else {
         updateTokensAndUser(null, null, null);
       }
@@ -67,6 +90,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     refreshSession();
   }, [refreshSession]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      updateTokensAndUser(null, null, null);
+    };
+
+    window.addEventListener('studyvault:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('studyvault:unauthorized', handleUnauthorized);
+    };
+  }, [updateTokensAndUser]);
 
   const handleLogin = async (data: LoginInput) => {
     setIsLoading(true);
@@ -102,13 +136,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleLogout = async () => {
     setIsLoading(true);
-    try {
-      const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
-      await authService.logout(storedRefreshToken || undefined);
-    } catch (_err) {
-      // Local cleanup must happen even if the server call fails.
-    }
+    const storedRefreshToken = readStoredToken(REFRESH_TOKEN_KEY);
+    // DELETE localStorage & reset state first
     updateTokensAndUser(null, null, null);
+
+    if (storedRefreshToken) {
+      try {
+        await authService.logout(storedRefreshToken);
+      } catch (_err) {
+        // Ignore if logout API call fails
+      }
+    }
     setIsLoading(false);
   };
 
