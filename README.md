@@ -84,7 +84,7 @@ L'application démarre simultanément :
    - `CLIENT_URL` — URL exacte du site statique frontend, ex. `https://studyvault.onrender.com`
    - `JWT_SECRET` / `REFRESH_TOKEN_SECRET` — secrets longs et aléatoires
    - `GEMINI_API_KEY` — Clé d'API Google Gemini pour l'extraction vision IA des maquettes et plannings
-   - `GEMINI_MODEL` — Modèle d'extraction Vision (défaut : `gemini-2.5-flash-preview-05-20` avec fallback automatique sur `gemini-2.0-flash` et `gemini-1.5-flash-latest`)
+   - `GEMINI_MODEL` — Modèle d'extraction Vision (défaut : `gemini-1.5-flash` avec fallback automatique sur `gemini-1.5-pro`, `gemini-2.0-flash-exp` et découverte dynamique via `ModelService.ListModels`)
    - `STORAGE_DRIVER=local` (optionnel), `NODE_ENV=production`
 5. ⚠️ **Démarrage à froid** : sur le plan gratuit, Render met l'instance en veille. Le premier appel peut prendre **30 à 60 s**. Les requêtes échouées avant le réveil doivent être rejouées.
 

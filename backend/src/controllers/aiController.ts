@@ -4,8 +4,41 @@ import { ApiError } from '../utils/apiError';
 import { env } from '../config/env';
 
 /**
- * Appelle l'API Gemini pour générer du contenu structuré JSON à partir d'images
- * avec liste de fallback intelligente en cas de modèle obsolète ou indisponible (404).
+ * Interroge l'API Google Gemini ListModels pour obtenir la liste dynamique
+ * des modèles actuellement disponibles et supportant `generateContent`.
+ */
+async function fetchAvailableGeminiModels(apiKey: string): Promise<string[]> {
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    console.log('[Gemini] Interrogation dynamique de ModelService.ListModels...');
+    const response = await fetch(listUrl);
+    if (!response.ok) return [];
+
+    const data = (await response.json()) as any;
+    if (!data.models || !Array.isArray(data.models)) return [];
+
+    const validModels: string[] = [];
+    for (const m of data.models) {
+      if (
+        m.name &&
+        Array.isArray(m.supportedGenerationMethods) &&
+        m.supportedGenerationMethods.includes('generateContent')
+      ) {
+        const cleanName = m.name.replace(/^models\//, '');
+        validModels.push(cleanName);
+      }
+    }
+    console.log(`[Gemini] Modèles découverts dynamiquement (${validModels.length}) :`, validModels.join(', '));
+    return validModels;
+  } catch (err) {
+    console.error('[Gemini] Erreur lors de la découverte dynamique des modèles:', err);
+    return [];
+  }
+}
+
+/**
+ * Appelle l'API Gemini avec fallback automatique et découverte dynamique
+ * des modèles disponibles via ModelService.ListModels.
  */
 async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
@@ -13,10 +46,17 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
     throw ApiError.unauthorized('Clé API Gemini non configurée (GEMINI_API_KEY).', 'NO_GEMINI_KEY');
   }
 
-  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20';
-  const modelCandidates = Array.from(
-    new Set([preferredModel, 'gemini-2.5-flash-preview-05-20', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'])
-  );
+  const envModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const defaultCandidates = [
+    envModel,
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp',
+    'gemini-2.0-flash-001',
+    'gemini-1.5-flash-8b',
+  ];
+
+  let modelCandidates = Array.from(new Set(defaultCandidates));
 
   const parts: any[] = [{ text: prompt }];
 
@@ -40,9 +80,12 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
     },
   };
 
-  let lastError: Error | null = null;
+  let lastErrorText = '';
+  let triedModels = new Set<string>();
 
+  // Étape 1 : Essayer les modèles candidats prédéfinis
   for (const model of modelCandidates) {
+    triedModels.add(model);
     console.log(`[Gemini] Modèle utilisé : ${model}`);
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -58,6 +101,7 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
 
       if (!response.ok) {
         const errText = await response.text();
+        lastErrorText = errText;
         console.error(`[Gemini API Error ${response.status} avec ${model}]`, errText);
 
         const isModelUnavailable =
@@ -68,14 +112,13 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
 
         if (isModelUnavailable) {
           console.warn(`[Gemini] Modèle ${model} indisponible (404/obsolète), tentative de fallback...`);
-          lastError = new Error(`Modèle ${model} indisponible (404)`);
           continue;
         }
 
         throw ApiError.badGateway(`Erreur API Gemini (${response.status}) : ${errText}`, 'GEMINI_API_ERROR');
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as any;
       const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       if (!rawJsonText) {
@@ -90,12 +133,57 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
       }
     } catch (err: any) {
       if (err instanceof ApiError) throw err;
-      lastError = err;
+      lastErrorText = err?.message || String(err);
+    }
+  }
+
+  // Étape 2 : Découverte dynamique si aucun candidat par défaut n'a fonctionné
+  console.warn('[Gemini] Aucun modèle par défaut fonctionnel. Découverte dynamique via ListModels...');
+  const discoveredModels = await fetchAvailableGeminiModels(apiKey);
+
+  for (const model of discoveredModels) {
+    if (triedModels.has(model)) continue;
+    triedModels.add(model);
+
+    console.log(`[Gemini] Modèle découvert utilisé : ${model}`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        lastErrorText = errText;
+        console.error(`[Gemini API Error ${response.status} avec ${model}]`, errText);
+        continue;
+      }
+
+      const result = (await response.json()) as any;
+      const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!rawJsonText) continue;
+
+      try {
+        return JSON.parse(rawJsonText);
+      } catch (parseErr) {
+        console.error('[Gemini JSON Parse Error]', rawJsonText);
+        continue;
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError) throw err;
+      lastErrorText = err?.message || String(err);
     }
   }
 
   throw ApiError.badGateway(
-    `Tous les modèles Gemini ont échoué ou sont indisponibles. Dernier détail : ${lastError?.message || 'Erreur inconnue'}`,
+    `Tous les modèles Gemini ont été tentés et ont tous échoué. Dernier détail d'erreur : ${lastErrorText}`,
     'ALL_GEMINI_MODELS_FAILED'
   );
 }
