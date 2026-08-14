@@ -12,9 +12,118 @@ interface WordItem {
   };
 }
 
+export interface DetectedGrid {
+  horizontalLines: number[];
+  verticalLines: number[];
+}
+
 /**
- * Reconstruit la structure 2D (tableau 2D string[][]) d'un document ou tableau
- * à partir des coordonnées des mots (bounding boxes Tesseract).
+ * Détecte la grille (traits horizontaux et verticaux noirs/sombres) sur le canvas d'une maquette.
+ * Retourne les coordonnées des frontières horizontales et verticales, ou null si aucune grille explicite.
+ */
+export function detectGrid(canvas: HTMLCanvasElement): DetectedGrid | null {
+  const width = canvas.width;
+  const height = canvas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || width === 0 || height === 0) return null;
+
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+
+  // 1. Frontières HORIZONTALES : pour chaque y, ratio de pixels sombres sur la largeur
+  const darkYCandidates: boolean[] = new Array(height).fill(false);
+  for (let y = 0; y < height; y++) {
+    let darkCount = 0;
+    const rowOffset = y * width * 4;
+    for (let x = 0; x < width; x++) {
+      const idx = rowOffset + x * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (luminance < 128) {
+        darkCount++;
+      }
+    }
+    if (darkCount / width > 0.5) {
+      darkYCandidates[y] = true;
+    }
+  }
+
+  // Regrouper les y consécutifs (±3 px) en une frontière unique
+  const horizontalLines: number[] = [];
+  let tempGroup: number[] = [];
+
+  for (let y = 0; y < height; y++) {
+    if (darkYCandidates[y]) {
+      tempGroup.push(y);
+    } else {
+      if (tempGroup.length > 0) {
+        const avgY = Math.round(tempGroup.reduce((a, b) => a + b, 0) / tempGroup.length);
+        horizontalLines.push(avgY);
+        tempGroup = [];
+      }
+    }
+  }
+  if (tempGroup.length > 0) {
+    const avgY = Math.round(tempGroup.reduce((a, b) => a + b, 0) / tempGroup.length);
+    horizontalLines.push(avgY);
+  }
+
+  if (horizontalLines.length < 3) return null;
+
+  // 2. Frontières VERTICALES : calculées entre la première et la dernière frontière horizontale
+  const minY = horizontalLines[0];
+  const maxY = horizontalLines[horizontalLines.length - 1];
+  const spanY = Math.max(1, maxY - minY);
+
+  const darkXCandidates: boolean[] = new Array(width).fill(false);
+  for (let x = 0; x < width; x++) {
+    let darkCount = 0;
+    for (let y = minY; y <= maxY; y++) {
+      const idx = (y * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (luminance < 128) {
+        darkCount++;
+      }
+    }
+    if (darkCount / spanY > 0.5) {
+      darkXCandidates[x] = true;
+    }
+  }
+
+  // Regrouper les x consécutifs (±3 px) en une frontière unique
+  const verticalLines: number[] = [];
+  let tempXGroup: number[] = [];
+
+  for (let x = 0; x < width; x++) {
+    if (darkXCandidates[x]) {
+      tempXGroup.push(x);
+    } else {
+      if (tempXGroup.length > 0) {
+        const avgX = Math.round(tempXGroup.reduce((a, b) => a + b, 0) / tempXGroup.length);
+        verticalLines.push(avgX);
+        tempXGroup = [];
+      }
+    }
+  }
+  if (tempXGroup.length > 0) {
+    const avgX = Math.round(tempXGroup.reduce((a, b) => a + b, 0) / tempXGroup.length);
+    verticalLines.push(avgX);
+  }
+
+  if (verticalLines.length < 3) return null;
+
+  return { horizontalLines, verticalLines };
+}
+
+/**
+ * Reconstruit la structure 2D (tableau 2D string[][]) d'une image de maquette.
+ * Utilise en priorité la détection de grille (bordures sombres).
+ * Si aucune grille n'est trouvée, utilise le clustering par bounding boxes.
  */
 export async function extractTableFromImage(
   file: File,
@@ -23,11 +132,11 @@ export async function extractTableFromImage(
   onProgress?.('Préparation et optimisation de l\'image...', 10);
   const canvas = await loadAndPrepareImage(file);
 
-  onProgress?.('Analyse OCR et extraction des coordonnées...', 30);
+  onProgress?.('Analyse de la grille et extraction OCR...', 30);
   const res = await Tesseract.recognize(canvas, 'fra+eng', {
     logger: (m) => {
       if (m.status === 'recognizing text' && m.progress) {
-        onProgress?.('Reconnaissance du texte et coordonnées...', Math.round(30 + m.progress * 50));
+        onProgress?.('Reconnaissance des mots et coordonnées...', Math.round(30 + m.progress * 50));
       }
     },
   });
@@ -35,10 +144,10 @@ export async function extractTableFromImage(
   const rawText = res.data.text || '';
   const wordsRaw = (res.data as any).words as WordItem[] | undefined;
 
-  // Fallback si pas de mots exploitables
+  // Fallback si aucun mot utilisable
   if (!wordsRaw || !Array.isArray(wordsRaw) || wordsRaw.length === 0) {
     onProgress?.('Utilisation du fallback texte brut...', 90);
-    return fallbackRawTextToRows(rawText);
+    return cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
   // Filtrage : confiance > 30 et texte non vide
@@ -47,111 +156,150 @@ export async function extractTableFromImage(
   );
 
   if (words.length === 0) {
-    return fallbackRawTextToRows(rawText);
+    return cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
-  // 1. Calcul de la hauteur médiane des mots pour définir les seuils adaptatifs
-  const heights = words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
-  const medianHeight = heights[Math.floor(heights.length / 2)] || 20;
+  // Tentative de détection de la grille binaire
+  onProgress?.('Détection de la grille du tableau...', 85);
+  const grid = detectGrid(canvas);
 
-  // 2. Tri des mots par position verticale (y0)
-  words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+  let rawRows: string[][] = [];
 
-  // 3. Groupement en lignes horizontales
-  interface LineBucket {
-    words: WordItem[];
-    minY: number;
-    maxY: number;
-  }
-  const lines: LineBucket[] = [];
+  if (grid) {
+    // -------------------------------------------------------------
+    // OPTION A : Extraction basée sur la grille détectée
+    // -------------------------------------------------------------
+    const numRows = grid.horizontalLines.length - 1;
+    const numCols = grid.verticalLines.length - 1;
 
-  for (const word of words) {
-    const wMinY = word.bbox.y0;
-    const wMaxY = word.bbox.y1;
+    const gridMatrix: WordItem[][][] = Array.from({ length: numRows }, () =>
+      Array.from({ length: numCols }, () => [])
+    );
 
-    let added = false;
-    if (lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
-      // Nouvelle ligne si le haut du mot dépasse le bas de la ligne moins 40% de la hauteur médiane
-      if (wMinY <= lastLine.maxY - 0.4 * medianHeight) {
-        lastLine.words.push(word);
-        lastLine.minY = Math.min(lastLine.minY, wMinY);
-        lastLine.maxY = Math.max(lastLine.maxY, wMaxY);
-        added = true;
+    for (const word of words) {
+      const centerX = (word.bbox.x0 + word.bbox.x1) / 2;
+      const centerY = (word.bbox.y0 + word.bbox.y1) / 2;
+
+      let r = -1;
+      for (let i = 0; i < numRows; i++) {
+        if (centerY >= grid.horizontalLines[i] && centerY < grid.horizontalLines[i + 1]) {
+          r = i;
+          break;
+        }
+      }
+
+      let c = -1;
+      for (let j = 0; j < numCols; j++) {
+        if (centerX >= grid.verticalLines[j] && centerX < grid.verticalLines[j + 1]) {
+          c = j;
+          break;
+        }
+      }
+
+      if (r >= 0 && c >= 0) {
+        gridMatrix[r][c].push(word);
       }
     }
 
-    if (!added) {
-      lines.push({
-        words: [word],
-        minY: wMinY,
-        maxY: wMaxY,
-      });
+    for (let r = 0; r < numRows; r++) {
+      const rowCells: string[] = [];
+      for (let c = 0; c < numCols; c++) {
+        const cellWords = gridMatrix[r][c];
+        cellWords.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+        const cellText = cellWords.map((w) => w.text.trim()).join(' ');
+        rowCells.push(cellText);
+      }
+      if (rowCells.some((cell) => cell.length > 0)) {
+        rawRows.push(rowCells);
+      }
     }
-  }
+  } else {
+    // -------------------------------------------------------------
+    // OPTION B (Fallback) : Clustering par Bounding Boxes
+    // -------------------------------------------------------------
+    const heights = words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
+    const medianHeight = heights[Math.floor(heights.length / 2)] || 20;
 
-  // 4. Groupement des cellules par ligne (colonnes)
-  const rows: string[][] = [];
+    words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
 
-  for (const line of lines) {
-    // Tri des mots de la ligne de gauche à droite (x0)
-    line.words.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    interface LineBucket {
+      words: WordItem[];
+      minY: number;
+      maxY: number;
+    }
+    const lines: LineBucket[] = [];
 
-    const lineHeights = line.words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
-    const lineMedianHeight = lineHeights[Math.floor(lineHeights.length / 2)] || medianHeight;
+    for (const word of words) {
+      const wMinY = word.bbox.y0;
+      const wMaxY = word.bbox.y1;
 
-    // Seuil de séparation des colonnes
-    const gapThreshold = Math.max(12, 0.5 * lineMedianHeight);
+      let added = false;
+      if (lines.length > 0) {
+        const lastLine = lines[lines.length - 1];
+        if (wMinY <= lastLine.maxY - 0.4 * medianHeight) {
+          lastLine.words.push(word);
+          lastLine.minY = Math.min(lastLine.minY, wMinY);
+          lastLine.maxY = Math.max(lastLine.maxY, wMaxY);
+          added = true;
+        }
+      }
 
-    const rowCells: string[] = [];
-    let currentCellWords: string[] = [];
-    let prevX1 = -1;
+      if (!added) {
+        lines.push({
+          words: [word],
+          minY: wMinY,
+          maxY: wMaxY,
+        });
+      }
+    }
 
-    for (const word of line.words) {
-      const wordText = word.text.trim();
-      if (prevX1 !== -1 && word.bbox.x0 - prevX1 > gapThreshold) {
+    for (const line of lines) {
+      line.words.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+
+      const lineHeights = line.words.map((w) => Math.abs(w.bbox.y1 - w.bbox.y0)).sort((a, b) => a - b);
+      const lineMedianHeight = lineHeights[Math.floor(lineHeights.length / 2)] || medianHeight;
+      const gapThreshold = Math.max(12, 0.5 * lineMedianHeight);
+
+      const rowCells: string[] = [];
+      let currentCellWords: string[] = [];
+      let prevX1 = -1;
+
+      for (const word of line.words) {
+        const wordText = word.text.trim();
+        if (prevX1 !== -1 && word.bbox.x0 - prevX1 > gapThreshold) {
+          rowCells.push(currentCellWords.join(' '));
+          currentCellWords = [wordText];
+        } else {
+          currentCellWords.push(wordText);
+        }
+        prevX1 = word.bbox.x1;
+      }
+
+      if (currentCellWords.length > 0) {
         rowCells.push(currentCellWords.join(' '));
-        currentCellWords = [wordText];
-      } else {
-        currentCellWords.push(wordText);
       }
-      prevX1 = word.bbox.x1;
-    }
 
-    if (currentCellWords.length > 0) {
-      rowCells.push(currentCellWords.join(' '));
-    }
-
-    if (rowCells.length > 0) {
-      rows.push(rowCells);
+      if (rowCells.length > 0) {
+        rawRows.push(rowCells);
+      }
     }
   }
 
-  // 5. Filtrage du bruit (mentions légales, numéros de page isolés, etc.)
-  const cleanRows: string[][] = [];
-  for (const row of rows) {
-    if (row.length === 1) {
-      const txt = row[0].trim();
-      if (/^©$/i.test(txt) || /^page\s*\d*/i.test(txt) || txt.length < 3) {
-        continue;
-      }
-    }
-    cleanRows.push(row);
-  }
+  // 3. Nettoyage sémantique des lignes parasites
+  const cleanedRows = cleanSemanticRows(rawRows);
 
-  // 6. Vérification du nombre max de colonnes : si < 2 colonnes, fallback texte brut
-  const maxCols = Math.max(...cleanRows.map((r) => r.length), 0);
+  const maxCols = Math.max(...cleanedRows.map((r) => r.length), 0);
   if (maxCols < 2) {
-    onProgress?.('Structure peu marquée, passage au fallback...', 95);
-    return fallbackRawTextToRows(rawText);
+    onProgress?.('Structure peu marquée, passage au fallback texte brut...', 95);
+    return cleanSemanticRows(fallbackRawTextToRows(rawText));
   }
 
   onProgress?.('Reconstruction du tableau terminée !', 100);
-  return cleanRows;
+  return cleanedRows;
 }
 
 /**
- * Traite séquentiellement plusieurs images et concatène leurs lignes 2D
+ * Traite séquentiellement plusieurs images et concatène leurs lignes 2D.
  */
 export async function extractTableFromMultipleImages(
   files: File[],
@@ -174,6 +322,46 @@ export async function extractTableFromMultipleImages(
 
   onProgress?.('Reconstruction globale terminée !', 100);
   return allRows;
+}
+
+/**
+ * Nettoie les lignes parasites et répétitives spécifiques aux maquettes (en-têtes répétées, crédits, mentions).
+ */
+function cleanSemanticRows(rows: string[][]): string[][] {
+  const result: string[][] = [];
+
+  for (const row of rows) {
+    const nonEmptyCells = row.map((c) => c.trim()).filter((c) => c.length > 0);
+    const fullRowText = nonEmptyCells.join(' ');
+
+    if (nonEmptyCells.length === 1) {
+      const txt = nonEmptyCells[0];
+      if (
+        /^©$/i.test(txt) ||
+        /^page\s*\d*/i.test(txt) ||
+        txt.length < 3 ||
+        /UE\s*(FONDAMENTALES|SPECIALITE|METHODOLOGIE)/i.test(txt) ||
+        /TOTAL\s+SEMESTRE/i.test(txt) ||
+        /CONTENUS DES|MASSE HORAIRE|MODALITES|COEF|Crédit/i.test(txt) ||
+        /MASTER|SEMESTRE N°/i.test(txt)
+      ) {
+        continue;
+      }
+    }
+
+    if (
+      nonEmptyCells.length <= 2 &&
+      (/UE\s*(FONDAMENTALES|SPECIALITE|METHODOLOGIE)/i.test(fullRowText) ||
+        /TOTAL\s+SEMESTRE/i.test(fullRowText) ||
+        /CONTENUS DES|MASSE HORAIRE|MODALITES/i.test(fullRowText))
+    ) {
+      continue;
+    }
+
+    result.push(row);
+  }
+
+  return result;
 }
 
 /**
