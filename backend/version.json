@@ -1,20 +1,27 @@
 {
-  "version": "1.0.2",
-  "releaseDate": "2026-08-07",
+  "version": "1.0.3",
+  "releaseDate": "2026-08-14",
   "channel": "stable",
   "notes": [
-    "Application desktop Tauri disponible pour Windows, macOS et Linux",
-    "Mises à jour automatiques silencieuses depuis l'application desktop",
+    "Centre de Mises à Jour style Play Store dans l'application desktop StudyVault",
+    "Session utilisateur persistante sur 7 jours avec refresh token automatique",
     "Guide utilisateur interactif avec tour guidé au premier démarrage",
     "Centre d'aide intégré avec articles et FAQ",
     "Page Mes Données pour la transparence sur le stockage",
-    "Bannière de notification pour les nouvelles versions web",
     "Conformité RGPD complète : export JSON et suppression sous 30 jours",
     "Classement intelligent des documents avec validation humaine obligatoire",
     "OCR d'emploi du temps depuis photo ou PDF",
     "Recherche globale multi-critères sur tous vos documents"
   ],
   "history": [
+    {
+      "version": "1.0.3",
+      "releaseDate": "2026-08-14",
+      "highlights": [
+        "Centre de Mises à Jour interactif desktop (Play Store style)",
+        "Session utilisateur persistante 7 jours avec rotation des tokens"
+      ]
+    },
     {
       "version": "1.0.2",
       "releaseDate": "2026-08-07",

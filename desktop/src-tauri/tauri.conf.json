@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "StudyVault",
-    "version": "1.0.2"
+    "version": "1.0.3"
   },
   "tauri": {
     "allowlist": {
@@ -21,6 +21,9 @@
         "all": false,
         "ask": true,
         "message": true
+      },
+      "process": {
+        "relaunch": true
       }
     },
     "bundle": {

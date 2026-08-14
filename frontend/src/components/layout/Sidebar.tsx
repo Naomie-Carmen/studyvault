@@ -1,5 +1,5 @@
 import logo from '../../assets/logo.png';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   GraduationCap, 
@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Database,
   BarChart3,
-  RotateCcw
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { useAcademic } from '../../context/useAcademic';
@@ -46,6 +47,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { profile, hasConfiguredProfile } = useAcademic();
+  const [hasUpdateAvailable, setHasUpdateAvailable] = useState<boolean>(false);
+
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && Boolean(
+      (window as any).__TAURI__ ||
+      (window as any).__TAURI_IPC__ ||
+      (window as any).__TAURI_METADATA__ ||
+      window.location.protocol.startsWith('tauri') ||
+      window.location.protocol.startsWith('asset')
+    );
+
+    if (isTauri) {
+      import('@tauri-apps/api/updater')
+        .then(({ checkUpdate }) => checkUpdate())
+        .then((res) => {
+          if (res?.shouldUpdate) {
+            setHasUpdateAvailable(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const selectedTab = activeTab || currentView || 'dashboard';
 
@@ -219,6 +242,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div className="nav-section">
             <span className="section-title">AIDE & RESSOURCES</span>
+
+            <button
+              className={`nav-item ${selectedTab === 'updates' ? 'active' : ''}`}
+              onClick={() => handleNav('updates')}
+              style={{ position: 'relative' }}
+            >
+              <RefreshCw size={18} />
+              <span>Mises à jour</span>
+              {hasUpdateAvailable && (
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f97316',
+                    marginLeft: 'auto',
+                    boxShadow: '0 0 6px rgba(249, 115, 22, 0.8)',
+                  }}
+                  title="Mise à jour disponible"
+                />
+              )}
+            </button>
 
             <button
               className={`nav-item ${selectedTab === 'changelog' ? 'active' : ''}`}

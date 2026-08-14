@@ -26,6 +26,7 @@ const OnboardingTour = lazy(() => import('./components/onboarding/OnboardingTour
 const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage'));
 const MyDataPage = lazy(() => import('./pages/MyDataPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
+const UpdatePage = lazy(() => import('./pages/UpdatePage'));
 const BetaLandingPage = lazy(() => import('./pages/BetaLandingPage').then(m => ({ default: m.BetaLandingPage })));
 const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').then(m => ({ default: m.BetaDashboardPage })));
 
@@ -36,10 +37,32 @@ export const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [showTour, setShowTour] = useState<boolean>(false);
   const [resetToken, setResetToken] = useState<string>('');
+  const [showDesktopUpdateBanner, setShowDesktopUpdateBanner] = useState<boolean>(false);
 
   const [healthData, setHealthData] = useState<HealthCheckData | null>(null);
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
   const [errorHealth, setErrorHealth] = useState<string | null>(null);
+
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && Boolean(
+      (window as any).__TAURI__ ||
+      (window as any).__TAURI_IPC__ ||
+      (window as any).__TAURI_METADATA__ ||
+      window.location.protocol.startsWith('tauri') ||
+      window.location.protocol.startsWith('asset')
+    );
+
+    if (isTauri) {
+      import('@tauri-apps/api/updater')
+        .then(({ checkUpdate }) => checkUpdate())
+        .then((res) => {
+          if (res?.shouldUpdate) {
+            setShowDesktopUpdateBanner(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   if (authLoading) {
     return (
@@ -272,6 +295,13 @@ export const App: React.FC = () => {
           </Suspense>
         );
 
+      case 'updates':
+        return (
+          <Suspense fallback={<div className="lazy-loading">Chargement du Centre de Mises à Jour…</div>}>
+            <UpdatePage />
+          </Suspense>
+        );
+
       default:
         return (
           <DashboardShell
@@ -286,6 +316,21 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {/* Desktop Update Notification Banner */}
+      {showDesktopUpdateBanner && (
+        <div className="desktop-update-banner">
+          <span>🎉 Une nouvelle version de StudyVault est disponible !</span>
+          <div className="banner-actions">
+            <button className="banner-view-btn" onClick={() => handleTabChange('updates')}>
+              Voir la mise à jour →
+            </button>
+            <button className="banner-close-btn" onClick={() => setShowDesktopUpdateBanner(false)}>
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Web Update Notification Banner */}
       <UpdateBanner />
 
@@ -331,6 +376,58 @@ export const App: React.FC = () => {
           min-height: 200px;
           color: var(--text-muted);
           font-size: 0.9rem;
+        }
+        .desktop-update-banner {
+          position: fixed;
+          top: 12px;
+          right: 24px;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.6rem 1.2rem;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(168, 85, 247, 0.95) 100%);
+          color: white;
+          border-radius: 30px;
+          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+          backdrop-filter: blur(8px);
+          font-size: 0.88rem;
+          font-weight: 500;
+          animation: bannerSlideDown 0.3s ease-out;
+        }
+        .banner-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .banner-view-btn {
+          background: rgba(255, 255, 255, 0.25);
+          color: white;
+          border: none;
+          padding: 0.3rem 0.8rem;
+          border-radius: 20px;
+          font-size: 0.82rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+        .banner-view-btn:hover {
+          background: rgba(255, 255, 255, 0.4);
+        }
+        .banner-close-btn {
+          background: transparent;
+          color: rgba(255, 255, 255, 0.8);
+          border: none;
+          font-size: 0.9rem;
+          cursor: pointer;
+          padding: 0 0.3rem;
+        }
+        .banner-close-btn:hover {
+          color: white;
+        }
+        @keyframes bannerSlideDown {
+          from { transform: translateY(-20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
     </div>

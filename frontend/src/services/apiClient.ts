@@ -1,9 +1,9 @@
 import { ApiResponse } from '../types/api';
 
-const isTauri = typeof window !== 'undefined' && (
-  '__TAURI__' in window ||
-  '__TAURI_IPC__' in window ||
-  '__TAURI_METADATA__' in window ||
+const isTauri = typeof window !== 'undefined' && Boolean(
+  (window as any).__TAURI__ ||
+  (window as any).__TAURI_IPC__ ||
+  (window as any).__TAURI_METADATA__ ||
   window.location.protocol.startsWith('tauri') ||
   window.location.protocol.startsWith('asset')
 );

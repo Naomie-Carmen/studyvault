@@ -71,18 +71,6 @@ fn main() {
     tauri::Builder::default()
         .menu(menu)
         .on_menu_event(handle_menu_event)
-        .setup(|app| {
-            // Vérification silencieuse des mises à jour au démarrage
-            let handle = app.handle();
-            tauri::async_runtime::spawn(async move {
-                if let Ok(update) = handle.updater().check().await {
-                    if update.is_update_available() {
-                        let _ = update.download_and_install().await;
-                    }
-                }
-            });
-            Ok(())
-        })
         .run(tauri::generate_context!())
         .expect("Erreur lors du lancement de l'application StudyVault Desktop");
 }
