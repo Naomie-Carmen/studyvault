@@ -4,7 +4,8 @@ import { ApiError } from '../utils/apiError';
 import { env } from '../config/env';
 
 /**
- * Appelle l'API Gemini 2.5 Flash pour générer du contenu structuré JSON à partir d'images
+ * Appelle l'API Gemini pour générer du contenu structuré JSON à partir d'images
+ * avec liste de fallback intelligente en cas de modèle obsolète ou indisponible (404).
  */
 async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
@@ -12,8 +13,10 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
     throw ApiError.unauthorized('Clé API Gemini non configurée (GEMINI_API_KEY).', 'NO_GEMINI_KEY');
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20';
+  const modelCandidates = Array.from(
+    new Set([preferredModel, 'gemini-2.5-flash-preview-05-20', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'])
+  );
 
   const parts: any[] = [{ text: prompt }];
 
@@ -37,34 +40,64 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
     },
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`[Gemini API Error ${response.status}]`, errText);
-    throw ApiError.badGateway(`Erreur API Gemini (${response.status}) : ${errText}`, 'GEMINI_API_ERROR');
+  for (const model of modelCandidates) {
+    console.log(`[Gemini] Modèle utilisé : ${model}`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[Gemini API Error ${response.status} avec ${model}]`, errText);
+
+        const isModelUnavailable =
+          response.status === 404 ||
+          errText.includes('no longer available') ||
+          errText.includes('not found') ||
+          errText.includes('is not supported');
+
+        if (isModelUnavailable) {
+          console.warn(`[Gemini] Modèle ${model} indisponible (404/obsolète), tentative de fallback...`);
+          lastError = new Error(`Modèle ${model} indisponible (404)`);
+          continue;
+        }
+
+        throw ApiError.badGateway(`Erreur API Gemini (${response.status}) : ${errText}`, 'GEMINI_API_ERROR');
+      }
+
+      const result = await response.json();
+      const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!rawJsonText) {
+        throw ApiError.badGateway('Aucune réponse textuelle générée par Gemini.', 'EMPTY_GEMINI_RESPONSE');
+      }
+
+      try {
+        return JSON.parse(rawJsonText);
+      } catch (parseErr) {
+        console.error('[Gemini JSON Parse Error]', rawJsonText);
+        throw ApiError.badGateway('La réponse générée par Gemini n\'est pas un JSON valide.', 'INVALID_JSON_RESPONSE');
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError) throw err;
+      lastError = err;
+    }
   }
 
-  const result = await response.json();
-  const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  if (!rawJsonText) {
-    throw ApiError.badGateway('Aucune réponse textuelle générée par Gemini.', 'EMPTY_GEMINI_RESPONSE');
-  }
-
-  try {
-    return JSON.parse(rawJsonText);
-  } catch (parseErr) {
-    console.error('[Gemini JSON Parse Error]', rawJsonText);
-    throw ApiError.badGateway('La réponse générée par Gemini n\'est pas un JSON valide.', 'INVALID_JSON_RESPONSE');
-  }
+  throw ApiError.badGateway(
+    `Tous les modèles Gemini ont échoué ou sont indisponibles. Dernier détail : ${lastError?.message || 'Erreur inconnue'}`,
+    'ALL_GEMINI_MODELS_FAILED'
+  );
 }
 
 export async function extractMaquette(req: Request, res: Response, next: NextFunction): Promise<void> {
