@@ -1,0 +1,100 @@
+import { Request, Response, NextFunction } from 'express';
+import { sendSuccess } from '../utils/apiResponse';
+import { ApiError } from '../utils/apiError';
+import { env } from '../config/env';
+
+/**
+ * Appelle l'API Gemini 2.5 Flash pour générer du contenu structuré JSON à partir d'images
+ */
+async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string): Promise<any> {
+  const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
+  if (!apiKey) {
+    throw ApiError.unauthorized('Clé API Gemini non configurée (GEMINI_API_KEY).', 'NO_GEMINI_KEY');
+  }
+
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const parts: any[] = [{ text: prompt }];
+
+  for (const file of images) {
+    const base64Data = file.buffer ? file.buffer.toString('base64') : '';
+    if (!base64Data) continue;
+    const mimeType = file.mimetype || 'image/jpeg';
+    parts.push({
+      inline_data: {
+        mime_type: mimeType,
+        data: base64Data,
+      },
+    });
+  }
+
+  const payload = {
+    contents: [{ parts }],
+    generationConfig: {
+      temperature: 0,
+      response_mime_type: 'application/json',
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`[Gemini API Error ${response.status}]`, errText);
+    throw ApiError.badGateway(`Erreur API Gemini (${response.status}) : ${errText}`, 'GEMINI_API_ERROR');
+  }
+
+  const result = await response.json();
+  const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  if (!rawJsonText) {
+    throw ApiError.badGateway('Aucune réponse textuelle générée par Gemini.', 'EMPTY_GEMINI_RESPONSE');
+  }
+
+  try {
+    return JSON.parse(rawJsonText);
+  } catch (parseErr) {
+    console.error('[Gemini JSON Parse Error]', rawJsonText);
+    throw ApiError.badGateway('La réponse générée par Gemini n\'est pas un JSON valide.', 'INVALID_JSON_RESPONSE');
+  }
+}
+
+export async function extractMaquette(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (!files || files.length === 0) {
+      throw ApiError.badRequest('Aucune photo de maquette envoyée.', 'NO_IMAGES');
+    }
+
+    const prompt = `Tu es un assistant d'extraction de maquette pédagogique universitaire. Extrais la structure de cette image sous forme de tableau JSON strict : { "rows": [ ["CODE_UE", "INTITULE_UE", "CODE_ECUE", "INTITULE_ECUE", "CM", "TD", "TP", "TPE", "ECTS"], ... ] }. Ne rien inventer ; recopier exactement les textes et nombres.`;
+
+    const extractedData = await callGeminiVisionApi(files, prompt);
+    sendSuccess(res, extractedData, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function extractTimetable(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (!files || files.length === 0) {
+      throw ApiError.badRequest('Aucune photo d\'emploi du temps envoyée.', 'NO_IMAGES');
+    }
+
+    const prompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Extrais le tableau de cette image en JSON strict, sans markdown : un tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP) (chaînes vides si absentes). Un objet par séance. Ne rien inventer ; recopier exactement.`;
+
+    const extractedData = await callGeminiVisionApi(files, prompt);
+    sendSuccess(res, extractedData, 200);
+  } catch (error) {
+    next(error);
+  }
+}

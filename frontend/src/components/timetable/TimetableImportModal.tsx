@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as timetableService from '../../services/timetableService';
 import * as ocrService from '../../services/ocrService';
 import { processMultiOrientationOCR } from '../../utils/ocrImage';
+import { API_BASE_URL } from '../../services/apiClient';
 import { ImportProgress } from './ImportProgress';
 import { TimetableValidationModal } from './TimetableValidationModal';
-import { X, UploadCloud, FileCheck, AlertCircle, Cpu, RefreshCw } from 'lucide-react';
+import { X, UploadCloud, FileCheck, AlertCircle, Cpu, RefreshCw, Sparkles } from 'lucide-react';
 
 interface TimetableImportModalProps {
   isOpen: boolean;
@@ -27,11 +28,121 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
   const [ocrStatus, setOcrStatus] = useState<string | null>(null);
   const [ocrProgress, setOcrProgress] = useState<number>(0);
 
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiFailed, setAiFailed] = useState<boolean>(false);
+
+  const modalCardRef = useRef<HTMLDivElement>(null);
+  const actionBlockRef = useRef<HTMLDivElement>(null);
+
+  const isImage = file ? (file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name)) : false;
+
+  useEffect(() => {
+    if (isOpen) {
+      if (modalCardRef.current) {
+        modalCardRef.current.scrollTop = 0;
+        modalCardRef.current.focus();
+      }
+      setFile(null);
+      setImportedId(null);
+      setIsProcessing(false);
+      setIsValidating(false);
+      setUploading(false);
+      setErrorMsg(null);
+      setOcrStatus(null);
+      setOcrProgress(0);
+      setAiLoading(false);
+      setAiError(null);
+      setAiFailed(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isImage && file) {
+      const timer = setTimeout(() => {
+        actionBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isImage, file]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      setAiError(null);
+      setAiFailed(false);
+      setErrorMsg(null);
+    }
+  };
+
+  const handleRunAiExtraction = async () => {
+    if (!file) return;
+    setAiLoading(true);
+    setAiError(null);
+    setErrorMsg(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('images', file);
+
+      const token = localStorage.getItem('studyvault_access_token') || '';
+      const response = await fetch(`${API_BASE_URL}/ai/extract-timetable`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const sessionsList = Array.isArray(data.data)
+        ? data.data
+        : Array.isArray(data.data?.sessions)
+        ? data.data.sessions
+        : Array.isArray(data.sessions)
+        ? data.sessions
+        : [];
+
+      if (sessionsList.length === 0) {
+        throw new Error('Aucune séance détectée par l\'IA.');
+      }
+
+      const textLines = sessionsList.map((s: any) => {
+        const jour = s.jour || s.day || '';
+        const start = s.startTime || s.start || '';
+        const end = s.endTime || s.end || '';
+        const type = s.type || '';
+        const mat = s.matiere || s.subject || '';
+        const room = s.salle || s.room || '';
+        const prof = s.enseignant || s.teacher || '';
+        const grp = s.groupe || s.group || '';
+        return `${jour} ${start} ${end} ${type} ${mat} ${room} ${prof} ${grp}`.trim();
+      });
+
+      const textContent = textLines.join('\n');
+      const textFile = new File([textContent], file.name.replace(/\.[^/.]+$/, '') + '-ai.txt', { type: 'text/plain' });
+
+      setOcrStatus('Téléversement et analyse des séances IA...');
+      const res = await timetableService.uploadTimetableFile(textFile);
+      if (res.success && res.data) {
+        setImportedId(res.data.id);
+        await ocrService.processImport(res.data.id);
+        setAiLoading(false);
+        setOcrStatus(null);
+        setIsProcessing(true);
+      } else {
+        throw new Error(res.error?.message || 'Erreur lors de la préparation des séances.');
+      }
+    } catch (_err) {
+      setAiFailed(true);
+      setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou vérifiez la clé GEMINI_API_KEY.");
+      setAiLoading(false);
     }
   };
 
@@ -45,7 +156,6 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     try {
       let fileToUpload: File = file;
 
-      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
       if (isImage) {
         setOcrStatus('Préparation et extraction OCR...');
         const extractedText = await processMultiOrientationOCR(file, (msg, pct) => {
@@ -53,7 +163,6 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
           setOcrProgress(pct);
         });
 
-        // Convert extracted text into a text File for timetable parsing
         const textFileName = file.name.replace(/\.[^/.]+$/, '') + '.txt';
         fileToUpload = new File([extractedText], textFileName, { type: 'text/plain' });
       }
@@ -86,10 +195,10 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
   return (
     <>
       <div className="modal-backdrop">
-        <div className="glass-card import-modal-card">
+        <div className="glass-card import-modal-card" ref={modalCardRef} tabIndex={-1}>
           <div className="modal-header">
             <h3>Importer un Emploi du Temps Officiel</h3>
-            <button className="btn-close" onClick={onClose} disabled={uploading}>
+            <button className="btn-close" onClick={onClose} disabled={uploading || aiLoading}>
               <X size={18} />
             </button>
           </div>
@@ -100,7 +209,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
             ) : (
               <>
                 <p className="import-info">
-                  Téléversez une photo ou un document PDF de votre emploi du temps pour déclencher l'<strong>extraction automatique par OCR</strong>.
+                  Téléversez une photo ou un document PDF de votre emploi du temps pour déclencher l'<strong>extraction automatique par IA ou OCR</strong>.
                 </p>
 
                 {errorMsg && (
@@ -123,7 +232,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                     id="timetable-file-input"
                     accept="application/pdf,image/png,image/jpeg"
                     onChange={handleFileChange}
-                    disabled={uploading}
+                    disabled={uploading || aiLoading}
                     className="file-input-hidden"
                   />
 
@@ -142,11 +251,115 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                     )}
                   </label>
                 </div>
+
+                {isImage && (
+                  <div
+                    className="extraction-mode-block"
+                    ref={actionBlockRef}
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.85rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <FileCheck size={18} className="text-cyan" />
+                      <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{file?.name || ''}</span>
+                    </div>
+
+                    {aiError && (
+                      <div className="alert alert-error" style={{ fontSize: '0.825rem', padding: '0.65rem 0.85rem' }}>
+                        <AlertCircle size={16} />
+                        <span>{aiError}</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      {/* Gros bouton violet Extraction IA (recommandé) */}
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleRunAiExtraction}
+                        disabled={aiLoading || uploading}
+                        style={{
+                          flex: 1,
+                          minWidth: '200px',
+                          padding: '0.75rem 1rem',
+                          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          cursor: aiLoading || uploading ? 'not-allowed' : 'pointer',
+                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                        }}
+                      >
+                        {aiLoading ? (
+                          <>
+                            <RefreshCw size={18} className="spinning" />
+                            <span>Analyse IA en cours…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={18} />
+                            <span>✨ Extraction IA (recommandé)</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Bouton secondaire Extraction locale (sans internet) */}
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={handleUploadAndRunOCR}
+                        disabled={aiLoading || uploading}
+                        style={{
+                          flex: 1,
+                          minWidth: '200px',
+                          padding: '0.75rem 1rem',
+                          background: aiFailed ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                          border: aiFailed ? '1px solid #818cf8' : '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          cursor: aiLoading || uploading ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {uploading ? (
+                          <>
+                            <RefreshCw size={18} className="spinning text-indigo" />
+                            <span>OCR local ({ocrProgress}%)…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Cpu size={18} className="text-indigo" />
+                            <span>Extraction locale (sans internet)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
 
-          {!isProcessing && (
+          {!isProcessing && !isImage && (
             <div className="modal-footer">
               <button className="btn-cancel" onClick={onClose}>
                 Annuler
@@ -154,10 +367,10 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
               <button
                 className="btn-submit"
                 onClick={handleUploadAndRunOCR}
-                disabled={!file || uploading}
+                disabled={!file || uploading || aiLoading}
               >
                 <Cpu size={16} />
-                <span>{uploading ? 'Téléversement...' : 'Lancer l\'Extraction OCR'}</span>
+                <span>{uploading ? 'Téléversement...' : 'Lancer l\'Extraction'}</span>
               </button>
             </div>
           )}
@@ -170,7 +383,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
           }
 
           .import-modal-card {
-            width: 100%; max-width: 500px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+            width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
           }
 
           .modal-header { display: flex; align-items: center; justify-content: space-between; }

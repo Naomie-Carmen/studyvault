@@ -14,6 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 import { StructureImportItem, StructureImportSummary } from '../../types/structure';
 import { importStructureBatch } from '../../services/academicStructureService';
+import { API_BASE_URL } from '../../services/apiClient';
 import {
   X,
   Upload,
@@ -491,12 +492,13 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setError(null);
     try {
       const formData = new FormData();
-      selectedFiles.forEach((f) => formData.append('files', f));
+      selectedFiles.forEach((f) => formData.append('images', f));
 
-      const response = await fetch('/api/academic-structure/extract-ai', {
+      const token = localStorage.getItem('studyvault_access_token') || '';
+      const response = await fetch(`${API_BASE_URL}/ai/extract-maquette`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('studyvault_access_token') || ''}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: formData,
       });

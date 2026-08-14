@@ -17,6 +17,7 @@ import favoriteRoutes from './favoriteRoutes';
 import quickAccessRoutes from './quickAccessRoutes';
 import tagRoutes from './tagRoutes';
 import personalFolderRoutes from './personalFolderRoutes';
+import aiRoutes from './aiRoutes';
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.use('/academic-structure', academicStructureRoutes);
 router.use('/documents', documentRoutes);
 router.use('/search', searchRoutes);
 router.use('/timetable', timetableRoutes);
+router.use('/ai', aiRoutes);
 router.use('/rgpd', rgpdRoutes);
 router.use('/version', versionRoutes); // App version & changelog
 router.use('/beta', betaRoutes); // Closed beta invitation & waitlist

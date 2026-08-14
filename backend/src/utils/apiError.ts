@@ -32,4 +32,8 @@ export class ApiError extends Error {
   static internal(message: string = 'Erreur interne du serveur', code: string = 'INTERNAL_SERVER_ERROR'): ApiError {
     return new ApiError(message, 500, code);
   }
+
+  static badGateway(message: string = 'Erreur de passerelle', code: string = 'BAD_GATEWAY'): ApiError {
+    return new ApiError(message, 502, code);
+  }
 }
