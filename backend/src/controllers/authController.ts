@@ -15,8 +15,8 @@ const REFRESH_COOKIE_NAME = 'studyvault_refresh';
 function setRefreshTokenCookie(res: Response, token: string): void {
   res.cookie(REFRESH_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: env.IS_PROD,
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: `${env.API_PREFIX}/auth`,
   });
@@ -25,8 +25,8 @@ function setRefreshTokenCookie(res: Response, token: string): void {
 function clearRefreshTokenCookie(res: Response): void {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     httpOnly: true,
-    secure: env.IS_PROD,
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     path: `${env.API_PREFIX}/auth`,
   });
 }
@@ -67,10 +67,31 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const token = req.cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken;
+    let token: string | undefined = undefined;
+
+    // 1) Priorité 1 : Body { refreshToken }
+    if (req.body && typeof req.body.refreshToken === 'string' && req.body.refreshToken.trim()) {
+      token = req.body.refreshToken.trim();
+    }
+
+    // 2) Priorité 2 : Header Authorization Bearer
+    if (!token && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        const headerToken = authHeader.slice(7).trim();
+        if (headerToken && headerToken !== 'undefined' && headerToken !== 'null') {
+          token = headerToken;
+        }
+      }
+    }
+
+    // 3) Priorité 3 : Cookie HTTP-only en dernier recours
+    if (!token && req.cookies && req.cookies[REFRESH_COOKIE_NAME]) {
+      token = req.cookies[REFRESH_COOKIE_NAME];
+    }
 
     if (!token) {
-      throw ApiError.unauthorized('Jeton de rafraîchissement absent.', 'NO_REFRESH_TOKEN');
+      throw ApiError.unauthorized('Refresh token manquant.', 'NO_REFRESH_TOKEN');
     }
 
     const { user, accessToken, refreshToken } = await authService.refreshSession(token);
@@ -79,14 +100,37 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     sendSuccess(res, { user, accessToken, refreshToken }, 200);
   } catch (error) {
     clearRefreshTokenCookie(res);
-    next(error);
+    if (error instanceof ApiError) {
+      next(error);
+    } else {
+      const errMsg = error instanceof Error ? error.message : 'Refresh token invalide ou expiré.';
+      next(ApiError.unauthorized(errMsg || 'Refresh token invalide ou expiré.', 'INVALID_REFRESH_TOKEN'));
+    }
   }
 }
 
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const token = req.cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken;
-    await authService.logoutUser(token);
+    let token: string | undefined = undefined;
+
+    if (req.body && typeof req.body.refreshToken === 'string' && req.body.refreshToken.trim()) {
+      token = req.body.refreshToken.trim();
+    }
+
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      const headerToken = req.headers.authorization.slice(7).trim();
+      if (headerToken && headerToken !== 'undefined' && headerToken !== 'null') {
+        token = headerToken;
+      }
+    }
+
+    if (!token && req.cookies && req.cookies[REFRESH_COOKIE_NAME]) {
+      token = req.cookies[REFRESH_COOKIE_NAME];
+    }
+
+    if (token) {
+      await authService.logoutUser(token);
+    }
     clearRefreshTokenCookie(res);
 
     sendSuccess(res, { message: 'Déconnexion réussie.' }, 200);

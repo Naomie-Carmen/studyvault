@@ -294,6 +294,12 @@ export async function extractTableFromImage(
   const otsuCanvas = binarizeOtsu(deskewedCanvas);
   const grid = detectGrid(otsuCanvas);
 
+  // Ignorer l'OCR si les dimensions sont inférieures à 40px (évite les avertissements WASM)
+  if (deskewedCanvas.width < 40 || deskewedCanvas.height < 40) {
+    console.warn('[ocrTable] Image trop petite (< 40px), passage d\'OCR ignoré.');
+    return [];
+  }
+
   // IMPORTANT : OCR exécuté sur le canvas REDRESSÉ pour correspondance exacte des bounding boxes
   onProgress?.('Reconnaissance OCR sur l\'image redressée...', 45);
   const res = await Tesseract.recognize(deskewedCanvas, 'fra+eng', {

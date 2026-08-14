@@ -18,16 +18,18 @@ export async function login(data: LoginInput): Promise<ApiResponse<AuthSuccessPa
 }
 
 export async function refresh(refreshToken?: string): Promise<ApiResponse<AuthSuccessPayload>> {
+  const tokenToUse = refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('studyvault_refresh_token') || undefined : undefined);
   return fetchApi<AuthSuccessPayload>('/auth/refresh', {
     method: 'POST',
-    ...(refreshToken ? { body: JSON.stringify({ refreshToken }) } : {}),
+    ...(tokenToUse ? { body: JSON.stringify({ refreshToken: tokenToUse }) } : {}),
   });
 }
 
 export async function logout(refreshToken?: string): Promise<ApiResponse<{ message: string }>> {
+  const tokenToUse = refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('studyvault_refresh_token') || undefined : undefined);
   return fetchApi<{ message: string }>('/auth/logout', {
     method: 'POST',
-    ...(refreshToken ? { body: JSON.stringify({ refreshToken }) } : {}),
+    ...(tokenToUse ? { body: JSON.stringify({ refreshToken: tokenToUse }) } : {}),
   });
 }
 
