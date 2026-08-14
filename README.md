@@ -84,8 +84,17 @@ L'application démarre simultanément :
    - `CLIENT_URL` — URL exacte du site statique frontend, ex. `https://studyvault.onrender.com`
    - `JWT_SECRET` / `REFRESH_TOKEN_SECRET` — secrets longs et aléatoires
    - `GEMINI_API_KEY` — Clé d'API Google Gemini pour l'extraction vision IA des maquettes et plannings
-   - `GEMINI_MODEL` — Modèle d'extraction Vision (défaut : `gemini-1.5-flash` avec fallback automatique sur `gemini-1.5-pro`, `gemini-2.0-flash-exp` et découverte dynamique via `ModelService.ListModels`)
+   - `GEMINI_MODEL` — Modèle d'extraction Vision (priorité : `gemini-2.5-pro` ➔ `gemini-2.0-flash-exp` ➔ `gemini-1.5-pro` ➔ `gemini-1.5-flash`)
+   - `CLOUDFLARE_ACCOUNT_ID` — ID de compte Cloudflare pour le fallback Cloudflare Workers AI
+   - `CLOUDFLARE_API_TOKEN` — Jeton API Cloudflare Workers AI (`@cf/meta/llama-3.2-11b-vision-preview`)
    - `STORAGE_DRIVER=local` (optionnel), `NODE_ENV=production`
+
+#### ☁️ Configuration de Cloudflare Workers AI (Fallback Vision gratuit — 2 min)
+1. Créez un compte **Cloudflare** (gratuit).
+2. Allez dans **Workers & Pages ➔ AI ➔ Create API Token**.
+3. Copiez votre **Account ID** (en haut à droite du tableau de bord Cloudflare).
+4. Ajoutez dans **Render Environment** : `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`.
+
 5. ⚠️ **Démarrage à froid** : sur le plan gratuit, Render met l'instance en veille. Le premier appel peut prendre **30 à 60 s**. Les requêtes échouées avant le réveil doivent être rejouées.
 
 ### Frontend statique (Render Static Site)

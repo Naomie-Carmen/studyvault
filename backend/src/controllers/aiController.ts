@@ -37,23 +37,22 @@ async function fetchAvailableGeminiModels(apiKey: string): Promise<string[]> {
 }
 
 /**
- * Appelle l'API Gemini avec fallback automatique et découverte dynamique
- * des modèles disponibles via ModelService.ListModels.
+ * Tente d'exécuter l'extraction vision via l'API Google Gemini.
+ * Ordre de priorité : gemini-2.5-pro -> gemini-2.0-flash-exp -> autres modèles candidats.
  */
 async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY || (env as any).GEMINI_API_KEY || '';
   if (!apiKey) {
-    throw ApiError.unauthorized('Clé API Gemini non configurée (GEMINI_API_KEY).', 'NO_GEMINI_KEY');
+    throw new Error('Clé API Gemini non configurée (GEMINI_API_KEY).');
   }
 
-  const envModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const envModel = process.env.GEMINI_MODEL;
   const defaultCandidates = [
-    envModel,
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    ...(envModel ? [envModel] : []),
+    'gemini-2.5-pro',
     'gemini-2.0-flash-exp',
-    'gemini-2.0-flash-001',
-    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
   ];
 
   let modelCandidates = Array.from(new Set(defaultCandidates));
@@ -83,7 +82,6 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
   let lastErrorText = '';
   let triedModels = new Set<string>();
 
-  // Étape 1 : Essayer les modèles candidats prédéfinis
   for (const model of modelCandidates) {
     triedModels.add(model);
     console.log(`[Gemini] Modèle utilisé : ${model}`);
@@ -115,30 +113,29 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
           continue;
         }
 
-        throw ApiError.badGateway(`Erreur API Gemini (${response.status}) : ${errText}`, 'GEMINI_API_ERROR');
+        throw new Error(`Erreur API Gemini (${response.status}) : ${errText}`);
       }
 
       const result = (await response.json()) as any;
       const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       if (!rawJsonText) {
-        throw ApiError.badGateway('Aucune réponse textuelle générée par Gemini.', 'EMPTY_GEMINI_RESPONSE');
+        throw new Error('Aucune réponse textuelle générée par Gemini.');
       }
 
       try {
         return JSON.parse(rawJsonText);
       } catch (parseErr) {
         console.error('[Gemini JSON Parse Error]', rawJsonText);
-        throw ApiError.badGateway('La réponse générée par Gemini n\'est pas un JSON valide.', 'INVALID_JSON_RESPONSE');
+        throw new Error('La réponse générée par Gemini n\'est pas un JSON valide.');
       }
     } catch (err: any) {
-      if (err instanceof ApiError) throw err;
       lastErrorText = err?.message || String(err);
     }
   }
 
-  // Étape 2 : Découverte dynamique si aucun candidat par défaut n'a fonctionné
-  console.warn('[Gemini] Aucun modèle par défaut fonctionnel. Découverte dynamique via ListModels...');
+  // Découverte dynamique si aucun candidat prédéfini n'a fonctionné
+  console.warn('[Gemini] Tous les modèles candidats Gemini ont échoué. Découverte dynamique via ListModels...');
   const discoveredModels = await fetchAvailableGeminiModels(apiKey);
 
   for (const model of discoveredModels) {
@@ -177,15 +174,76 @@ async function callGeminiVisionApi(images: Express.Multer.File[], prompt: string
         continue;
       }
     } catch (err: any) {
-      if (err instanceof ApiError) throw err;
       lastErrorText = err?.message || String(err);
     }
   }
 
-  throw ApiError.badGateway(
-    `Tous les modèles Gemini ont été tentés et ont tous échoué. Dernier détail d'erreur : ${lastErrorText}`,
-    'ALL_GEMINI_MODELS_FAILED'
-  );
+  throw new Error(`Tous les modèles Gemini ont échoué. Dernier détail : ${lastErrorText}`);
+}
+
+/**
+ * Fallback Cloudflare Workers AI via le modèle vision @cf/meta/llama-3.2-11b-vision-preview
+ */
+async function callCloudflareVisionApi(
+  images: Express.Multer.File[],
+  prompt: string
+): Promise<any> {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN || '';
+
+  if (!accountId || !apiToken) {
+    throw new Error('Variables d\'environnement CLOUDFLARE_ACCOUNT_ID et CLOUDFLARE_API_TOKEN non configurées.');
+  }
+
+  console.log('[Cloudflare AI] Lancement du fallback vision (@cf/meta/llama-3.2-11b-vision-preview)...');
+
+  const file = images[0];
+  const base64Data = file && file.buffer ? file.buffer.toString('base64') : '';
+  if (!base64Data) {
+    throw new Error('Aucune image valide fournie pour Cloudflare Workers AI.');
+  }
+
+  const imageByteArray = Array.from(Buffer.from(base64Data, 'base64'));
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.2-11b-vision-preview`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: prompt,
+      image: imageByteArray,
+      max_tokens: 2048,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`[Cloudflare Workers AI Error ${response.status}]`, errText);
+    throw new Error(`Cloudflare AI a répondu avec le statut ${response.status} : ${errText}`);
+  }
+
+  const result = (await response.json()) as any;
+  const rawText = result.result?.response || result.result?.description || result.result?.text || '';
+
+  if (!rawText) {
+    throw new Error('Aucune réponse textuelle reçue de Cloudflare Workers AI.');
+  }
+
+  const cleanedText = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+
+  try {
+    return JSON.parse(cleanedText);
+  } catch (parseErr) {
+    console.error('[Cloudflare AI JSON Parse Error]', rawText);
+    const jsonMatch = cleanedText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('Format JSON invalide retourné par Cloudflare Workers AI.');
+  }
 }
 
 export async function extractMaquette(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -195,10 +253,44 @@ export async function extractMaquette(req: Request, res: Response, next: NextFun
       throw ApiError.badRequest('Aucune photo de maquette envoyée.', 'NO_IMAGES');
     }
 
-    const prompt = `Tu es un assistant d'extraction de maquette pédagogique universitaire. Extrais la structure de cette image sous forme de tableau JSON strict : { "rows": [ ["CODE_UE", "INTITULE_UE", "CODE_ECUE", "INTITULE_ECUE", "CM", "TD", "TP", "TPE", "ECTS"], ... ] }. Ne rien inventer ; recopier exactement les textes et nombres.`;
+    const geminiPrompt = `Tu es un assistant d'extraction de maquette pédagogique universitaire. Extrais la structure de cette image sous forme de tableau JSON strict : { "rows": [ ["CODE_UE", "INTITULE_UE", "CODE_ECUE", "INTITULE_ECUE", "CM", "TD", "TP", "TPE", "ECTS"], ... ] }. Ne rien inventer ; recopier exactement les textes et nombres.`;
+    const cfPrompt = `Extract this academic curriculum table into JSON: array of objects with keys semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant. One object per ECUE row. Return ONLY valid JSON, no markdown.`;
 
-    const extractedData = await callGeminiVisionApi(files, prompt);
-    sendSuccess(res, extractedData, 200);
+    try {
+      const extractedData = await callGeminiVisionApi(files, geminiPrompt);
+      sendSuccess(res, extractedData, 200);
+      return;
+    } catch (geminiErr: any) {
+      console.warn('[Vision AI] Gemini a échoué. Tentative de fallback sur Cloudflare Workers AI...', geminiErr?.message);
+    }
+
+    try {
+      const cfData = await callCloudflareVisionApi(files, cfPrompt);
+      let rows: string[][] = [];
+      if (Array.isArray(cfData)) {
+        rows = cfData.map((item: any) => [
+          item.codeUE || '',
+          item.intituleUE || '',
+          item.codeECUE || '',
+          item.intituleECUE || '',
+          '',
+          '',
+          '',
+          '',
+          String(item.ects || ''),
+        ]);
+      } else if (cfData && Array.isArray(cfData.rows)) {
+        rows = cfData.rows;
+      }
+      sendSuccess(res, { rows: rows.length > 0 ? rows : cfData }, 200);
+      return;
+    } catch (cfErr: any) {
+      console.error('[Vision AI Error] Gemini et Cloudflare Workers AI ont tous deux échoué.', cfErr);
+      throw ApiError.badGateway(
+        `L'extraction Vision par IA (Gemini et Cloudflare) est momentanément indisponible. Vérifiez la configuration de CLOUDFLARE_API_TOKEN / GEMINI_API_KEY. Détail : ${cfErr?.message || 'Erreur inconnue'}`,
+        'VISION_AI_FAILED'
+      );
+    }
   } catch (error) {
     next(error);
   }
@@ -211,10 +303,28 @@ export async function extractTimetable(req: Request, res: Response, next: NextFu
       throw ApiError.badRequest('Aucune photo d\'emploi du temps envoyée.', 'NO_IMAGES');
     }
 
-    const prompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Extrais le tableau de cette image en JSON strict, sans markdown : un tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP) (chaînes vides si absentes). Un objet par séance. Ne rien inventer ; recopier exactement.`;
+    const geminiPrompt = `Tu es un assistant d'extraction d'emploi du temps universitaire. Extrais le tableau de cette image en JSON strict, sans markdown : un tableau d'objets avec les clés jour (lundi..dimanche), startTime (HH:MM), endTime (HH:MM), matiere, salle, enseignant, groupe, type (CM/TD/TP) (chaînes vides si absentes). Un objet par séance. Ne rien inventer ; recopier exactement.`;
+    const cfPrompt = `Extract this timetable table into JSON: array of objects with keys jour, startTime, endTime, matiere, salle, enseignant, groupe, type. One object per session. Return ONLY valid JSON, no markdown.`;
 
-    const extractedData = await callGeminiVisionApi(files, prompt);
-    sendSuccess(res, extractedData, 200);
+    try {
+      const extractedData = await callGeminiVisionApi(files, geminiPrompt);
+      sendSuccess(res, extractedData, 200);
+      return;
+    } catch (geminiErr: any) {
+      console.warn('[Vision AI] Gemini a échoué. Tentative de fallback sur Cloudflare Workers AI...', geminiErr?.message);
+    }
+
+    try {
+      const cfData = await callCloudflareVisionApi(files, cfPrompt);
+      sendSuccess(res, cfData, 200);
+      return;
+    } catch (cfErr: any) {
+      console.error('[Vision AI Error] Gemini et Cloudflare Workers AI ont tous deux échoué.', cfErr);
+      throw ApiError.badGateway(
+        `L'extraction Vision par IA (Gemini et Cloudflare) est momentanément indisponible. Vérifiez la configuration de CLOUDFLARE_API_TOKEN / GEMINI_API_KEY. Détail : ${cfErr?.message || 'Erreur inconnue'}`,
+        'VISION_AI_FAILED'
+      );
+    }
   } catch (error) {
     next(error);
   }
