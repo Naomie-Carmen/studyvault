@@ -16,7 +16,8 @@
     "db:down": "docker-compose down",
     "desktop:dev": "npm --prefix desktop run dev",
     "desktop:build": "npm --prefix desktop run build",
-    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install"
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

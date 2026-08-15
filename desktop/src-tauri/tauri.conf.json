@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "StudyVault",
-    "version": "1.0.9"
+    "version": "1.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -62,7 +62,7 @@
     "security": {
       "csp": null
     },
-              "updater": {
+    "updater": {
       "active": true,
       "dialog": false,
       "endpoints": [
@@ -87,5 +87,3 @@
     ]
   }
 }
-
-

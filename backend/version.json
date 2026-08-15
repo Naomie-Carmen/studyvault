@@ -1,19 +1,33 @@
 {
-  "version": "1.0.9",
+  "version": "1.1.0",
   "releaseDate": "2026-08-15",
   "channel": "stable",
   "notes": [
-    "Centre de Mises à Jour style Play Store dans l'application desktop StudyVault",
-    "Session utilisateur persistante sur 7 jours avec refresh token automatique",
-    "Guide utilisateur interactif avec tour guidé au premier démarrage",
-    "Centre d'aide intégré avec articles et FAQ",
-    "Page Mes Données pour la transparence sur le stockage",
-    "Conformité RGPD complète : export JSON et suppression sous 30 jours",
-    "Classement intelligent des documents avec validation humaine obligatoire",
-    "OCR d'emploi du temps depuis photo ou PDF",
-    "Recherche globale multi-critères sur tous vos documents"
+    "Maquette académique : importation intelligente avec auto-détection & Semestres S1/S2",
+    "Squelette dynamique par défaut (Semestres S1 & S2 automatiquement garantis)",
+    "Planning & Emploi du Temps : importation OCR/IA actionnable et personnalisée",
+    "Notes & Moyennes : calcul en direct avec carnet de notes interactif",
+    "Recherche globale multi-critères sur tous vos documents et cours",
+    "Internationalisation (i18n) complète en anglais et français",
+    "Design système unifié haute fidélité avec modales optimisées",
+    "Conformité RGPD intégrale & stockage sécurisé"
   ],
   "history": [
+    {
+      "version": "1.0.9",
+      "releaseDate": "2026-08-15",
+      "highlights": [
+        "Centre de Mises à Jour style Play Store dans l'application desktop StudyVault",
+        "Session utilisateur persistante sur 7 jours avec refresh token automatique",
+        "Guide utilisateur interactif avec tour guidé au premier démarrage",
+        "Centre d'aide intégré avec articles et FAQ",
+        "Page Mes Données pour la transparence sur le stockage",
+        "Conformité RGPD complète : export JSON et suppression sous 30 jours",
+        "Classement intelligent des documents avec validation humaine obligatoire",
+        "OCR d'emploi du temps depuis photo ou PDF",
+        "Recherche globale multi-critères sur tous vos documents"
+      ]
+    },
     {
       "version": "1.0.3",
       "releaseDate": "2026-08-14",
@@ -32,5 +46,3 @@
     }
   ]
 }
-
-
