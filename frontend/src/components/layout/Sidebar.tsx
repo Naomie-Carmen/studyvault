@@ -39,6 +39,11 @@ interface SidebarProps {
   onRestartTour?: () => void;
 }
 
+const DEFAULT_SIDEBAR_WIDTH = 280;
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 560; // Double largeur max par défaut (280px * 2)
+const SIDEBAR_WIDTH_KEY = 'studyvault_sidebar_width';
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
@@ -52,6 +57,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { profile, hasConfiguredProfile } = useAcademic();
   const { t } = useTranslation();
   const [hasUpdateAvailable, setHasUpdateAvailable] = useState<boolean>(false);
+
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const parsed = saved ? parseInt(saved, 10) : DEFAULT_SIDEBAR_WIDTH;
+    return !isNaN(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH ? parsed : DEFAULT_SIDEBAR_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+  }, [sidebarWidth]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = Math.min(Math.max(e.clientX, MIN_SIDEBAR_WIDTH), MAX_SIDEBAR_WIDTH);
+      setSidebarWidth(newWidth);
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(newWidth));
+    };
+
+    const handleMouseUp = () => {
+      if (isResizing) {
+        setIsResizing(false);
+      }
+    };
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  const handleDoubleClickResizer = () => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(DEFAULT_SIDEBAR_WIDTH));
+  };
 
   const hasCheckedUpdateRef = useRef(false);
 
@@ -94,7 +149,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isOpen && onToggle && <div className="sidebar-backdrop" onClick={onToggle} />}
 
-      <aside className={`sidebar glass-card ${isOpen ? 'open' : ''}`}>
+      <aside
+        className={`sidebar glass-card ${isOpen ? 'open' : ''} ${isResizing ? 'is-resizing' : ''}`}
+        style={{ width: `${sidebarWidth}px` }}
+      >
+        {/* Handle de redimensionnement (Drag handle jusqu'à double largeur max 560px) */}
+        <div
+          className="sidebar-resizer"
+          onMouseDown={handleMouseDown}
+          onDoubleClick={handleDoubleClickResizer}
+          title="Cliquer-glisser pour redimensionner la barre latérale (jusqu'à double largeur max). Double-cliquer pour réinitialiser."
+        >
+          <div className="sidebar-resizer-line" />
+        </div>
         {/* Sidebar Header */}
         <div className="sidebar-header">
           <div className="brand-group" onClick={() => handleNav('dashboard')}>
