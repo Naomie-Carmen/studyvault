@@ -417,6 +417,12 @@ export async function importStructureBatch(userId: string, items: StructureImpor
           });
 
           if (foundECUE) {
+            if (!foundECUE.ects && item.ects) {
+              await tx.eCUE.update({
+                where: { id: foundECUE.id },
+                data: { ects: item.ects },
+              });
+            }
             ecueEntry = { ecue: foundECUE, isNew: false };
             skippedECUEs++;
           } else {
@@ -425,6 +431,7 @@ export async function importStructureBatch(userId: string, items: StructureImpor
                 ueId: ue.id,
                 title: item.ecueTitle,
                 code: item.ecueCode || null,
+                ects: item.ects || null,
               },
             });
             ecueEntry = { ecue: newECUE, isNew: true };

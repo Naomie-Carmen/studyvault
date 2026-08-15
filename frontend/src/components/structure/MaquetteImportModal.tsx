@@ -1258,8 +1258,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                     >
                       <option value={-1}>
                         {isSemester
-                          ? t('maquetteImport.noSemesterCol', '-- Aucune colonne semestre --')
-                          : '-- Ignorer cette donnée --'}
+                          ? '-- Non spécifié (S1 / S2 ci-dessous) --'
+                          : '-- Ignorer cette colonne --'}
                       </option>
                       {headers.map((h, hIdx) => (
                         <option key={hIdx} value={hIdx}>
