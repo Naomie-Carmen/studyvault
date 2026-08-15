@@ -428,3 +428,94 @@ button {
     print-color-adjust: exact !important;
   }
 }
+
+/* ========================================================== */
+/* LIGHT MODE ELEGANT THEME STYLES                            */
+/* ========================================================== */
+
+:root.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.05) 0%, transparent 45%);
+}
+
+:root.light .glass-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+:root.light .glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.1);
+}
+
+:root.light .sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+:root.light .app-header {
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+:root.light .modal-backdrop {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+:root.light .modal-card,
+:root.light .maquette-import-modal,
+:root.light .import-modal-card,
+:root.light .modal-content,
+:root.light .grid-editor-card {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12) !important;
+}
+
+:root.light .modal-header {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+:root.light .modal-footer {
+  background: #f8fafc !important;
+  border-top-color: #e2e8f0 !important;
+}
+
+:root.light input,
+:root.light select,
+:root.light textarea {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+:root.light input:focus,
+:root.light select:focus,
+:root.light textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+}
+
+:root.light .btn-close,
+:root.light .close-btn {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+:root.light .btn-close:hover,
+:root.light .close-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #ef4444 !important;
+}
+
+:root.light .text-muted {
+  color: #64748b !important;
+}
