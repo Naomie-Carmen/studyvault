@@ -459,6 +459,43 @@ export const UpdatePage: React.FC = () => {
           border-radius: 4px;
           animation: progressIndeterminate 1.5s infinite ease-in-out;
         }
+        .web-notice-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 1.25rem;
+          padding: 1.75rem 2rem;
+          border-radius: 16px;
+          background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 0 20px rgba(99, 102, 241, 0.08);
+          position: relative;
+          overflow: hidden;
+        }
+        .web-notice-card::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: linear-gradient(180deg, #6366f1 0%, #a855f7 100%);
+        }
+        .web-notice-card h4 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1.15rem;
+          font-weight: 700;
+          color: #f8fafc;
+        }
+        .web-notice-card p {
+          margin: 0 0 0.35rem 0;
+          font-size: 0.9rem;
+          color: #cbd5e1;
+          line-height: 1.5;
+        }
+        .web-notice-card p:last-child {
+          margin-bottom: 0;
+          color: #94a3b8;
+        }
         .info-footer-card {
           display: flex;
           align-items: flex-start;
