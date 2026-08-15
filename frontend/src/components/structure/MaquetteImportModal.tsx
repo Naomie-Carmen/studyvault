@@ -89,11 +89,6 @@ const FIELD_CONFIGS: FieldConfig[] = [
     matchers: [/ects/i, /credit/i, /crédit/i, /coef/i, /ch/i],
   },
   {
-    key: 'semester',
-    label: "Semestre (Numéro ou Nom)",
-    matchers: [/semestre/i, /sem/i, /s[1-6]/i, /semester/i],
-  },
-  {
     key: 'ecue_title',
     label: "Intitulé de l'ECUE / Matière",
     matchers: [/intitule.*ecue/i, /intitulé.*ecue/i, /^ecue$/i, /element.*constitutif/i, /élément.*constitutif/i, /nom.*ecue/i],
@@ -1238,64 +1233,55 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               </div>
             )}
 
+            {/* Choix direct du Semestre (Image 2) */}
+            <div className="fallback-semester-box" style={{ marginBottom: '1.25rem', marginTop: '0.5rem' }}>
+              <span className="fallback-label">
+                {t('maquetteImport.semesterBelongsTo', 'Ces cours appartiennent à :')}
+              </span>
+              <div className="semester-radio-group">
+                <button
+                  type="button"
+                  className={`sem-radio-btn ${fallbackSemester === 1 ? 'active' : ''}`}
+                  onClick={() => setFallbackSemester(1)}
+                >
+                  <span className="radio-dot" />
+                  <span>{t('maquetteImport.semester1', 'Semestre 1 (S1)')}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`sem-radio-btn ${fallbackSemester === 2 ? 'active' : ''}`}
+                  onClick={() => setFallbackSemester(2)}
+                >
+                  <span className="radio-dot" />
+                  <span>{t('maquetteImport.semester2', 'Semestre 2 (S2)')}</span>
+                </button>
+              </div>
+            </div>
+
             <div className="mapping-grid">
-              {FIELD_CONFIGS.map((cfg) => {
-                const isSemester = cfg.key === 'semester';
-
-                return (
-                  <div key={cfg.key} className={`form-group mapping-card ${isSemester ? 'semester-card-group' : ''}`}>
-                    <label>
-                      {cfg.label} {cfg.required && <span className="text-red">*</span>}
-                    </label>
-                    <select
-                      value={columnMapping[cfg.key]}
-                      onChange={(e) =>
-                        setColumnMapping({
-                          ...columnMapping,
-                          [cfg.key]: Number(e.target.value),
-                        })
-                      }
-                    >
-                      <option value={-1}>
-                        {isSemester
-                          ? '-- Non spécifié (S1 / S2 ci-dessous) --'
-                          : '-- Ignorer cette colonne --'}
+              {FIELD_CONFIGS.map((cfg) => (
+                <div key={cfg.key} className="form-group mapping-card">
+                  <label>
+                    {cfg.label} {cfg.required && <span className="text-red">*</span>}
+                  </label>
+                  <select
+                    value={columnMapping[cfg.key]}
+                    onChange={(e) =>
+                      setColumnMapping({
+                        ...columnMapping,
+                        [cfg.key]: Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value={-1}>-- Ignorer cette colonne --</option>
+                    {headers.map((h, hIdx) => (
+                      <option key={hIdx} value={hIdx}>
+                        Colonne {hIdx + 1} : {h}
                       </option>
-                      {headers.map((h, hIdx) => (
-                        <option key={hIdx} value={hIdx}>
-                          Colonne {hIdx + 1} : {h}
-                        </option>
-                      ))}
-                    </select>
-
-                    {isSemester && columnMapping.semester === -1 && (
-                      <div className="fallback-semester-box">
-                        <span className="fallback-label">
-                          {t('maquetteImport.semesterBelongsTo', 'Ces cours appartiennent à :')}
-                        </span>
-                        <div className="semester-radio-group">
-                          <button
-                            type="button"
-                            className={`sem-radio-btn ${fallbackSemester === 1 ? 'active' : ''}`}
-                            onClick={() => setFallbackSemester(1)}
-                          >
-                            <span className="radio-dot" />
-                            <span>{t('maquetteImport.semester1', 'Semestre 1 (S1)')}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className={`sem-radio-btn ${fallbackSemester === 2 ? 'active' : ''}`}
-                            onClick={() => setFallbackSemester(2)}
-                          >
-                            <span className="radio-dot" />
-                            <span>{t('maquetteImport.semester2', 'Semestre 2 (S2)')}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    ))}
+                  </select>
+                </div>
+              ))}
             </div>
 
             <div className="info-box-heritage">
