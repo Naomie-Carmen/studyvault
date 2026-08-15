@@ -12,7 +12,8 @@ import {
   deleteSubject,
   importBatch,
   bulkImportStructure,
-  reorderStructure
+  reorderStructure,
+  deleteAllStructure
 } from '../controllers/academicStructureController';
 import { requireAuth } from '../middleware/authMiddleware';
 
@@ -21,9 +22,10 @@ const router = Router();
 // Protect all academic structure routes with requireAuth
 router.use(requireAuth);
 
-// Tree & Reorder Endpoints
+// Tree, Reorder & Delete All Endpoints
 router.get('/', getTree);
 router.put('/reorder', reorderStructure);
+router.delete('/all', deleteAllStructure);
 
 // Bulk Import Endpoints
 router.post('/import-batch', importBatch);

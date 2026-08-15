@@ -91,3 +91,9 @@ export async function reorderStructure(data: {
     body: JSON.stringify(data),
   });
 }
+
+export async function deleteAllStructure(): Promise<ApiResponse<{ message: string }>> {
+  return fetchApi<{ message: string }>('/academic-structure/all', {
+    method: 'DELETE',
+  });
+}

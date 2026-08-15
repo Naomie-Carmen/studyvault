@@ -19,7 +19,9 @@ import {
   UploadCloud,
   Search,
   X,
-  FileQuestion
+  FileQuestion,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 
 import { SubjectInput } from '../../types/validators';
@@ -56,6 +58,11 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   const [editingUE, setEditingUE] = useState<UE | null>(null);
   const [editingECUE, setEditingECUE] = useState<ECUE | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+
+  // Delete All State
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Deleting Item State
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -166,6 +173,25 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
     }
   };
 
+  const handleConfirmDeleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const res = await structureService.deleteAllStructure();
+      if (res.success) {
+        setIsDeleteAllModalOpen(false);
+        setSuccessMessage('Arborescence vidée. Vous pouvez maintenant importer votre maquette.');
+        setTimeout(() => setSuccessMessage(null), 6000);
+        fetchTree();
+      } else {
+        setError(res.error?.message || 'Erreur lors de la réinitialisation.');
+      }
+    } catch (_err) {
+      setError('Erreur de connexion au serveur.');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const executeDelete = async () => {
     if (!deleteTarget) return;
     if (deleteTarget.type === 'UE') await handleConfirmDeleteUE();
@@ -217,6 +243,16 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         </div>
 
         <div className="header-actions">
+          {tree && Array.isArray(tree.semesters) && tree.semesters.some(s => s.ues.length > 0) && (
+            <button
+              className="refresh-btn delete-all-btn"
+              onClick={() => setIsDeleteAllModalOpen(true)}
+              title="Tout supprimer pour repartir de zéro"
+            >
+              <Trash2 size={16} />
+              <span>Tout supprimer</span>
+            </button>
+          )}
           <button
             className="refresh-btn import-btn"
             onClick={() => setIsImportOpen(true)}
@@ -265,6 +301,13 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         )}
       </div>
 
+      {successMessage && (
+        <div className="alert alert-success">
+          <CheckCircle2 size={18} />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
       {error && (
         <div className="alert alert-error">
           <AlertCircle size={18} />
@@ -273,10 +316,10 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       )}
 
       {/* Main Content Tree View */}
-      {loading ? (
+      {loading || deletingAll ? (
         <div className="loading-card glass-card">
           <RefreshCw size={24} className="spinning text-indigo" />
-          <p>Chargement de la structure académique...</p>
+          <p>{deletingAll ? 'Suppression de toute l\'arborescence…' : 'Chargement de la structure académique...'}</p>
         </div>
       ) : debouncedSearchQuery.trim() !== '' && matchCount === 0 ? (
         <div className="glass-card no-search-results-card">
@@ -380,7 +423,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Single Item Confirmation Modal */}
       {deleteTarget && (
         <DeleteConfirmModal
           isOpen={!!deleteTarget}
@@ -389,6 +432,18 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           title={deleteTarget.name}
           itemName={deleteTarget.name}
           itemType={deleteTarget.type}
+        />
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {isDeleteAllModalOpen && (
+        <DeleteConfirmModal
+          isOpen={isDeleteAllModalOpen}
+          onClose={() => setIsDeleteAllModalOpen(false)}
+          onConfirm={handleConfirmDeleteAll}
+          title="Réinitialiser l'arborescence"
+          message="⚠️ Cette action supprimera TOUS vos semestres, UE et ECUE. Voulez-vous continuer ?"
+          confirmButtonText="Supprimer tout"
         />
       )}
 
@@ -537,6 +592,17 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           background: rgba(255, 255, 255, 0.1);
         }
 
+        .delete-all-btn {
+          background: rgba(239, 68, 68, 0.15);
+          color: #f87171;
+          border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .delete-all-btn:hover {
+          background: rgba(239, 68, 68, 0.25);
+          color: #ffffff;
+        }
+
         .import-btn {
           background: rgba(99, 102, 241, 0.15);
           color: var(--primary);
@@ -556,6 +622,18 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           border-radius: var(--radius-md);
           background: var(--status-error-bg);
           color: var(--status-error);
+          font-size: 0.85rem;
+        }
+
+        .alert-success {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border-radius: var(--radius-md);
+          background: rgba(16, 185, 129, 0.15);
+          color: #34d399;
+          border: 1px solid rgba(16, 185, 129, 0.3);
           font-size: 0.85rem;
         }
 

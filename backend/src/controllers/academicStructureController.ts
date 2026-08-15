@@ -173,3 +173,13 @@ export async function reorderStructure(req: Request, res: Response, next: NextFu
   }
 }
 
+export async function deleteAllStructure(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const result = await structureService.deleteAllStructure(req.user.id);
+    sendSuccess(res, result, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+

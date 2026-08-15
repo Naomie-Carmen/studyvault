@@ -1,13 +1,15 @@
 import React from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Trash2, X, RefreshCw } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
   title: string;
-  itemName: string;
-  itemType: 'UE' | 'ECUE' | 'Matière';
+  itemName?: string;
+  itemType?: string;
+  message?: string;
+  confirmButtonText?: string;
 }
 
 export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
@@ -16,7 +18,9 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onConfirm,
   title,
   itemName,
-  itemType,
+  itemType = 'élément',
+  message,
+  confirmButtonText,
 }) => {
   const [loading, setLoading] = React.useState(false);
 
@@ -38,21 +42,27 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         <div className="modal-header">
           <div className="title-group text-error">
             <AlertTriangle size={22} />
-            <h3>Confirmer la suppression</h3>
+            <h3>{title}</h3>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} disabled={loading}>
             <X size={18} />
           </button>
         </div>
 
         <div className="modal-body">
-          <p>
-            Êtes-vous sûr de vouloir supprimer cet(te) {itemType} :
-          </p>
-          <div className="item-highlight">{itemName || title}</div>
-          <p className="warning-text">
-            ⚠️ Cette action supprimera définitivement cet élément et tous ses sous-éléments rattachés.
-          </p>
+          {message ? (
+            <p className="warning-text-primary">{message}</p>
+          ) : (
+            <>
+              <p>
+                Êtes-vous sûr de vouloir supprimer cet(te) {itemType} :
+              </p>
+              {itemName && <div className="item-highlight">{itemName}</div>}
+              <p className="warning-text">
+                ⚠️ Cette action supprimera définitivement cet élément et tous ses sous-éléments rattachés.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="modal-actions">
@@ -60,8 +70,12 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             Annuler
           </button>
           <button className="btn-delete" onClick={handleConfirm} disabled={loading}>
-            <Trash2 size={16} />
-            <span>{loading ? 'Suppression...' : 'Supprimer Définitivement'}</span>
+            {loading ? (
+              <RefreshCw size={16} className="spinning" />
+            ) : (
+              <Trash2 size={16} />
+            )}
+            <span>{loading ? 'Suppression...' : confirmButtonText || 'Supprimer Définitivement'}</span>
           </button>
         </div>
       </div>
@@ -81,7 +95,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
         .danger-card {
           width: 100%;
-          max-width: 440px;
+          max-width: 460px;
           padding: 1.75rem;
           background: var(--bg-secondary);
           border: 1px solid rgba(239, 68, 68, 0.3);
@@ -105,6 +119,13 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         .modal-body p {
           font-size: 0.9rem;
           color: var(--text-secondary);
+        }
+
+        .warning-text-primary {
+          font-size: 0.95rem !important;
+          color: var(--text-primary) !important;
+          font-weight: 600;
+          line-height: 1.5;
         }
 
         .item-highlight {
@@ -153,6 +174,14 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         }
 
         .close-btn { color: var(--text-muted); }
+
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          100% { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   );

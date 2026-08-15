@@ -704,3 +704,22 @@ export async function reorderStructureItem(userId: string, input: ReorderInput) 
   throw ApiError.badRequest('Type invalide (ue ou ecue).');
 }
 
+export async function deleteAllStructure(userId: string) {
+  const academicYear = await prisma.academicYear.findFirst({
+    where: { userId, isCurrent: true },
+  });
+
+  if (!academicYear) {
+    return { message: 'Aucune structure à supprimer.' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.semester.deleteMany({
+      where: { academicYearId: academicYear.id },
+    });
+  });
+
+  console.log(`[DELETE ALL] User ${userId} deleted all academic structure`);
+  return { message: 'Arborescence académique réinitialisée avec succès.' };
+}
+
