@@ -8,6 +8,7 @@ export interface NoteTypeConfig {
 }
 
 export interface GradeConfigResponse {
+  mode?: 'weighted' | 'simple';
   defaultTypes: NoteTypeConfig[];
   customTypes: {
     id: string;
@@ -56,6 +57,7 @@ export interface SemesterGradeSummary {
 }
 
 export interface GradeAveragesResponse {
+  mode?: 'weighted' | 'simple';
   annualAverage: number | null;
   totalValidatedCredits: number;
   totalCredits: number;
@@ -70,11 +72,12 @@ export async function getGradeConfig(): Promise<ApiResponse<GradeConfigResponse>
 
 export async function updateGradeConfig(
   ecueId: string | null,
-  types: NoteTypeConfig[]
-): Promise<ApiResponse<NoteTypeConfig[]>> {
-  return fetchApi<NoteTypeConfig[]>('/grades/config', {
+  types?: NoteTypeConfig[],
+  mode?: 'weighted' | 'simple'
+): Promise<ApiResponse<GradeConfigResponse>> {
+  return fetchApi<GradeConfigResponse>('/grades/config', {
     method: 'POST',
-    body: JSON.stringify({ ecueId, types }),
+    body: JSON.stringify({ ecueId, types, mode }),
   });
 }
 

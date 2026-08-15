@@ -16,8 +16,8 @@ export async function getConfig(req: Request, res: Response, next: NextFunction)
 export async function updateConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (!req.user) throw ApiError.unauthorized();
-    const { ecueId, types } = req.body;
-    const updated = await gradeService.setGradeConfig(req.user.id, ecueId, types);
+    const { ecueId, types, mode } = req.body;
+    const updated = await gradeService.setGradeConfig(req.user.id, ecueId, types, mode);
     sendSuccess(res, updated, 200);
   } catch (error) {
     next(error);

@@ -59,6 +59,13 @@
       "title": "À propos de l'application",
       "version": "Version actuelle",
       "changelogBtn": "Voir les notes de version"
+    },
+    "grades": {
+      "title": "📊 Barème de notation",
+      "desc": "Définissez les coefficients des évaluations (CC, TD, CM, TP…) appliqués pour le calcul des moyennes.",
+      "globalMode": "Même barème pour toutes les matières",
+      "perEcueMode": "Barème personnalisé par matière",
+      "simpleModeLabel": "Moyenne simple (toutes les notes comptent pareil)"
     }
   },
   "timetable": {

@@ -318,7 +318,7 @@ export const GradesPage: React.FC = () => {
                       {/* Unique Note Types headers */}
                       {ue.ecues[0]?.notes.map((n) => (
                         <th key={n.noteTypeId} style={{ width: '130px', textAlign: 'center' }}>
-                          {n.noteTypeName} ({n.weight}%)
+                          {data?.mode === 'simple' ? n.noteTypeName : `${n.noteTypeName} (${n.weight}%)`}
                         </th>
                       ))}
                       <th style={{ width: '130px', textAlign: 'center' }}>Moyenne ECUE</th>

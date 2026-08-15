@@ -28,6 +28,7 @@ model User {
   betaFeedbackCount         Int                        @default(0)
   isScheduledForPurge       Boolean                    @default(false)
   purgeScheduledAt          DateTime?
+  gradeMode                 String                     @default("weighted") // "weighted" | "simple"
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
   refreshTokens             RefreshToken[]

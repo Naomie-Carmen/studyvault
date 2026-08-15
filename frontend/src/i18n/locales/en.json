@@ -59,6 +59,13 @@
       "title": "About Application",
       "version": "Current version",
       "changelogBtn": "View release notes"
+    },
+    "grades": {
+      "title": "📊 Grading Scale",
+      "desc": "Define evaluation coefficients (CC, TD, CM, TP…) applied for calculating averages.",
+      "globalMode": "Same grading scale for all subjects",
+      "perEcueMode": "Custom grading scale per subject",
+      "simpleModeLabel": "Simple average (all grades have equal weight)"
     }
   },
   "timetable": {

@@ -23,6 +23,9 @@ export const GradeConfigSection: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Grade Mode: 'weighted' | 'simple'
+  const [gradeMode, setGradeMode] = useState<'weighted' | 'simple'>('weighted');
+
   // Global vs Per-ECUE mode
   const [isPerEcueMode, setIsPerEcueMode] = useState<boolean>(false);
 
@@ -45,6 +48,9 @@ export const GradeConfigSection: React.FC = () => {
     try {
       const resConfig = await getGradeConfig();
       if (resConfig.success && resConfig.data) {
+        if (resConfig.data.mode) {
+          setGradeMode(resConfig.data.mode);
+        }
         if (resConfig.data.defaultTypes.length > 0) {
           setGlobalTypes(resConfig.data.defaultTypes);
         }
@@ -89,7 +95,6 @@ export const GradeConfigSection: React.FC = () => {
         if (specific.length > 0) {
           setCustomEcueTypes(specific.map((s) => ({ name: s.name, weight: s.weight })));
         } else {
-          // Pre-fill with global types
           setCustomEcueTypes([...globalTypes]);
         }
       }
@@ -104,7 +109,8 @@ export const GradeConfigSection: React.FC = () => {
   };
 
   const currentSum = calculateSum(activeTypes);
-  const isValidSum = Math.abs(currentSum - 100) <= 1.0;
+  const isSimpleMode = gradeMode === 'simple';
+  const isValidSum = isSimpleMode || Math.abs(currentSum - 100) <= 1.0;
 
   const handleAddType = () => {
     setActiveTypes([...activeTypes, { name: '', weight: 0 }]);
@@ -136,6 +142,24 @@ export const GradeConfigSection: React.FC = () => {
     setActiveTypes(defaults);
   };
 
+  const handleModeToggle = async (newMode: 'weighted' | 'simple') => {
+    setGradeMode(newMode);
+    setSaving(true);
+    try {
+      const targetEcueId = isPerEcueMode ? selectedEcueId : null;
+      await updateGradeConfig(targetEcueId, activeTypes, newMode);
+      setMessage({
+        type: 'success',
+        text: newMode === 'simple' ? 'Mode moyenne simple activé !' : 'Mode moyenne pondérée activé !',
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (_err) {
+      setMessage({ type: 'error', text: 'Erreur lors du changement de mode.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!isValidSum) {
       setMessage({
@@ -149,7 +173,7 @@ export const GradeConfigSection: React.FC = () => {
     setMessage(null);
     try {
       const targetEcueId = isPerEcueMode ? selectedEcueId : null;
-      const res = await updateGradeConfig(targetEcueId, activeTypes);
+      const res = await updateGradeConfig(targetEcueId, activeTypes, gradeMode);
 
       if (res.success) {
         setMessage({
@@ -207,7 +231,22 @@ export const GradeConfigSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Mode Switch Toggle */}
+      {/* Simple Average Toggle Switch */}
+      <div className="simple-mode-switch-box">
+        <label className="switch-container">
+          <input
+            type="checkbox"
+            checked={isSimpleMode}
+            onChange={(e) => handleModeToggle(e.target.checked ? 'simple' : 'weighted')}
+          />
+          <span className="switch-slider" />
+          <span className="switch-label-text">
+            {t('settings.grades.simpleModeLabel', 'Moyenne simple (toutes les notes comptent pareil)')}
+          </span>
+        </label>
+      </div>
+
+      {/* Mode Switch Toggle (Global vs Per-ECUE) */}
       <div className="mode-toggle-group">
         <button
           type="button"
@@ -260,15 +299,15 @@ export const GradeConfigSection: React.FC = () => {
 
       {/* Line Editor */}
       <div className="types-editor-container">
-        <div className="editor-header-row">
+        <div className={`editor-header-row ${isSimpleMode ? 'simple-grid' : ''}`}>
           <span>Nom du type d'épreuve</span>
-          <span>Coefficient (%)</span>
+          {!isSimpleMode && <span>Coefficient (%)</span>}
           <span style={{ width: '40px' }} />
         </div>
 
         <div className="type-rows-list">
           {activeTypes.map((item, idx) => (
-            <div key={idx} className="type-row">
+            <div key={idx} className={`type-row ${isSimpleMode ? 'simple-grid' : ''}`}>
               <input
                 type="text"
                 placeholder="ex: CC, TD, CM, TP..."
@@ -276,18 +315,20 @@ export const GradeConfigSection: React.FC = () => {
                 onChange={(e) => handleTypeChange(idx, 'name', e.target.value)}
                 className="input-name"
               />
-              <div className="weight-input-wrap">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={item.weight}
-                  onChange={(e) => handleTypeChange(idx, 'weight', e.target.value)}
-                  className="input-weight"
-                />
-                <span className="unit-tag">%</span>
-              </div>
+              {!isSimpleMode && (
+                <div className="weight-input-wrap">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={item.weight}
+                    onChange={(e) => handleTypeChange(idx, 'weight', e.target.value)}
+                    className="input-weight"
+                  />
+                  <span className="unit-tag">%</span>
+                </div>
+              )}
               <button
                 type="button"
                 className="remove-btn"
@@ -308,14 +349,18 @@ export const GradeConfigSection: React.FC = () => {
             <span>Ajouter un type d'épreuve</span>
           </button>
 
-          <button type="button" className="btn-reset-default" onClick={handleResetDefault}>
-            <RotateCcw size={14} />
-            <span>Réinitialiser (30/10/60)</span>
-          </button>
+          {!isSimpleMode && (
+            <button type="button" className="btn-reset-default" onClick={handleResetDefault}>
+              <RotateCcw size={14} />
+              <span>Réinitialiser (30/10/60)</span>
+            </button>
+          )}
 
-          <div className={`sum-counter-pill ${isValidSum ? 'valid' : 'invalid'}`}>
-            Total : {currentSum}% {isValidSum ? '✓' : '⚠️ (100% requis)'}
-          </div>
+          {!isSimpleMode && (
+            <div className={`sum-counter-pill ${isValidSum ? 'valid' : 'invalid'}`}>
+              Total : {currentSum}% {isValidSum ? '✓' : '⚠️ (100% requis)'}
+            </div>
+          )}
         </div>
 
         {message && (
@@ -348,6 +393,63 @@ export const GradeConfigSection: React.FC = () => {
       </div>
 
       <style>{`
+        .simple-mode-switch-box {
+          background: rgba(99, 102, 241, 0.08);
+          border: 1px solid rgba(99, 102, 241, 0.2);
+          border-radius: 10px;
+          padding: 0.75rem 1rem;
+        }
+
+        .switch-container {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .switch-container input {
+          display: none;
+        }
+
+        .switch-slider {
+          position: relative;
+          width: 44px;
+          height: 24px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 20px;
+          border: 1px solid var(--border-color);
+          transition: background 0.25s ease;
+          flex-shrink: 0;
+        }
+
+        .switch-slider::before {
+          content: '';
+          position: absolute;
+          width: 18px;
+          height: 18px;
+          left: 2px;
+          top: 2px;
+          background: white;
+          border-radius: 50%;
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .switch-container input:checked + .switch-slider {
+          background: #6366f1;
+          border-color: #6366f1;
+        }
+
+        .switch-container input:checked + .switch-slider::before {
+          transform: translateX(20px);
+        }
+
+        .switch-label-text {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
         .mode-toggle-group {
           display: flex;
           gap: 0.5rem;
@@ -447,6 +549,9 @@ export const GradeConfigSection: React.FC = () => {
           font-weight: 600;
           text-transform: uppercase;
         }
+        .editor-header-row.simple-grid {
+          grid-template-columns: 1fr 40px;
+        }
 
         .type-rows-list {
           display: flex;
@@ -459,6 +564,9 @@ export const GradeConfigSection: React.FC = () => {
           grid-template-columns: 1fr 140px 40px;
           gap: 0.75rem;
           align-items: center;
+        }
+        .type-row.simple-grid {
+          grid-template-columns: 1fr 40px;
         }
 
         .input-name {

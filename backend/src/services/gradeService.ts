@@ -43,6 +43,7 @@ export async function ensureDefaultNoteTypes(userId: string) {
  * Récupérer la configuration du barème pour un utilisateur
  */
 export async function getGradeConfig(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   const defaultTypes = await ensureDefaultNoteTypes(userId);
   const customTypes = await prisma.noteType.findMany({
     where: { userId, ecueId: { not: null } },
@@ -50,52 +51,61 @@ export async function getGradeConfig(userId: string) {
   });
 
   return {
+    mode: user?.gradeMode || 'weighted',
     defaultTypes,
     customTypes,
   };
 }
 
 /**
- * Mettre à jour la configuration du barème (global ou par ECUE)
+ * Mettre à jour la configuration du barème (mode, global ou par ECUE)
  */
-export async function setGradeConfig(userId: string, ecueId: string | null | undefined, types: NoteTypeInput[]) {
-  if (!Array.isArray(types) || types.length === 0) {
-    throw ApiError.badRequest('Au moins un type de note est requis.');
+export async function setGradeConfig(
+  userId: string,
+  ecueId?: string | null,
+  types?: NoteTypeInput[],
+  mode?: 'weighted' | 'simple'
+) {
+  if (mode && (mode === 'weighted' || mode === 'simple')) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { gradeMode: mode },
+    });
   }
 
-  const sumWeight = types.reduce((acc, t) => acc + (Number(t.weight) || 0), 0);
-  if (Math.abs(sumWeight - 100) > 1.0) {
-    throw ApiError.badRequest(`La somme des coefficients doit être égale à 100% (±1%). Actuel : ${sumWeight}%`);
+  if (types && Array.isArray(types) && types.length > 0) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const currentMode = mode || user?.gradeMode || 'weighted';
+
+    if (currentMode === 'weighted') {
+      const sumWeight = types.reduce((acc, t) => acc + (Number(t.weight) || 0), 0);
+      if (Math.abs(sumWeight - 100) > 1.0) {
+        throw ApiError.badRequest(`La somme des coefficients doit être égale à 100% (±1%). Actuel : ${sumWeight}%`);
+      }
+    }
+
+    const targetEcueId = ecueId || null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.noteType.deleteMany({
+        where: {
+          userId,
+          ecueId: targetEcueId,
+        },
+      });
+
+      await tx.noteType.createMany({
+        data: types.map((t) => ({
+          userId,
+          ecueId: targetEcueId,
+          name: t.name.trim(),
+          weight: Number(t.weight) || 0,
+        })),
+      });
+    });
   }
 
-  const targetEcueId = ecueId || null;
-
-  return prisma.$transaction(async (tx) => {
-    // Supprimer la config existante sur ce scope
-    await tx.noteType.deleteMany({
-      where: {
-        userId,
-        ecueId: targetEcueId,
-      },
-    });
-
-    // Créer les nouveaux types de notes
-    await tx.noteType.createMany({
-      data: types.map((t) => ({
-        userId,
-        ecueId: targetEcueId,
-        name: t.name.trim(),
-        weight: Number(t.weight),
-      })),
-    });
-
-    return tx.noteType.findMany({
-      where: {
-        userId,
-        ecueId: targetEcueId,
-      },
-    });
-  });
+  return getGradeConfig(userId);
 }
 
 /**
@@ -138,12 +148,35 @@ export async function saveGrades(
 }
 
 /**
- * Calculer la moyenne d'une ECUE selon les formules officielles
+ * Calculer la moyenne d'une ECUE selon les formules officielles ou mode simple
  */
 export function calculateEcueAverage(
   noteTypes: { id: string; name: string; weight: number }[],
-  notes: { noteTypeId: string; value: number | null }[]
+  notes: { noteTypeId: string; value: number | null }[],
+  mode: 'weighted' | 'simple' = 'weighted'
 ): { average: number | null; enteredWeightRatio: number } {
+  if (mode === 'simple') {
+    let sumValues = 0;
+    let count = 0;
+
+    for (const nt of noteTypes) {
+      const userNote = notes.find((n) => n.noteTypeId === nt.id);
+      if (userNote && userNote.value !== null && userNote.value !== undefined && !isNaN(userNote.value)) {
+        sumValues += userNote.value;
+        count++;
+      }
+    }
+
+    if (count === 0) {
+      return { average: null, enteredWeightRatio: 0 };
+    }
+
+    const rawAvg = sumValues / count;
+    const roundedAvg = Math.round(rawAvg * 100) / 100;
+    return { average: roundedAvg, enteredWeightRatio: count / (noteTypes.length || 1) };
+  }
+
+  // Mode pondéré
   let sumValueWeight = 0;
   let sumEnteredWeights = 0;
 
@@ -169,6 +202,9 @@ export function calculateEcueAverage(
  * Obtenir l'ensemble des moyennes calculées (par ECUE, UE, Semestre, Année)
  */
 export async function getAverages(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const gradeMode = (user?.gradeMode as 'weighted' | 'simple') || 'weighted';
+
   await ensureDefaultNoteTypes(userId);
 
   // 1. Récupérer l'arborescence complète de l'année courante
@@ -190,6 +226,7 @@ export async function getAverages(userId: string) {
 
   if (!academicYear) {
     return {
+      mode: gradeMode,
       annualAverage: null,
       totalValidatedCredits: 0,
       totalCredits: 0,
@@ -234,7 +271,7 @@ export async function getAverages(userId: string) {
         const activeTypes = specificTypes.length > 0 ? specificTypes : defaultNoteTypes;
 
         const ecueNotes = allNotes.filter((n) => n.ecueId === ecue.id);
-        const { average } = calculateEcueAverage(activeTypes, ecueNotes);
+        const { average } = calculateEcueAverage(activeTypes, ecueNotes, gradeMode);
 
         const ecueEcts = ueEcts > 0 && ue.ecues.length > 0 ? ueEcts / ue.ecues.length : 3;
 
@@ -308,6 +345,7 @@ export async function getAverages(userId: string) {
   }
 
   return {
+    mode: gradeMode,
     annualAverage,
     totalValidatedCredits: Math.round(totalValidatedCredits * 10) / 10,
     totalCredits: Math.round(totalCredits * 10) / 10,
