@@ -107,26 +107,32 @@ export const UpdatePage: React.FC = () => {
   // Web view
   if (!isTauri) {
     return (
-      <div className="page-container">
-        <div className="page-header">
-          <div className="page-header-icon">
+      <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px' }}>
+        <div className="page-header" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+          <div className="page-header-icon" style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, #6C63FF 0%, #8B5CF6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', flexShrink: 0, boxShadow: '0 4px 14px rgba(108, 99, 255, 0.35)' }}>
             <RefreshCw size={24} />
           </div>
-          <div className="header-title-box">
-            <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
-            <p className="subtitle">{t('update.webSubtitle', 'Gestion des versions de l\'application StudyVault')}</p>
+          <div className="header-title-box" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary, #ffffff)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+              {t('update.centerTitle', 'Centre de Mises à Jour')}
+            </h1>
+            <p className="subtitle" style={{ fontSize: '14px', color: 'var(--text-muted, #94a3b8)', margin: 0, lineHeight: 1.4 }}>
+              {t('update.webSubtitle', 'Gestion des versions de l\'application StudyVault')}
+            </p>
           </div>
         </div>
 
-        <div className="empty-state">
-          <div className="empty-icon-circle">
+        <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 24px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', margin: '16px 0', backdropFilter: 'blur(12px)' }}>
+          <div className="empty-icon-circle" style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(108, 99, 255, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B5CF6', marginBottom: '16px', flexShrink: 0 }}>
             <Laptop size={32} />
           </div>
-          <h3>{t('update.webNoticeTitle', 'Application Web')}</h3>
-          <p>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary, #ffffff)', margin: '0 0 8px 0', textAlign: 'center' }}>
+            {t('update.webNoticeTitle', 'Application Web')}
+          </h3>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted, #94a3b8)', margin: '0 0 8px 0', textAlign: 'center', maxWidth: '450px', lineHeight: 1.5 }}>
             {t('update.webNoticeText', 'Les mises à jour automatiques sont disponibles dans l\'application desktop StudyVault.')}
           </p>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted, #94a3b8)', margin: 0, textAlign: 'center', maxWidth: '450px' }}>
             {t('update.webNoticeSub', 'Sur le Web, vous profitez toujours automatiquement de la version serveur la plus récente.')}
           </p>
         </div>
@@ -135,14 +141,18 @@ export const UpdatePage: React.FC = () => {
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div className="page-header-icon">
+    <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px' }}>
+      <div className="page-header" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+        <div className="page-header-icon" style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, #6C63FF 0%, #8B5CF6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', flexShrink: 0, boxShadow: '0 4px 14px rgba(108, 99, 255, 0.35)' }}>
           <RefreshCw size={24} />
         </div>
-        <div className="header-title-box">
-          <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
-          <p className="subtitle">{t('update.subtitle', 'Gestion et installation des versions de StudyVault Desktop')}</p>
+        <div className="header-title-box" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary, #ffffff)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+            {t('update.centerTitle', 'Centre de Mises à Jour')}
+          </h1>
+          <p className="subtitle" style={{ fontSize: '14px', color: 'var(--text-muted, #94a3b8)', margin: 0, lineHeight: 1.4 }}>
+            {t('update.subtitle', 'Gestion et installation des versions de StudyVault Desktop')}
+          </p>
         </div>
       </div>
 
