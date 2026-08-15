@@ -140,6 +140,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const modalCardRef = useRef<HTMLDivElement>(null);
   const actionBlockRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const continueBtnRef = useRef<HTMLDivElement>(null);
 
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState<number>(0);
@@ -157,10 +158,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [editableGrid, setEditableGrid] = useState<DetectedGrid | null>(null);
 
   useEffect(() => {
-    if (rawRows.length > 0) {
+    if (rawRows.length > 0 && step === 1) {
       const timer = setTimeout(() => {
-        previewContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 150);
+        continueBtnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [rawRows.length, step]);
@@ -1137,26 +1138,42 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             )}
 
             {rawRows.length > 0 && (
-              <div className="preview-raw-box" ref={previewContainerRef}>
-                <div className="preview-raw-header">
-                  <span>Aperçu des 8 premières lignes :</span>
-                  <span className="rows-count">{rawRows.length} lignes trouvées</span>
+              <>
+                <div className="preview-raw-box" ref={previewContainerRef}>
+                  <div className="preview-raw-header">
+                    <span>Aperçu des 8 premières lignes :</span>
+                    <span className="rows-count">{rawRows.length} lignes trouvées</span>
+                  </div>
+                  <div className="table-scroll">
+                    <table className="raw-table">
+                      <tbody>
+                        {rawRows.slice(0, 8).map((r, rIdx) => (
+                          <tr key={rIdx}>
+                            <td className="row-num">{rIdx + 1}</td>
+                            {(r || []).map((c: any, cIdx: number) => (
+                              <td key={cIdx}>{String(c || '')}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="table-scroll">
-                  <table className="raw-table">
-                    <tbody>
-                      {rawRows.slice(0, 8).map((r, rIdx) => (
-                        <tr key={rIdx}>
-                          <td className="row-num">{rIdx + 1}</td>
-                          {(r || []).map((c: any, cIdx: number) => (
-                            <td key={cIdx}>{String(c || '')}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                <div className="continue-step1-box" ref={continueBtnRef}>
+                  <button
+                    type="button"
+                    className="btn-continue-step1"
+                    onClick={() => {
+                      setStep(2);
+                      if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                    }}
+                  >
+                    <span>Continuer &rarr; 2. Colonnes</span>
+                    <ArrowRight size={20} />
+                  </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}
@@ -1355,7 +1372,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               {step > 1 && (
                 <button
                   className="btn-cancel"
-                  onClick={() => setStep((s) => (s - 1) as any)}
+                  onClick={() => {
+                    setStep((s) => (s - 1) as any);
+                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                  }}
                   disabled={submitting}
                 >
                   <ArrowLeft size={16} /> Précédent
@@ -1365,7 +1385,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                 <button
                   className="btn-submit"
                   disabled={!rawRows.length}
-                  onClick={() => setStep(2)}
+                  onClick={() => {
+                    setStep(2);
+                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                  }}
                 >
                   Suivant : Configurer le Mapping <ArrowRight size={16} />
                 </button>
@@ -1374,7 +1397,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                 <button
                   className="btn-submit"
                   disabled={columnMapping.ue_title === -1}
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    setStep(3);
+                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                  }}
                 >
                   Suivant : Prévisualiser <ArrowRight size={16} />
                 </button>
@@ -1402,7 +1428,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           .maquette-import-modal {
             max-width: 800px;
             width: 90vw;
-            max-height: 90vh;
+            max-height: 85vh;
             display: flex;
             flex-direction: column;
           }
@@ -1492,7 +1518,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           }
 
           .step-content {
-            padding: 1.5rem;
+            padding: 1.5rem 1.5rem 80px 1.5rem;
             overflow-y: auto;
             flex: 1;
             display: flex;
@@ -1555,6 +1581,34 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             overflow: hidden;
+          }
+
+          .continue-step1-box {
+            margin-top: 1.25rem;
+            width: 100%;
+          }
+
+          .btn-continue-step1 {
+            width: 100%;
+            padding: 0.85rem 1.5rem;
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+          }
+
+          .btn-continue-step1:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
           }
 
           .preview-raw-header {

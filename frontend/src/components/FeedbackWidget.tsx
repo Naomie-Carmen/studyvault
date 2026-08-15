@@ -183,11 +183,16 @@ export const FeedbackWidget: React.FC = () => {
       )}
 
       <style>{`
+        body:has(.modal-backdrop) .feedback-widget-container,
+        body:has(.modal-card) .feedback-widget-container {
+          display: none !important;
+        }
+
         .feedback-widget-container {
           position: fixed;
           bottom: 1.25rem;
           right: 1.25rem;
-          z-index: 9000;
+          z-index: 90;
         }
 
         .feedback-trigger-btn {
