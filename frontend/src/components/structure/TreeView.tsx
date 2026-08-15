@@ -350,7 +350,6 @@ export const TreeView: React.FC<TreeViewProps> = ({
                   {isSemCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                 </button>
                 <span className="semester-pill">S{sem.number}</span>
-                <span className="semester-pill">S{sem.number}</span>
                 <span className="semester-label">{sem.label}</span>
                 {renderBadge(getSemAvg(sem.number))}
                 {!sem.isActive && <span className="inactive-badge">{t('structure.inactive', 'Inactif')}</span>}
