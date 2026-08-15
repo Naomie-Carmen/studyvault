@@ -588,6 +588,12 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           transition: border-color 0.2s ease;
         }
 
+        .structure-search-box .search-icon {
+          position: static !important;
+          flex-shrink: 0;
+          color: #818cf8;
+        }
+
         .structure-search-box:focus-within {
           border-color: #6366f1;
           box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
