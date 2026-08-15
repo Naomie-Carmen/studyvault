@@ -807,7 +807,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
   // Arbre hiérarchique pour l'aperçu
   const previewTree = useMemo(() => {
-    const map = new Map<number, Map<string, { title: string; code?: string; ects?: number | null; ecues: Map<string, { title: string; code?: string; subjects: { name: string; instructor?: string }[] }>; directSubjects: { name: string; instructor?: string }[] }>>();
+    const map = new Map<number, Map<string, { title: string; code?: string; ects?: number | null; ecues: Map<string, { title: string; code?: string; ects?: number | null; subjects: { name: string; instructor?: string }[] }>; directSubjects: { name: string; instructor?: string }[] }>>();
 
     parsedItemsData.items.forEach((it) => {
       const semNum = it.semesterNumber;
@@ -819,7 +819,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         semMap.set(ueKey, {
           title: it.ueTitle,
           code: it.ueCode,
-          ects: it.ects,
+          ects: it.ueEcts || it.ects,
           ecues: new Map(),
           directSubjects: [],
         });
@@ -832,6 +832,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           ueNode.ecues.set(ecueKey, {
             title: it.ecueTitle,
             code: it.ecueCode,
+            ects: it.ecueEcts || it.ects,
             subjects: [],
           });
         }
@@ -1417,8 +1418,13 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
                                   {Array.from(ueNode.ecues.entries()).map(([ecueKey, ecueNode]) => (
                                     <div key={ecueKey} className="preview-ecue-box">
-                                      <div className="ecue-title">
-                                        ECUE : {ecueNode.code ? `[${ecueNode.code}] ` : ''}{ecueNode.title}
+                                      <div className="ecue-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>ECUE : {ecueNode.code ? `[${ecueNode.code}] ` : ''}{ecueNode.title}</span>
+                                        {ecueNode.ects && (
+                                          <span className="ects-badge" style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'rgba(99, 102, 241, 0.2)', color: '#a5b4fc', borderRadius: '6px', fontWeight: 600 }}>
+                                            coef {ecueNode.ects}
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="ecue-subjects">
                                         {ecueNode.subjects.map((sub, sIdx) => (
