@@ -508,6 +508,12 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                       <span className="ecue-title">
                                         <HighlightText text={ecue.title} query={q} />
                                       </span>
+                                      {ecue.instructor && (
+                                        <span className="instructor-tag">
+                                          <UserCheck size={12} />
+                                          <HighlightText text={ecue.instructor} query={q} />
+                                        </span>
+                                      )}
                                       {renderBadge(getEcueAvg(ecue.id))}
                                       <span
                                         className={`ects-badge ${!ecue.ects || Number(ecue.ects) <= 0 ? 'no-coef' : ''}`}

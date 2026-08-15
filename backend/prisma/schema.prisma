@@ -137,18 +137,19 @@ model UE {
 }
 
 model ECUE {
-  id        String     @id @default(uuid())
-  ueId      String
-  ue        UE         @relation(fields: [ueId], references: [id], onDelete: Cascade)
-  code      String?
-  title     String
-  ects      Float?
-  order     Int        @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  subjects  Subject[]
-  noteTypes NoteType[]
-  notes     Note[]
+  id         String     @id @default(uuid())
+  ueId       String
+  ue         UE         @relation(fields: [ueId], references: [id], onDelete: Cascade)
+  code       String?
+  title      String
+  ects       Float?
+  instructor String?
+  order      Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  subjects   Subject[]
+  noteTypes  NoteType[]
+  notes      Note[]
 
   @@index([ueId])
 }

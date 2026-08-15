@@ -191,6 +191,7 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
           code: ecue.code,
           title: ecue.title,
           ects: ecue.ects,
+          instructor: ecue.instructor,
           subjects: ecue.subjects.map((sub) => ({
             id: sub.id,
             ecueId: sub.ecueId,
@@ -251,11 +252,12 @@ export async function createECUE(userId: string, input: ECUEInput) {
       title: input.title,
       code: input.code || null,
       ects: input.ects !== undefined && input.ects !== null ? Number(input.ects) : null,
+      instructor: input.instructor || null,
     },
   });
 }
 
-export async function updateECUE(userId: string, ecueId: string, input: Partial<ECUEInput> & { ects?: number | null }) {
+export async function updateECUE(userId: string, ecueId: string, input: Partial<ECUEInput> & { ects?: number | null; instructor?: string | null }) {
   await verifyECUEOwnership(userId, ecueId);
 
   return prisma.eCUE.update({
@@ -264,6 +266,7 @@ export async function updateECUE(userId: string, ecueId: string, input: Partial<
       ...(input.title ? { title: input.title } : {}),
       ...(input.code !== undefined ? { code: input.code } : {}),
       ...(input.ects !== undefined ? { ects: input.ects !== null && !isNaN(Number(input.ects)) ? Number(input.ects) : null } : {}),
+      ...(input.instructor !== undefined ? { instructor: input.instructor } : {}),
     },
   });
 }

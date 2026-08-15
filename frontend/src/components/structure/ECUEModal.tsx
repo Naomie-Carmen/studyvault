@@ -6,7 +6,7 @@ import { Layers, X, Save } from 'lucide-react';
 interface ECUEModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { ueId: string; title: string; code?: string; ects?: number }) => Promise<void>;
+  onSubmit: (data: { ueId: string; title: string; code?: string; ects?: number; instructor?: string }) => Promise<void>;
   ueId: string;
   editECUE?: ECUE | null;
 }
@@ -22,6 +22,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [ects, setEcts] = useState<string>('');
+  const [instructor, setInstructor] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,10 +31,12 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
       setTitle(editECUE.title);
       setCode(editECUE.code || '');
       setEcts(editECUE.ects !== undefined && editECUE.ects !== null ? String(editECUE.ects) : '');
+      setInstructor(editECUE.instructor || '');
     } else {
       setTitle('');
       setCode('');
       setEcts('');
+      setInstructor('');
     }
   }, [editECUE, isOpen]);
 
@@ -61,6 +64,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
         title: title.trim(),
         code: code.trim() || undefined,
         ects: parsedEcts,
+        instructor: instructor.trim() || undefined,
       });
       onClose();
     } catch (err: unknown) {
@@ -104,6 +108,16 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
               placeholder={t('modal.ecueCodePlaceholder', 'ex: ECUE1')}
               value={code}
               onChange={(e) => setCode(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>{t('modal.ecueInstructorLabel', 'Enseignant / Professeur (Optionnel)')}</label>
+            <input
+              type="text"
+              placeholder={t('modal.ecueInstructorPlaceholder', 'ex: Pr. Martin')}
+              value={instructor}
+              onChange={(e) => setInstructor(e.target.value)}
             />
           </div>
 

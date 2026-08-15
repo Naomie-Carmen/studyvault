@@ -13,6 +13,7 @@ export interface ECUE {
   code?: string | null;
   title: string;
   ects?: number | null;
+  instructor?: string | null;
   subjects: Subject[];
 }
 
