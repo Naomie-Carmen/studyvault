@@ -10,6 +10,11 @@ import { X, UploadCloud, FileCheck, AlertCircle, Cpu, RefreshCw, Sparkles } from
 
 import { extractTableWithDetails, WordItem } from '../../utils/ocrTable';
 
+const ACTIONABLE_AI_ERROR = `😕 L'IA n'a pas pu lire cette photo. Solutions :
+1) Utilisez le PDF ou Excel officiel (100% fiable)
+2) Cliquez « Extraction locale » puis ajustez manuellement
+3) Reprenez une photo plus nette, à plat et lumineuse`;
+
 interface TimetableImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,6 +45,17 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
   const actionBlockRef = useRef<HTMLDivElement>(null);
 
   const isImage = file ? (file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name)) : false;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -85,13 +101,23 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     if (!file) return;
     setAiLoading(true);
     setAiError(null);
+    setAiFailed(false);
     setErrorMsg(null);
 
     try {
       setOcrStatus(t('timetableImport.stepOcr', '1/2 Lecture locale de la photo…'));
       const details = await extractTableWithDetails(file);
-      const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
+      const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000).trim();
 
+      // b) Si texte < 40 caractères -> NE PAS appeler le backend ; afficher directement le message actionnable
+      if (!rawOcrText || rawOcrText.length < 40) {
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        setOcrStatus(null);
+        return;
+      }
+
+      // c) Sinon -> POST /ai/structure { text, kind }
       setOcrStatus(t('timetableImport.stepAi', '2/2 Reconstruction par IA…'));
       const token = localStorage.getItem('studyvault_access_token') || '';
       const response = await fetch(`${API_BASE_URL}/ai/structure`, {
@@ -100,19 +126,25 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ rawText: rawOcrText }),
+        body: JSON.stringify({ text: rawOcrText, kind: 'timetable' }),
       });
 
       if (!response.ok) {
-        throw new Error(t('timetableImport.aiErrStatus', 'Échec du service IA (status {{status}}).', { status: response.status }));
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        setOcrStatus(null);
+        return;
       }
 
       const json = await response.json();
-      if (!json.success || !json.data?.rows) {
-        throw new Error(json.error?.message || t('timetableImport.aiErrFormat', 'Données IA non exploitables.'));
+      if (!json.success || !json.data?.rows || json.data.rows.length === 0) {
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        setOcrStatus(null);
+        return;
       }
 
-      const csvContent = json.data.rows.map((row: string[]) => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const csvContent = json.data.rows.map((row: string[]) => row.map((cell: any) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
       const csvBlob = new Blob([csvContent], { type: 'text/csv' });
       const csvFile = new File([csvBlob], 'timetable_ai.csv', { type: 'text/csv' });
 
@@ -125,14 +157,16 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
         setOcrStatus(null);
         setIsProcessing(true);
       } else {
-        throw new Error(uploadRes.error?.message || t('timetableImport.uploadErr', 'Erreur lors du téléversement du CSV IA.'));
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        setOcrStatus(null);
       }
     } catch (err: any) {
-      console.warn('[Extraction IA Planning Error]', err);
-      setAiError(err.message || t('timetableImport.aiErrorDefault', 'Extraction IA indisponible pour cette image. Veuillez utiliser l\'extraction locale.'));
       setAiFailed(true);
-      setAiLoading(false);
+      setAiError(ACTIONABLE_AI_ERROR);
       setOcrStatus(null);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -189,11 +223,11 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
 
   return (
     <>
-      <div className="modal-backdrop">
+      <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="glass-card import-modal-card" ref={modalCardRef} tabIndex={-1}>
           <div className="modal-header">
             <h3>{t('timetableImport.title', 'Importer un Emploi du Temps Officiel')}</h3>
-            <button className="btn-close" onClick={onClose} disabled={uploading || aiLoading}>
+            <button type="button" className="btn-close" onClick={onClose} disabled={uploading || aiLoading} aria-label="Fermer" title="Fermer" style={{ zIndex: 10 }}>
               <X size={18} />
             </button>
           </div>
@@ -268,8 +302,8 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                     </div>
 
                     {aiError && (
-                      <div className="alert alert-error" style={{ fontSize: '0.825rem', padding: '0.65rem 0.85rem' }}>
-                        <AlertCircle size={16} />
+                      <div className="alert alert-error" style={{ fontSize: '0.85rem', padding: '0.85rem 1rem', whiteSpace: 'pre-line', lineHeight: '1.55' }}>
+                        <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                         <span>{aiError}</span>
                       </div>
                     )}
@@ -313,7 +347,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
 
                       <button
                         type="button"
-                        className="btn-secondary"
+                        className={`btn-secondary ${aiFailed ? 'pulse-highlight' : ''}`}
                         onClick={handleUploadAndRunOCR}
                         disabled={aiLoading || uploading}
                         style={{
@@ -352,24 +386,39 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
             )}
           </div>
 
-          {!isProcessing && !isImage && (
+          {!isProcessing && (
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={onClose}>
-                {t('common.cancel', 'Annuler')}
+              <button type="button" className="btn-cancel" onClick={onClose} disabled={uploading || aiLoading}>
+                ✕ Fermer
               </button>
-              <button
-                className="btn-submit"
-                onClick={handleUploadAndRunOCR}
-                disabled={!file || uploading || aiLoading}
-              >
-                <Cpu size={16} />
-                <span>{uploading ? t('timetableImport.uploading', 'Téléversement...') : t('timetableImport.startExtractBtn', 'Lancer l\'Extraction')}</span>
-              </button>
+              {!isImage && (
+                <button
+                  type="button"
+                  className="btn-submit"
+                  onClick={handleUploadAndRunOCR}
+                  disabled={!file || uploading || aiLoading}
+                >
+                  <Cpu size={16} />
+                  <span>{uploading ? t('timetableImport.uploading', 'Téléversement...') : t('timetableImport.startExtractBtn', 'Lancer l\'Extraction')}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
 
         <style>{`
+          @keyframes gentlePulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.2); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+          }
+
+          .pulse-highlight {
+            animation: gentlePulse 2s infinite ease-in-out !important;
+            border-color: #6366f1 !important;
+            background: rgba(99, 102, 241, 0.25) !important;
+          }
+
           .modal-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
             display: flex; align-items: center; justify-content: center; z-index: 110; padding: 1rem;

@@ -256,9 +256,11 @@ export async function extractTimetable(req: Request, res: Response, next: NextFu
  */
 export async function structureTextWithAi(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { text, kind } = req.body;
-    if (!text || typeof text !== 'string') {
-      throw ApiError.badRequest('Le texte brut OCR (text) est requis.', 'MISSING_TEXT');
+    const { text, rawText: bodyRawText, kind } = req.body;
+    const inputText = String(text || bodyRawText || '').trim();
+
+    if (!inputText || inputText.length < 40) {
+      throw ApiError.unprocessableEntity("Texte insuffisant pour l'analyse par IA (minimum 40 caractères requis).", 'INSUFFICIENT_TEXT');
     }
 
     const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
@@ -285,7 +287,7 @@ Format JSON strict :
 Corrige les fautes d'orthographe et mots déformés par le sens (ex: 'Macoscommoie'→'Macroéconomie'). Un objet par ligne ECUE.`;
     }
 
-    const truncatedText = text.slice(0, 12000);
+    const truncatedText = inputText.slice(0, 12000);
     const fullPrompt = `${prompt}\n\nTEXTE BRUT OCR :\n${truncatedText}`;
 
     console.log(`[Cloudflare AI] Structure de texte (${kind || 'maquette'})...`);

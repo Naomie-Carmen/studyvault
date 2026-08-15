@@ -39,6 +39,11 @@ import {
 
 
 
+const ACTIONABLE_AI_ERROR = `😕 L'IA n'a pas pu lire cette photo. Solutions :
+1) Utilisez le PDF ou Excel officiel (100% fiable)
+2) Cliquez « Extraction locale » puis ajustez manuellement
+3) Reprenez une photo plus nette, à plat et lumineuse`;
+
 interface MaquetteImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -182,6 +187,17 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isImageFormat, selectedFiles.length, rawRows.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -512,45 +528,11 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     if (selectedFiles.length === 0) return;
     setAiLoading(true);
     setAiError(null);
+    setAiFailed(false);
     setError(null);
 
     try {
-      // 1. Envoie l'IMAGE directement à /api/v1/ai/extract-maquette (Vision directe multi-fournisseurs)
-      setAiStepMessage("1/2 Analyse Visuelle IA de la photo…");
-      const formData = new FormData();
-      selectedFiles.forEach((f) => formData.append('images', f));
-
-      const token = localStorage.getItem('studyvault_access_token') || '';
-      const response = await fetch(`${API_BASE_URL}/ai/extract-maquette`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        let extractedRows: string[][] = Array.isArray(data.data?.rows) ? data.data.rows : [];
-
-        if (extractedRows.length > 0) {
-          const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
-          const firstRowStr = (extractedRows[0] || []).join(' ').toLowerCase();
-          const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
-
-          if (!hasHeaderKeywords) {
-            extractedRows = [defaultHeader, ...extractedRows];
-          }
-
-          setRawRows(extractedRows);
-          autoDetect(extractedRows);
-          return;
-        }
-      }
-
-      // 2. Si la vision directe échoue, fallback hybride (OCR local + /ai/structure)
-      console.warn('[Vision Fallback] Passage sur le mode hybride OCR local + LLM texte...');
-      setAiStepMessage("2/2 Fallback : Extraction OCR + IA texte…");
+      setAiStepMessage("1/2 Lecture OCR locale de la photo…");
 
       let allWordsText: string[] = [];
       for (const fileItem of selectedFiles) {
@@ -558,8 +540,18 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         const imgText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
         allWordsText.push(imgText);
       }
-      const rawOcrText = allWordsText.join('\n');
+      const rawOcrText = allWordsText.join('\n').trim();
 
+      // b) Si texte < 40 caractères -> NE PAS appeler le backend ; afficher directement le message actionnable
+      if (!rawOcrText || rawOcrText.length < 40) {
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        return;
+      }
+
+      // c) Sinon -> POST /ai/structure { text, kind }
+      setAiStepMessage("2/2 Analyse par l'IA backend…");
+      const token = localStorage.getItem('studyvault_access_token') || '';
       const textResponse = await fetch(`${API_BASE_URL}/ai/structure`, {
         method: 'POST',
         headers: {
@@ -572,40 +564,34 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         }),
       });
 
-      if (textResponse.ok) {
-        const data = await textResponse.json();
-        let extractedRows: string[][] = Array.isArray(data.data?.rows) ? data.data.rows : [];
-
-        if (extractedRows.length > 0) {
-          const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
-          const firstRowStr = (extractedRows[0] || []).join(' ').toLowerCase();
-          const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
-
-          if (!hasHeaderKeywords) {
-            extractedRows = [defaultHeader, ...extractedRows];
-          }
-
-          setRawRows(extractedRows);
-          autoDetect(extractedRows);
-          return;
-        }
-      }
-
-      // 3. Fallback final : Si tout échoue, utiliser le tableau OCR local autonome
-      console.warn('[Vision Fallback] Passage sur l\'OCR local autonome...');
-      const rows = await extractTableFromMultipleImages(selectedFiles);
-      setRawRows(rows);
-      autoDetect(rows);
-    } catch (_err) {
-      console.warn('[AI Vision Error] Fallback sur l\'OCR local autonome...');
-      try {
-        const rows = await extractTableFromMultipleImages(selectedFiles);
-        setRawRows(rows);
-        autoDetect(rows);
-      } catch (_localErr) {
+      if (!textResponse.ok) {
         setAiFailed(true);
-        setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
+        setAiError(ACTIONABLE_AI_ERROR);
+        return;
       }
+
+      const data = await textResponse.json();
+      let extractedRows: string[][] = Array.isArray(data.data?.rows) ? data.data.rows : [];
+
+      if (!data.success || extractedRows.length === 0) {
+        setAiFailed(true);
+        setAiError(ACTIONABLE_AI_ERROR);
+        return;
+      }
+
+      const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
+      const firstRowStr = (extractedRows[0] || []).join(' ').toLowerCase();
+      const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
+
+      if (!hasHeaderKeywords) {
+        extractedRows = [defaultHeader, ...extractedRows];
+      }
+
+      setRawRows(extractedRows);
+      autoDetect(extractedRows);
+    } catch (_err) {
+      setAiFailed(true);
+      setAiError(ACTIONABLE_AI_ERROR);
     } finally {
       setAiLoading(false);
       setAiStepMessage(null);
@@ -925,7 +911,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card maquette-import-modal" ref={modalCardRef} tabIndex={-1}>
         <div className="modal-header">
           <div className="modal-title-box">
@@ -935,7 +921,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               <p className="subtitle">{t('maquetteImport.subtitle', 'Convertissez votre fichier Excel ou CSV en arborescence de cours')}</p>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose} disabled={submitting}>
+          <button type="button" className="close-btn" onClick={onClose} disabled={submitting} aria-label="Fermer" title="Fermer" style={{ zIndex: 10 }}>
             <X size={18} />
           </button>
         </div>
@@ -1049,8 +1035,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                 </div>
 
                 {aiError && (
-                  <div className="alert alert-error" style={{ fontSize: '0.825rem', padding: '0.65rem 0.85rem' }}>
-                    <AlertTriangle size={16} />
+                  <div className="alert alert-error" style={{ fontSize: '0.85rem', padding: '0.85rem 1rem', whiteSpace: 'pre-line', lineHeight: '1.55' }}>
+                    <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span>{aiError}</span>
                   </div>
                 )}
@@ -1096,7 +1082,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                   {/* Bouton secondaire Extraction locale (sans internet) */}
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className={`btn-secondary ${aiFailed ? 'pulse-highlight' : ''}`}
                     onClick={handleRunLocalOcr}
                     disabled={aiLoading || ocrLoading}
                     style={{
@@ -1471,6 +1457,9 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           )}
 
           <div className="footer-nav-row">
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={submitting} style={{ marginRight: 'auto' }}>
+              ✕ Fermer
+            </button>
             {importSummary ? (
               <button className="btn-submit" onClick={onSuccess}>
                 {t('maquetteImport.btnFinish', 'Terminer & Rafraîchir l\'arborescence')}
@@ -1479,6 +1468,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               <>
                 {step > 1 && (
                   <button
+                    type="button"
                     className="btn-cancel"
                     onClick={() => {
                       setStep((s) => (s - 1) as any);
@@ -1942,6 +1932,18 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           }
 
           .metric-val { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+          @keyframes gentlePulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.2); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+          }
+
+          .pulse-highlight {
+            animation: gentlePulse 2s infinite ease-in-out !important;
+            border-color: #6366f1 !important;
+            background: rgba(99, 102, 241, 0.25) !important;
+          }
+
           .metric-label { font-size: 0.75rem; color: var(--text-muted); }
 
           .modal-footer {

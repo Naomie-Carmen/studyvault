@@ -36,4 +36,8 @@ export class ApiError extends Error {
   static badGateway(message: string = 'Erreur de passerelle', code: string = 'BAD_GATEWAY'): ApiError {
     return new ApiError(message, 502, code);
   }
+
+  static unprocessableEntity(message: string = 'Entité non traitable', code: string = 'UNPROCESSABLE_ENTITY'): ApiError {
+    return new ApiError(message, 422, code);
+  }
 }
