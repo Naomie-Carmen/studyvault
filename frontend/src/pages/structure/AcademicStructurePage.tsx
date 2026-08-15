@@ -10,7 +10,6 @@ import { DeleteConfirmModal } from '../../components/structure/DeleteConfirmModa
 import { MaquetteImportModal } from '../../components/structure/MaquetteImportModal';
 import { useAcademic } from '../../context/useAcademic';
 import { 
-  FolderTree, 
   Sparkles, 
   RefreshCw, 
   AlertCircle, 
@@ -377,9 +376,9 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           <h3>{t('structure.noResults', 'Aucun résultat pour')} « {debouncedSearchQuery} »</h3>
           <p>Vérifiez l'orthographe ou essayez un autre terme (ex: code UE, matière, nom d'enseignant).</p>
         </div>
-      ) : tree && Array.isArray(tree.semesters) && tree.semesters.length > 0 ? (
+      ) : (
         <TreeView
-          semesters={tree.semesters}
+          semesters={tree?.semesters || []}
           searchQuery={debouncedSearchQuery}
           onReorder={async (data) => {
             try {
@@ -421,12 +420,6 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           }}
           onDeleteSubject={(sub) => setDeleteTarget({ type: 'Matière', id: sub.id, name: sub.name })}
         />
-      ) : (
-        <div className="glass-card empty-tree-card">
-          <FolderTree size={40} className="text-indigo" />
-          <h3>Aucune structure définie</h3>
-          <p>Ajoutez votre première Unité d'Enseignement (UE) dans l'un de vos semestres pour démarrer.</p>
-        </div>
       )}
 
       {/* UE Modal */}

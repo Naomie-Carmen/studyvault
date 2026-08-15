@@ -54,16 +54,13 @@ export async function processTimetableImport(
   // Parse structured sessions from text
   const parsed = parseTimetableText(fileText);
 
-  // Fetch existing user subjects for fuzzy matching
+  // Fetch existing user subjects (UE or ECUE) for fuzzy matching
   const userSubjects = await prisma.subject.findMany({
     where: {
-      ue: {
-        semester: {
-          academicYear: {
-            userId,
-          },
-        },
-      },
+      OR: [
+        { ue: { semester: { academicYear: { userId } } } },
+        { ecue: { ue: { semester: { academicYear: { userId } } } } },
+      ],
     },
     select: { id: true, name: true },
   });
@@ -112,10 +109,7 @@ export async function processTimetableImport(
 export async function getSuggestions(
   userId: string,
   importId: string
-): Promise<{
-  suggestions: TimetableSuggestionDTO[];
-  stats: { total: number; highConfidence: number; mediumConfidence: number; lowConfidence: number };
-}> {
+): Promise<{ suggestions: TimetableSuggestionDTO[]; stats: { total: number; highConfidence: number; needsReview: number } }> {
   const imp = await prisma.timetableImport.findUnique({
     where: { id: importId },
   });
@@ -129,7 +123,6 @@ export async function getSuggestions(
     orderBy: { confidenceScore: 'desc' },
   });
 
-  // Get subject names for matchedSubjectId
   const subjectIds = suggestions.map((s) => s.matchedSubjectId).filter(Boolean) as string[];
   const subjects = await prisma.subject.findMany({
     where: { id: { in: subjectIds } },
@@ -137,24 +130,29 @@ export async function getSuggestions(
   });
   const subjectMap = new Map(subjects.map((sub) => [sub.id, sub.name]));
 
-  const dtos: TimetableSuggestionDTO[] = suggestions.map((s) => ({
-    ...(s as unknown as TimetableSuggestionDTO),
+  const dtoSuggestions: TimetableSuggestionDTO[] = suggestions.map((s) => ({
+    id: s.id,
+    timetableImportId: s.timetableImportId,
+    detectedSubjectName: s.detectedSubjectName,
+    matchedSubjectId: s.matchedSubjectId,
     matchedSubjectName: s.matchedSubjectId ? subjectMap.get(s.matchedSubjectId) || null : null,
+    dayOfWeek: s.dayOfWeek,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    room: s.room,
+    sessionType: s.sessionType,
+    confidenceScore: s.confidenceScore,
+    status: s.status,
+    createdAt: s.createdAt,
   }));
 
-  const highConfidence = dtos.filter((s) => s.confidenceScore >= 80).length;
-  const mediumConfidence = dtos.filter((s) => s.confidenceScore >= 50 && s.confidenceScore < 80).length;
-  const lowConfidence = dtos.filter((s) => s.confidenceScore < 50).length;
-
-  return {
-    suggestions: dtos,
-    stats: {
-      total: dtos.length,
-      highConfidence,
-      mediumConfidence,
-      lowConfidence,
-    },
+  const stats = {
+    total: suggestions.length,
+    highConfidence: suggestions.filter((s) => s.confidenceScore >= 80).length,
+    needsReview: suggestions.filter((s) => s.confidenceScore < 80).length,
   };
+
+  return { suggestions: dtoSuggestions, stats };
 }
 
 export async function validateSuggestions(
@@ -184,10 +182,35 @@ export async function validateSuggestions(
   for (const s of suggestions) {
     const corr = correctionMap.get(s.id);
 
-    const targetSubjectId = corr?.subjectId || s.matchedSubjectId;
+    let targetSubjectId = corr?.subjectId || s.matchedSubjectId;
     if (!targetSubjectId) {
-      // Skip if no subject is assigned or matched
-      continue;
+      // Find existing subject for user or create one automatically
+      const existingSub = await prisma.subject.findFirst({
+        where: {
+          name: { equals: s.detectedSubjectName, mode: 'insensitive' },
+          OR: [
+            { ue: { semester: { academicYear: { userId } } } },
+            { ecue: { ue: { semester: { academicYear: { userId } } } } },
+          ],
+        },
+      });
+
+      if (existingSub) {
+        targetSubjectId = existingSub.id;
+      } else {
+        const firstEcue = await prisma.eCUE.findFirst({
+          where: { ue: { semester: { academicYear: { userId } } } },
+        });
+
+        const newSub = await prisma.subject.create({
+          data: {
+            name: s.detectedSubjectName || 'Matière importée',
+            ecueId: firstEcue ? firstEcue.id : null,
+            color: '#6366f1',
+          },
+        });
+        targetSubjectId = newSub.id;
+      }
     }
 
     const dayOfWeek = corr?.dayOfWeek !== undefined ? corr.dayOfWeek : s.dayOfWeek ?? 0;

@@ -21,6 +21,73 @@ export function parseTimetableText(text: string): RawParsedSession[] {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const results: RawParsedSession[] = [];
 
+  // Check if content is CSV format
+  const isCsv = lines.some((l) => l.includes(',') && (l.toLowerCase().includes('jour') || l.toLowerCase().includes('heure') || l.toLowerCase().includes('matière') || l.toLowerCase().includes('matiere')));
+
+  if (isCsv) {
+    for (const line of lines) {
+      const cells = line.split(',').map((c) => c.replace(/^"|"$/g, '').trim());
+      if (cells.length < 2) continue;
+
+      const lowerJoin = cells.join(' ').toLowerCase();
+      if (lowerJoin.includes('jour') && (lowerJoin.includes('heure') || lowerJoin.includes('matière') || lowerJoin.includes('matiere'))) {
+        continue; // skip header line
+      }
+
+      let dayVal = 0;
+      let startTime = '08:30';
+      let endTime = '10:30';
+      let subjectName = '';
+      let room: string | undefined = undefined;
+      let sessionType: 'CM' | 'TD' | 'TP' | 'EXAM' | 'OTHER' = 'CM';
+
+      cells.forEach((cell) => {
+        const lowerCell = cell.toLowerCase();
+        for (const [dayKey, dNum] of Object.entries(DAY_MAP)) {
+          if (lowerCell === dayKey || lowerCell.startsWith(dayKey)) {
+            dayVal = dNum;
+          }
+        }
+        const tm = cell.match(/(\d{1,2})[h:](\d{2})?/i);
+        if (tm) {
+          const formatted = `${String(tm[1]).padStart(2, '0')}:${tm[2] ? String(tm[2]).padStart(2, '0') : '00'}`;
+          if (!startTime || startTime === '08:30') startTime = formatted;
+          else endTime = formatted;
+        }
+        if (/td|travaux dirigés/i.test(cell)) sessionType = 'TD';
+        else if (/tp|travaux pratiques/i.test(cell)) sessionType = 'TP';
+        else if (/exam|examen/i.test(cell)) sessionType = 'EXAM';
+
+        if (/amphi|salle|bâtiment/i.test(cell)) room = cell;
+
+        if (
+          cell.length >= 2 &&
+          !/(\d{1,2})[h:](\d{2})?/i.test(cell) &&
+          !Object.keys(DAY_MAP).some((d) => lowerCell.startsWith(d)) &&
+          !/^(cm|td|tp|exam|examen|cours)$/i.test(cell) &&
+          !/amphi|salle|bâtiment/i.test(cell)
+        ) {
+          if (!subjectName || cell.length > subjectName.length) {
+            subjectName = cell;
+          }
+        }
+      });
+
+      if (subjectName) {
+        results.push({
+          detectedSubjectName: subjectName,
+          dayOfWeek: dayVal,
+          startTime,
+          endTime,
+          room,
+          sessionType,
+        });
+      }
+    }
+
+    if (results.length > 0) return results;
+  }
+
   let currentDay: number | undefined = undefined;
 
   for (const line of lines) {

@@ -1947,16 +1947,70 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           .modal-footer {
             position: sticky;
             bottom: 0;
-            background: var(--bg-card, #1e1e2d);
+            background: #1e1e2d;
             border-top: 1px solid var(--border-color);
             padding: 1rem 1.5rem;
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
             z-index: 20;
-            backdrop-filter: blur(8px);
             border-bottom-left-radius: var(--radius-lg);
             border-bottom-right-radius: var(--radius-lg);
+          }
+
+          .btn-submit, .btn-continue-step1, .btn-ai-extract {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: #6C63FF !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            padding: 12px 20px !important;
+            border-radius: 10px !important;
+            border: none !important;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .btn-submit:hover:not(:disabled), .btn-continue-step1:hover:not(:disabled), .btn-ai-extract:hover:not(:disabled) {
+            background: #5b52e0 !important;
+            box-shadow: 0 4px 14px rgba(108, 99, 255, 0.4);
+          }
+
+          .btn-submit:disabled, .btn-continue-step1:disabled, .btn-ai-extract:disabled {
+            opacity: 0.5 !important;
+            color: #ffffff !important;
+            cursor: not-allowed !important;
+            background: #6C63FF !important;
+          }
+
+          .btn-cancel, .btn-local-extract {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: #f1f5f9 !important;
+            font-weight: 600 !important;
+            padding: 12px 20px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .btn-cancel:hover:not(:disabled), .btn-local-extract:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: #ffffff !important;
+          }
+
+          .btn-cancel:disabled, .btn-local-extract:disabled {
+            opacity: 0.5 !important;
+            color: #f1f5f9 !important;
+            cursor: not-allowed !important;
           }
 
           .footer-nav-row {

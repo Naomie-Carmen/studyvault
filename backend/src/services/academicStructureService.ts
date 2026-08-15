@@ -76,7 +76,7 @@ async function verifySubjectOwnership(userId: string, subjectId: string): Promis
 }
 
 export async function getFullStructure(userId: string): Promise<AcademicStructureTreeDTO> {
-  const academicYear = await prisma.academicYear.findFirst({
+  let academicYear = await prisma.academicYear.findFirst({
     where: { userId, isCurrent: true },
     include: {
       semesters: {
@@ -102,11 +102,73 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
   });
 
   if (!academicYear) {
-    return {
-      academicYearLabel: '',
-      level: '',
-      semesters: [],
-    };
+    academicYear = await prisma.academicYear.create({
+      data: {
+        userId,
+        yearLabel: '2025-2026',
+        level: 'L1',
+        isCurrent: true,
+        semesters: {
+          create: [
+            { number: 1, label: 'Semestre 1', isActive: true },
+            { number: 2, label: 'Semestre 2', isActive: true },
+          ],
+        },
+      },
+      include: {
+        semesters: {
+          orderBy: { number: 'asc' },
+          include: {
+            ues: {
+              orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+              include: {
+                ecues: {
+                  orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+                  include: {
+                    subjects: true,
+                  },
+                },
+                subjects: {
+                  where: { ecueId: null },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  } else if (academicYear.semesters.length === 0) {
+    await prisma.semester.createMany({
+      data: [
+        { academicYearId: academicYear.id, number: 1, label: 'Semestre 1', isActive: true },
+        { academicYearId: academicYear.id, number: 2, label: 'Semestre 2', isActive: true },
+      ],
+    });
+
+    academicYear = (await prisma.academicYear.findFirst({
+      where: { id: academicYear.id },
+      include: {
+        semesters: {
+          orderBy: { number: 'asc' },
+          include: {
+            ues: {
+              orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+              include: {
+                ecues: {
+                  orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+                  include: {
+                    subjects: true,
+                  },
+                },
+                subjects: {
+                  where: { ecueId: null },
+                },
+              },
+            },
+          },
+        },
+      },
+    })) || academicYear;
   }
 
   return {
