@@ -67,12 +67,16 @@ const FIELD_CONFIGS: FieldConfig[] = [
     key: 'ue_title',
     label: "Intitulé de l'UE",
     required: true,
-    matchers: [/intitule.*ue/i, /intitulé.*ue/i, /nom.*ue/i, /libelle.*ue/i, /ue/i],
+    matchers: [
+      /intitule.*ue/i, /intitulé.*ue/i, /nom.*ue/i, /libelle.*ue/i, /libellé.*ue/i,
+      /intitule.*unite/i, /intitulé.*unité/i, /libelle.*unite/i, /libellé.*unité/i,
+      /title.*ue/i, /^ue$/i, /unite.*enseignement/i, /unité.*enseignement/i, /code.*unit/i
+    ],
   },
   {
     key: 'ue_code',
     label: "Code UE",
-    matchers: [/code.*ue/i, /code_ue/i, /codification/i],
+    matchers: [/code.*ue/i, /code_ue/i, /codification/i, /code.*unité/i, /code.*unite/i],
   },
   {
     key: 'ects',
@@ -82,27 +86,27 @@ const FIELD_CONFIGS: FieldConfig[] = [
   {
     key: 'semester',
     label: "Semestre (Numéro ou Nom)",
-    matchers: [/semestre/i, /sem/i, /s[1-6]/i],
+    matchers: [/semestre/i, /sem/i, /s[1-6]/i, /semester/i],
   },
   {
     key: 'ecue_title',
     label: "Intitulé de l'ECUE / Matière",
-    matchers: [/intitule.*ecue/i, /intitulé.*ecue/i, /ecue/i, /élément/i, /element/i],
+    matchers: [/intitule.*ecue/i, /intitulé.*ecue/i, /^ecue$/i, /element.*constitutif/i, /élément.*constitutif/i, /nom.*ecue/i],
   },
   {
     key: 'ecue_code',
     label: "Code ECUE",
-    matchers: [/code.*ecue/i, /code_ecue/i],
+    matchers: [/code.*ecue/i, /code_ecue/i, /code.*matière/i, /code.*matiere/i],
   },
   {
     key: 'subject_name',
     label: "Nom de la Matière / Cours",
-    matchers: [/matiere/i, /matière/i, /cours/i, /enseignement/i, /discipline/i],
+    matchers: [/matiere/i, /matière/i, /cours/i, /enseignement/i, /discipline/i, /subject/i, /intitule/i, /intitulé/i],
   },
   {
     key: 'instructor',
     label: "Enseignant / Intervenant",
-    matchers: [/enseignant/i, /prof/i, /responsable/i, /intervenant/i, /formateur/i],
+    matchers: [/enseignant/i, /prof/i, /responsable/i, /intervenant/i, /formateur/i, /teacher/i, /instructor/i],
   },
 ];
 
@@ -119,8 +123,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [rawRows, setRawRows] = useState<any[][]>([]);
 
-  // Étape 2 : Ligne d'en-tête et mapping
+  // Étape 2 : Ligne d'en-tête, mapping & Semestre par défaut
   const [headerIndex, setHeaderIndex] = useState<number>(0);
+  const [fallbackSemester, setFallbackSemester] = useState<number>(1);
+  const [autoDetectBanner, setAutoDetectBanner] = useState<string | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<FieldKey, number>>({
     ue_title: -1,
     ue_code: -1,
@@ -201,6 +207,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setAiError(null);
       setAiFailed(false);
       setHeaderIndex(0);
+      setFallbackSemester(1);
+      setAutoDetectBanner(null);
       setColumnMapping({
         ue_title: -1,
         ue_code: -1,
@@ -269,6 +277,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       instructor: -1,
     };
 
+    let recognizedCount = 0;
+
     headerCells.forEach((cell, colIdx) => {
       const val = String(cell || '').trim();
       if (!val) return;
@@ -277,12 +287,21 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         if (newMapping[cfg.key] === -1) {
           if (cfg.matchers.some((m) => m.test(val))) {
             newMapping[cfg.key] = colIdx;
+            recognizedCount++;
           }
         }
       });
     });
 
     setColumnMapping(newMapping);
+
+    if (recognizedCount > 0) {
+      setAutoDetectBanner(
+        t('maquetteImport.autoDetectedColumns', '✨ {{count}} colonne(s) reconnue(s) automatiquement', { count: recognizedCount })
+      );
+    } else {
+      setAutoDetectBanner(null);
+    }
   };
 
   // Helper pour convertir un tableau de lignes textuelles en tableau 2D rawRows
@@ -671,6 +690,13 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     }
   };
 
+  // Champs obligatoires non mappés
+  const missingRequiredFields = useMemo(() => {
+    return FIELD_CONFIGS
+      .filter((cfg) => cfg.required && columnMapping[cfg.key] === -1)
+      .map((cfg) => cfg.label);
+  }, [columnMapping]);
+
   // Traitement des données pour l'Étape 3 (Aperçu + Héritage)
   const parsedItemsData = useMemo(() => {
     if (step < 2 || columnMapping.ue_title === -1 || rawRows.length === 0) {
@@ -680,7 +706,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     const items: StructureImportItem[] = [];
     let warningsCount = 0;
 
-    let prevSemester = 1;
+    let prevSemester = fallbackSemester;
     let prevUeTitle = '';
     let prevUeCode = '';
     let prevEcts: number | null = null;
@@ -729,14 +755,23 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         prevEcts = !isNaN(parsedEcts) && parsedEcts > 0 ? parsedEcts : null;
       }
 
-      // Héritage Semestre
+      // Détection & Héritage Semestre
       let semNum = prevSemester;
-      if (rawSemesterStr) {
-        const parsedSem = parseInt(rawSemesterStr.replace(/\D/g, ''), 10);
-        if (!isNaN(parsedSem) && parsedSem >= 1 && parsedSem <= 12) {
-          semNum = parsedSem;
-          prevSemester = semNum;
+      if (columnMapping.semester === -1) {
+        semNum = fallbackSemester;
+      } else if (rawSemesterStr) {
+        const normSem = rawSemesterStr.toLowerCase().trim();
+        if (/s\s*1|semestre\s*1|1er\s*sem|semester\s*1|^1$/i.test(normSem)) {
+          semNum = 1;
+        } else if (/s\s*2|semestre\s*2|2[eè]me\s*sem|2e\s*sem|semester\s*2|^2$/i.test(normSem)) {
+          semNum = 2;
+        } else {
+          const parsedSem = parseInt(rawSemesterStr.replace(/\D/g, ''), 10);
+          if (!isNaN(parsedSem) && parsedSem >= 1 && parsedSem <= 12) {
+            semNum = parsedSem;
+          }
         }
+        prevSemester = semNum;
       }
 
       const parsedEcts = parseFloat(rawEctsStr.replace(',', '.'));
@@ -751,7 +786,6 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         prevEcueCode = rawEcueCode;
       }
 
-
       items.push({
         semesterNumber: semNum,
         ueTitle: rawUeTitle,
@@ -765,7 +799,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     }
 
     return { items, warningsCount };
-  }, [rawRows, headerIndex, columnMapping, step]);
+  }, [rawRows, headerIndex, columnMapping, fallbackSemester, step]);
 
   // Arbre hiérarchique pour l'aperçu
   const previewTree = useMemo(() => {
@@ -1198,37 +1232,71 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
               </div>
             </div>
 
-            {columnMapping.ue_title === -1 && (
-              <div className="alert alert-warning">
-                <AlertTriangle size={16} />
-                <span>La colonne <strong>Intitulé UE</strong> est obligatoire pour continuer.</span>
+            {autoDetectBanner && (
+              <div className="alert alert-success" style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#047857', marginBottom: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={18} />
+                <span>{autoDetectBanner}</span>
               </div>
             )}
 
             <div className="mapping-grid">
-              {FIELD_CONFIGS.map((cfg) => (
-                <div key={cfg.key} className="form-group mapping-card">
-                  <label>
-                    {cfg.label} {cfg.required && <span className="text-red">*</span>}
-                  </label>
-                  <select
-                    value={columnMapping[cfg.key]}
-                    onChange={(e) =>
-                      setColumnMapping({
-                        ...columnMapping,
-                        [cfg.key]: Number(e.target.value),
-                      })
-                    }
-                  >
-                    <option value={-1}>-- Ignorer cette donnée --</option>
-                    {headers.map((h, hIdx) => (
-                      <option key={hIdx} value={hIdx}>
-                        Colonne {hIdx + 1} : {h}
+              {FIELD_CONFIGS.map((cfg) => {
+                const isSemester = cfg.key === 'semester';
+
+                return (
+                  <div key={cfg.key} className={`form-group mapping-card ${isSemester ? 'semester-card-group' : ''}`}>
+                    <label>
+                      {cfg.label} {cfg.required && <span className="text-red">*</span>}
+                    </label>
+                    <select
+                      value={columnMapping[cfg.key]}
+                      onChange={(e) =>
+                        setColumnMapping({
+                          ...columnMapping,
+                          [cfg.key]: Number(e.target.value),
+                        })
+                      }
+                    >
+                      <option value={-1}>
+                        {isSemester
+                          ? t('maquetteImport.noSemesterCol', '-- Aucune colonne semestre --')
+                          : '-- Ignorer cette donnée --'}
                       </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+                      {headers.map((h, hIdx) => (
+                        <option key={hIdx} value={hIdx}>
+                          Colonne {hIdx + 1} : {h}
+                        </option>
+                      ))}
+                    </select>
+
+                    {isSemester && columnMapping.semester === -1 && (
+                      <div className="fallback-semester-box">
+                        <span className="fallback-label">
+                          {t('maquetteImport.semesterBelongsTo', 'Ces cours appartiennent à :')}
+                        </span>
+                        <div className="semester-radio-group">
+                          <button
+                            type="button"
+                            className={`sem-radio-btn ${fallbackSemester === 1 ? 'active' : ''}`}
+                            onClick={() => setFallbackSemester(1)}
+                          >
+                            <span className="radio-dot" />
+                            <span>{t('maquetteImport.semester1', 'Semestre 1 (S1)')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`sem-radio-btn ${fallbackSemester === 2 ? 'active' : ''}`}
+                            onClick={() => setFallbackSemester(2)}
+                          >
+                            <span className="radio-dot" />
+                            <span>{t('maquetteImport.semester2', 'Semestre 2 (S2)')}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="info-box-heritage">
@@ -1290,7 +1358,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                 <div className="tree-preview-container">
                   {Array.from(previewTree.entries()).map(([semNum, uesMap]) => (
                     <div key={semNum} className="preview-semester-group">
-                      <div className="sem-header">Semestre {semNum}</div>
+                      <div className="sem-header">
+                        <span>Semestre {semNum}</span>
+                        <span className="sem-pill-badge" style={{ marginLeft: '0.5rem' }}>S{semNum}</span>
+                      </div>
                       <div className="sem-ues-list">
                         {Array.from(uesMap.entries()).map(([ueKey, ueNode]) => {
                           const fullKey = `${semNum}:${ueKey}`;
@@ -1305,6 +1376,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
                                     checked={!isExcluded}
                                     onChange={() => toggleUEExclusion(fullKey)}
                                   />
+                                  <span className="sem-pill-badge">S{semNum}</span>
                                   <span className="ue-title">
                                     {ueNode.code ? `[${ueNode.code}] ` : ''}{ueNode.title}
                                   </span>
@@ -1365,65 +1437,92 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         )}
 
         <div className="modal-footer">
-          {importSummary ? (
-            <button className="btn-submit" onClick={onSuccess}>
-              Terminer & Rafraîchir l'arborescence
-            </button>
-          ) : (
-            <>
-              {step > 1 && (
-                <button
-                  className="btn-cancel"
-                  onClick={() => {
-                    setStep((s) => (s - 1) as any);
-                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
-                  }}
-                  disabled={submitting}
-                >
-                  <ArrowLeft size={16} /> Précédent
-                </button>
+          {step === 2 && !importSummary && (
+            <div className="footer-status-bar" style={{ width: '100%' }}>
+              {missingRequiredFields.length > 0 ? (
+                <div className="alert alert-warning" style={{ margin: 0, width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                  <span>
+                    {t('maquetteImport.missingRequiredFields', '⚠️ Pour continuer, associez : {{fields}}', {
+                      fields: missingRequiredFields.join(', ')
+                    })}
+                  </span>
+                </div>
+              ) : (
+                <div className="alert alert-success" style={{ margin: 0, width: '100%', background: '#ecfdf5', border: '1px solid #10b981', color: '#047857', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                  <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                  <span>{t('maquetteImport.readyToPreview', '✅ Prêt à prévisualiser')}</span>
+                </div>
               )}
-              {step === 1 && (
-                <button
-                  className="btn-submit"
-                  disabled={!rawRows.length}
-                  onClick={() => {
-                    setStep(2);
-                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
-                  }}
-                >
-                  Suivant : Configurer le Mapping <ArrowRight size={16} />
-                </button>
-              )}
-              {step === 2 && (
-                <button
-                  className="btn-submit"
-                  disabled={columnMapping.ue_title === -1}
-                  onClick={() => {
-                    setStep(3);
-                    if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
-                  }}
-                >
-                  Suivant : Prévisualiser <ArrowRight size={16} />
-                </button>
-              )}
-              {step === 3 && (
-                <button
-                  className="btn-submit"
-                  disabled={submitting || parsedItemsData.items.length === 0}
-                  onClick={handleFinalSubmit}
-                >
-                  {submitting ? (
-                    <>
-                      <RefreshCw size={16} className="spinning" /> Importation en cours...
-                    </>
-                  ) : (
-                    'Valider l\'importation'
-                  )}
-                </button>
-              )}
-            </>
+            </div>
           )}
+
+          <div className="footer-nav-row">
+            {importSummary ? (
+              <button className="btn-submit" onClick={onSuccess}>
+                {t('maquetteImport.btnFinish', 'Terminer & Rafraîchir l\'arborescence')}
+              </button>
+            ) : (
+              <>
+                {step > 1 && (
+                  <button
+                    className="btn-cancel"
+                    onClick={() => {
+                      setStep((s) => (s - 1) as any);
+                      if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                    }}
+                    disabled={submitting}
+                  >
+                    <ArrowLeft size={16} /> {t('maquetteImport.btnPrev', 'Précédent')}
+                  </button>
+                )}
+                {step === 1 && (
+                  <button
+                    className="btn-submit"
+                    disabled={!rawRows.length}
+                    onClick={() => {
+                      setStep(2);
+                      if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                    }}
+                  >
+                    <span>{t('maquetteImport.btnNextMapping', 'Suivant : Configurer le Mapping')}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                )}
+                {step === 2 && (
+                  <button
+                    className="btn-submit"
+                    disabled={missingRequiredFields.length > 0}
+                    onClick={() => {
+                      setStep(3);
+                      if (modalCardRef.current) modalCardRef.current.scrollTop = 0;
+                    }}
+                  >
+                    <span>{t('maquetteImport.btnNextPreview', 'Suivant : Prévisualiser')}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                )}
+                {step === 3 && (
+                  <button
+                    className="btn-submit"
+                    disabled={submitting || parsedItemsData.items.length === 0}
+                    onClick={handleFinalSubmit}
+                  >
+                    {submitting ? (
+                      <>
+                        <RefreshCw size={16} className="spinning" /> {t('maquetteImport.importing', 'Importation en cours...')}
+                      </>
+                    ) : (
+                      <>
+                        <span>{t('maquetteImport.btnFinish', 'Terminer & Rafraîchir l\'arborescence')}</span>
+                        <CheckCircle2 size={16} />
+                      </>
+                    )}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <style>{`
@@ -1833,11 +1932,97 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           .metric-label { font-size: 0.75rem; color: var(--text-muted); }
 
           .modal-footer {
-            padding: 1rem 1.5rem;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-card, #1e1e2d);
             border-top: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            z-index: 20;
+            backdrop-filter: blur(8px);
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
+          }
+
+          .footer-nav-row {
             display: flex;
             justify-content: flex-end;
+            align-items: center;
             gap: 0.75rem;
+            width: 100%;
+          }
+
+          .fallback-semester-box {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed var(--border-color);
+          }
+
+          .fallback-label {
+            font-size: 0.775rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 0.4rem;
+          }
+
+          .semester-radio-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+          }
+
+          .sem-radio-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 0.65rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            font-size: 0.775rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .sem-radio-btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.4);
+          }
+
+          .sem-radio-btn.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+          }
+
+          .radio-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid var(--text-muted);
+            flex-shrink: 0;
+          }
+
+          .sem-radio-btn.active .radio-dot {
+            border-color: var(--primary);
+            background: var(--primary);
+          }
+
+          .sem-pill-badge {
+            display: inline-block;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.25);
+            color: #818cf8;
+            font-weight: 800;
+            font-size: 0.725rem;
+            border: 1px solid rgba(99, 102, 241, 0.4);
           }
 
           .text-red { color: #ef4444; }

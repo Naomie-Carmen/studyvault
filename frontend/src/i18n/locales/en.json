@@ -109,6 +109,25 @@
     "addDirectSubjectTitle": "Add a Direct Subject",
     "subject": "Subject"
   },
+  "maquetteImport": {
+    "title": "Import Academic Syllabus",
+    "subtitle": "Convert your Excel or CSV file into a course structure",
+    "step1": "1. File",
+    "step2": "2. Columns",
+    "step3": "3. Preview & Validation",
+    "autoDetectedColumns": "✨ {{count}} column(s) automatically recognized",
+    "noSemesterCol": "-- No semester column --",
+    "semesterBelongsTo": "These courses belong to:",
+    "semester1": "Semester 1 (S1)",
+    "semester2": "Semester 2 (S2)",
+    "missingRequiredFields": "⚠️ To continue, map: {{fields}}",
+    "readyToPreview": "✅ Ready to preview",
+    "btnNextPreview": "Next: Preview",
+    "btnPrev": "Back",
+    "btnNextMapping": "Next: Configure Mapping",
+    "btnFinish": "Finish & Refresh Structure",
+    "importing": "Importing..."
+  },
   "modal": {
     "ueTitleReq": "UE title is required.",
     "ueSaveErr": "Error saving UE.",

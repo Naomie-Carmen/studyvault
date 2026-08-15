@@ -109,6 +109,25 @@
     "addDirectSubjectTitle": "Ajouter une Matière directe",
     "subject": "Matière"
   },
+  "maquetteImport": {
+    "title": "Importation de Maquette Pédagogique",
+    "subtitle": "Convertissez votre fichier Excel ou CSV en arborescence de cours",
+    "step1": "1. Fichier",
+    "step2": "2. Colonnes",
+    "step3": "3. Aperçu & Validation",
+    "autoDetectedColumns": "✨ {{count}} colonne(s) reconnue(s) automatiquement",
+    "noSemesterCol": "-- Aucune colonne semestre --",
+    "semesterBelongsTo": "Ces cours appartiennent à :",
+    "semester1": "Semestre 1 (S1)",
+    "semester2": "Semestre 2 (S2)",
+    "missingRequiredFields": "⚠️ Pour continuer, associez : {{fields}}",
+    "readyToPreview": "✅ Prêt à prévisualiser",
+    "btnNextPreview": "Suivant : Prévisualiser",
+    "btnPrev": "Précédent",
+    "btnNextMapping": "Suivant : Configurer le Mapping",
+    "btnFinish": "Terminer & Rafraîchir l'arborescence",
+    "importing": "Importation en cours..."
+  },
   "modal": {
     "ueTitleReq": "L'intitulé de l'UE est obligatoire.",
     "ueSaveErr": "Erreur lors de l'enregistrement de l'UE.",
