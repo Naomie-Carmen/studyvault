@@ -6,24 +6,10 @@ import { DocumentUpdateInput, PersonalFolderInput } from '../types/validators';
 export async function uploadFiles(
   formData: FormData
 ): Promise<ApiResponse<DocumentItem[]>> {
-  const token = getClientAccessToken();
-  try {
-    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    });
-    return await response.json();
-  } catch (error) {
-    return {
-      success: false,
-      error: {
-        code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Impossible de contacter l\'API backend.',
-        statusCode: 503,
-      },
-    };
-  }
+  return fetchApi<DocumentItem[]>('/documents/upload', {
+    method: 'POST',
+    body: formData,
+  });
 }
 
 export async function getDocuments(filters?: {

@@ -79,8 +79,10 @@ export async function fetchApi<T>(
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(currentAccessToken ? { Authorization: `Bearer ${currentAccessToken}` } : {}),
     ...(options.headers || {}),
   };
@@ -110,7 +112,7 @@ export async function fetchApi<T>(
       const newToken = await refreshPromise;
       if (newToken) {
         const retryHeaders: HeadersInit = {
-          'Content-Type': 'application/json',
+          ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
           Authorization: `Bearer ${newToken}`,
           ...(options.headers || {}),
         };
