@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree, UE, ECUE, Subject } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
@@ -21,7 +21,8 @@ import {
   X,
   FileQuestion,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react';
 
 import { SubjectInput } from '../../types/validators';
@@ -70,6 +71,51 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
     id: string;
     name: string;
   } | null>(null);
+
+  // Undo Toast State
+  const [undoSnapshot, setUndoSnapshot] = useState<AcademicStructureTree | null>(null);
+  const [undoToast, setUndoToast] = useState<{ visible: boolean; type: 'delete' | 'success'; message: string } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerDeleteToast = (snapshot: AcademicStructureTree) => {
+    setUndoSnapshot(snapshot);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoToast({
+      visible: true,
+      type: 'delete',
+      message: t('structure.deleteDone', '🗑️ Suppression effectuée'),
+    });
+
+    undoTimerRef.current = setTimeout(() => {
+      setUndoToast(null);
+      setUndoSnapshot(null);
+    }, 8000);
+  };
+
+  const handleUndoDelete = async () => {
+    if (!undoSnapshot) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+    try {
+      const res = await structureService.restoreStructure(undoSnapshot);
+      if (res.success) {
+        setUndoToast({
+          visible: true,
+          type: 'success',
+          message: t('structure.actionUndone', '✅ Action annulée'),
+        });
+        fetchTree();
+        undoTimerRef.current = setTimeout(() => {
+          setUndoToast(null);
+          setUndoSnapshot(null);
+        }, 4000);
+      } else {
+        setError(res.error?.message || 'Erreur lors de la restauration.');
+      }
+    } catch (_err) {
+      setError('Erreur de connexion lors de l\'annulation.');
+    }
+  };
 
   const fetchTree = useCallback(async () => {
     setLoading(true);
@@ -134,6 +180,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
 
   const handleConfirmDeleteUE = async () => {
     if (deleteTarget && deleteTarget.type === 'UE') {
+      if (tree) triggerDeleteToast(JSON.parse(JSON.stringify(tree)));
       await structureService.deleteUE(deleteTarget.id);
       fetchTree();
     }
@@ -151,6 +198,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
 
   const handleConfirmDeleteECUE = async () => {
     if (deleteTarget && deleteTarget.type === 'ECUE') {
+      if (tree) triggerDeleteToast(JSON.parse(JSON.stringify(tree)));
       await structureService.deleteECUE(deleteTarget.id);
       fetchTree();
     }
@@ -168,18 +216,20 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
 
   const handleConfirmDeleteSubject = async () => {
     if (deleteTarget && deleteTarget.type === 'Matière') {
+      if (tree) triggerDeleteToast(JSON.parse(JSON.stringify(tree)));
       await structureService.deleteSubject(deleteTarget.id);
       fetchTree();
     }
   };
 
   const handleConfirmDeleteAll = async () => {
+    if (tree) triggerDeleteToast(JSON.parse(JSON.stringify(tree)));
     setDeletingAll(true);
     try {
       const res = await structureService.deleteAllStructure();
       if (res.success) {
         setIsDeleteAllModalOpen(false);
-        setSuccessMessage('Arborescence vidée. Vous pouvez maintenant importer votre maquette.');
+        setSuccessMessage(t('structure.resetSuccess', 'Arborescence réinitialisée. Importez votre maquette ou ajoutez vos UE manuellement.'));
         setTimeout(() => setSuccessMessage(null), 6000);
         fetchTree();
       } else {
@@ -457,6 +507,19 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         }}
       />
 
+      {/* Floating Undo Toast */}
+      {undoToast?.visible && (
+        <div className={`undo-toast-card glass-card ${undoToast.type}`}>
+          <span>{undoToast.message}</span>
+          {undoToast.type === 'delete' && (
+            <button type="button" className="btn-undo-action" onClick={handleUndoDelete}>
+              <RotateCcw size={14} />
+              <span>{t('structure.undoBtn', 'Annuler')}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       <style>{`
         .academic-structure-container {
           max-width: 900px;
@@ -654,6 +717,57 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
 
         @keyframes spin {
           100% { transform: rotate(360deg); }
+        }
+
+        .undo-toast-card {
+          position: fixed;
+          bottom: 1.75rem;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.75rem 1.25rem;
+          border-radius: 999px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid var(--border-color);
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(12px);
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #ffffff;
+        }
+
+        .undo-toast-card.success {
+          border-color: rgba(16, 185, 129, 0.4);
+          background: rgba(6, 78, 59, 0.85);
+          color: #34d399;
+        }
+
+        .btn-undo-action {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 999px;
+          background: rgba(99, 102, 241, 0.25);
+          border: 1px solid #818cf8;
+          color: #a5b4fc;
+          font-size: 0.825rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .btn-undo-action:hover {
+          background: #6366f1;
+          color: #ffffff;
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translate(-50%, 20px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
         }
 
         .text-indigo { color: var(--primary); }

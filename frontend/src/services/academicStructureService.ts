@@ -97,3 +97,10 @@ export async function deleteAllStructure(): Promise<ApiResponse<{ message: strin
     method: 'DELETE',
   });
 }
+
+export async function restoreStructure(structure: any): Promise<ApiResponse<{ message: string }>> {
+  return fetchApi<{ message: string }>('/academic-structure/restore', {
+    method: 'POST',
+    body: JSON.stringify({ structure }),
+  });
+}

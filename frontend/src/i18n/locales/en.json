@@ -90,10 +90,14 @@
     "emptySub": "Import your academic structure to start entering grades."
   },
   "structure": {
-    "searchPlaceholder": "Search UE, ECUE, instructor...",
-    "noResults": "No results for",
+    "searchPlaceholder": "Search for UE, ECUE, instructor...",
+    "noResults": "No results found for",
     "resultFound": "result found",
-    "resultsFound": "results found"
+    "resultsFound": "results found",
+    "deleteDone": "🗑️ Deletion completed",
+    "undoBtn": "Undo",
+    "actionUndone": "✅ Action undone",
+    "resetSuccess": "Academic structure reset. Import your syllabus or add your UEs manually."
   },
   "print": {
     "title": "My Week",

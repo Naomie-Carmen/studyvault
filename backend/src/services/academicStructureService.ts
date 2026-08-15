@@ -705,21 +705,141 @@ export async function reorderStructureItem(userId: string, input: ReorderInput) 
 }
 
 export async function deleteAllStructure(userId: string) {
-  const academicYear = await prisma.academicYear.findFirst({
+  let academicYear = await prisma.academicYear.findFirst({
     where: { userId, isCurrent: true },
   });
 
   if (!academicYear) {
-    return { message: 'Aucune structure à supprimer.' };
+    academicYear = await prisma.academicYear.create({
+      data: {
+        userId,
+        yearLabel: '2025-2026',
+        level: 'L1',
+        isCurrent: true,
+      },
+    });
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.semester.deleteMany({
       where: { academicYearId: academicYear.id },
     });
+
+    await tx.semester.createMany({
+      data: [
+        { academicYearId: academicYear.id, number: 1, label: 'Semestre 1' },
+        { academicYearId: academicYear.id, number: 2, label: 'Semestre 2' },
+      ],
+    });
   });
 
-  console.log(`[DELETE ALL] User ${userId} deleted all academic structure`);
-  return { message: 'Arborescence académique réinitialisée avec succès.' };
+  console.log(`[DELETE ALL] User ${userId} deleted all academic structure and recreated default S1 & S2`);
+  return { message: 'Arborescence réinitialisée. Importez votre maquette ou ajoutez vos UE manuellement.' };
+}
+
+export async function restoreStructure(userId: string, structure: any) {
+  if (!structure || !Array.isArray(structure.semesters)) {
+    throw ApiError.badRequest('Structure invalide pour la restauration.');
+  }
+
+  let academicYear = await prisma.academicYear.findFirst({
+    where: { userId, isCurrent: true },
+  });
+
+  if (!academicYear) {
+    academicYear = await prisma.academicYear.create({
+      data: {
+        userId,
+        yearLabel: '2025-2026',
+        level: 'L1',
+        isCurrent: true,
+      },
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.semester.deleteMany({
+      where: { academicYearId: academicYear.id },
+    });
+
+    for (let sIdx = 0; sIdx < structure.semesters.length; sIdx++) {
+      const sem = structure.semesters[sIdx];
+      const createdSem = await tx.semester.create({
+        data: {
+          academicYearId: academicYear.id,
+          number: sem.number ?? (sIdx + 1),
+          label: sem.name || sem.label || `Semestre ${sIdx + 1}`,
+        },
+      });
+
+      const ues = Array.isArray(sem.ues) ? sem.ues : [];
+      for (let uIdx = 0; uIdx < ues.length; uIdx++) {
+        const ue = ues[uIdx];
+        const createdUe = await tx.uE.create({
+          data: {
+            semesterId: createdSem.id,
+            title: ue.title,
+            code: ue.code || null,
+            ects: ue.ects ? Number(ue.ects) : null,
+            order: ue.order ?? uIdx,
+          },
+        });
+
+        const ecues = Array.isArray(ue.ecues) ? ue.ecues : [];
+        for (let eIdx = 0; eIdx < ecues.length; eIdx++) {
+          const ecue = ecues[eIdx];
+          const createdEcue = await tx.eCUE.create({
+            data: {
+              ueId: createdUe.id,
+              title: ecue.title,
+              code: ecue.code || null,
+              order: ecue.order ?? eIdx,
+            },
+          });
+
+          const subjects = Array.isArray(ecue.subjects) ? ecue.subjects : [];
+          if (subjects.length > 0) {
+            for (const sub of subjects) {
+              await tx.subject.create({
+                data: {
+                  name: sub.name,
+                  instructor: sub.instructor || null,
+                  color: sub.color || '#6366f1',
+                  ecueId: createdEcue.id,
+                  ueId: null,
+                },
+              });
+            }
+          } else {
+            await tx.subject.create({
+              data: {
+                name: ecue.title,
+                instructor: null,
+                color: '#6366f1',
+                ecueId: createdEcue.id,
+                ueId: null,
+              },
+            });
+          }
+        }
+
+        const directSubjects = Array.isArray(ue.directSubjects) ? ue.directSubjects : [];
+        for (const sub of directSubjects) {
+          await tx.subject.create({
+            data: {
+              name: sub.name,
+              instructor: sub.instructor || null,
+              color: sub.color || '#6366f1',
+              ecueId: null,
+              ueId: createdUe.id,
+            },
+          });
+        }
+      }
+    }
+  }, { timeout: 30000 });
+
+  console.log(`[RESTORE] User ${userId} restored academic structure snapshot`);
+  return { message: 'Arborescence restaurée avec succès.' };
 }
 

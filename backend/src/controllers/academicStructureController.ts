@@ -183,3 +183,17 @@ export async function deleteAllStructure(req: Request, res: Response, next: Next
   }
 }
 
+export async function restoreStructure(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { structure } = req.body;
+    if (!structure) {
+      throw ApiError.badRequest('La structure snapshot est requise.');
+    }
+    const result = await structureService.restoreStructure(req.user.id, structure);
+    sendSuccess(res, result, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+

@@ -93,7 +93,11 @@
     "searchPlaceholder": "Rechercher une UE, ECUE, enseignant...",
     "noResults": "Aucun résultat pour",
     "resultFound": "résultat trouvé",
-    "resultsFound": "résultats trouvés"
+    "resultsFound": "résultats trouvés",
+    "deleteDone": "🗑️ Suppression effectuée",
+    "undoBtn": "Annuler",
+    "actionUndone": "✅ Action annulée",
+    "resetSuccess": "Arborescence réinitialisée. Importez votre maquette ou ajoutez vos UE manuellement."
   },
   "print": {
     "title": "Ma Semaine",
