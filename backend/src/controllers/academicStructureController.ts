@@ -140,3 +140,17 @@ export async function importBatch(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function bulkImportStructure(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { rows } = req.body;
+    if (!Array.isArray(rows)) {
+      throw ApiError.badRequest('La clé "rows" doit être un tableau d\'éléments.');
+    }
+    const result = await structureService.bulkImportRows(req.user.id, rows);
+    sendSuccess(res, result, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+

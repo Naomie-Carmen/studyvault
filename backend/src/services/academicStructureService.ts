@@ -406,3 +406,186 @@ export async function importStructureBatch(userId: string, items: StructureImpor
   return result;
 }
 
+export async function bulkImportRows(userId: string, rawRows: any[]) {
+  let academicYear = await prisma.academicYear.findFirst({
+    where: { userId, isCurrent: true },
+  });
+
+  if (!academicYear) {
+    academicYear = await prisma.academicYear.create({
+      data: {
+        userId,
+        yearLabel: '2025-2026',
+        level: 'Master',
+        isCurrent: true,
+      },
+    });
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const createdSemestres = new Set<string>();
+    const createdUEs = new Set<string>();
+    const createdECUEs = new Set<string>();
+
+    const semesterMap = new Map<number, any>();
+    const ueMap = new Map<string, any>();
+    const ecueMap = new Map<string, any>();
+
+    // Pré-chargement des semestres, UEs et ECUEs existants en mémoire
+    const existingSemesters = await tx.semester.findMany({
+      where: { academicYearId: academicYear.id },
+      include: { ues: { include: { ecues: true } } },
+    });
+
+    for (const sem of existingSemesters) {
+      semesterMap.set(sem.number, sem);
+      for (const u of sem.ues) {
+        const uKey = `${sem.id}:${normalize(u.code || u.title)}`;
+        ueMap.set(uKey, u);
+        for (const e of u.ecues) {
+          const eKey = `${u.id}:${normalize(e.code || e.title)}`;
+          ecueMap.set(eKey, e);
+        }
+      }
+    }
+
+    let lastSemNum = 1;
+    let lastUECode = '';
+    let lastUETitle = '';
+
+    for (let r = 0; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!row) continue;
+
+      let semVal = '';
+      let codeUE = '';
+      let intituleUE = '';
+      let codeECUE = '';
+      let intituleECUE = '';
+      let ectsStr = '';
+      let enseignant = '';
+
+      if (Array.isArray(row)) {
+        semVal = String(row[0] || '').trim();
+        codeUE = String(row[1] || '').trim();
+        intituleUE = String(row[2] || '').trim();
+        codeECUE = String(row[3] || '').trim();
+        intituleECUE = String(row[4] || '').trim();
+        ectsStr = String(row[5] || '').trim();
+        enseignant = String(row[6] || '').trim();
+      } else if (typeof row === 'object') {
+        semVal = String(row.semestre || row.semesterNumber || row.Semestre || '').trim();
+        codeUE = String(row.codeUE || row.ueCode || row.CodeUE || '').trim();
+        intituleUE = String(row.intituleUE || row.ueTitle || row.IntituleUE || '').trim();
+        codeECUE = String(row.codeECUE || row.ecueCode || row.CodeECUE || '').trim();
+        intituleECUE = String(row.intituleECUE || row.ecueTitle || row.IntituleECUE || '').trim();
+        ectsStr = String(row.ects || row.ECTS || '').trim();
+        enseignant = String(row.enseignant || row.instructor || row.Enseignant || '').trim();
+      }
+
+      // Ignorer l'en-tête si présent dans rawRows
+      const lowerJoin = `${semVal} ${codeUE} ${intituleUE} ${codeECUE} ${intituleECUE}`.toLowerCase();
+      if (lowerJoin.includes('semestre') && lowerJoin.includes('code ue') && lowerJoin.includes('intitulé ue')) {
+        continue;
+      }
+      if (!semVal && !codeUE && !intituleUE && !codeECUE && !intituleECUE) {
+        continue;
+      }
+
+      // 1. Diction de Semestre
+      let semNum = lastSemNum;
+      if (semVal) {
+        const parsed = parseInt(semVal.replace(/\D/g, ''), 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) {
+          semNum = parsed;
+          lastSemNum = semNum;
+        }
+      }
+
+      let semObj = semesterMap.get(semNum);
+      if (!semObj) {
+        semObj = await tx.semester.create({
+          data: {
+            academicYearId: academicYear.id,
+            number: semNum,
+            label: `Semestre ${semNum}`,
+            isActive: true,
+          },
+        });
+        createdSemestres.add(semObj.id);
+        semesterMap.set(semNum, semObj);
+      }
+
+      // 2. UE (Unité d'Enseignement)
+      if (!codeUE && !intituleUE) {
+        codeUE = lastUECode;
+        intituleUE = lastUETitle;
+      } else {
+        lastUECode = codeUE;
+        lastUETitle = intituleUE;
+      }
+
+      if (!intituleUE && codeUE) intituleUE = codeUE;
+      if (!codeUE && intituleUE) codeUE = intituleUE;
+
+      if (!intituleUE) continue;
+
+      const ueKey = `${semObj.id}:${normalize(codeUE || intituleUE)}`;
+      let ueObj = ueMap.get(ueKey);
+
+      if (!ueObj) {
+        const parsedEcts = parseFloat(ectsStr.replace(',', '.'));
+        const ectsVal = !isNaN(parsedEcts) && parsedEcts > 0 ? parsedEcts : null;
+
+        ueObj = await tx.uE.create({
+          data: {
+            semesterId: semObj.id,
+            title: intituleUE,
+            code: codeUE || null,
+            ects: ectsVal,
+          },
+        });
+        createdUEs.add(ueObj.id);
+        ueMap.set(ueKey, ueObj);
+      }
+
+      // 3. ECUE & Matière
+      const finalEcueTitle = intituleECUE || codeECUE;
+      if (finalEcueTitle && finalEcueTitle.trim().length >= 2) {
+        const ecueKey = `${ueObj.id}:${normalize(codeECUE || finalEcueTitle)}`;
+        let ecueObj = ecueMap.get(ecueKey);
+
+        if (!ecueObj) {
+          ecueObj = await tx.eCUE.create({
+            data: {
+              ueId: ueObj.id,
+              title: finalEcueTitle,
+              code: codeECUE || null,
+            },
+          });
+          createdECUEs.add(ecueObj.id);
+          ecueMap.set(ecueKey, ecueObj);
+
+          await tx.subject.create({
+            data: {
+              name: finalEcueTitle.trim(),
+              instructor: enseignant || null,
+              color: '#6366f1',
+              ecueId: ecueObj.id,
+              ueId: null,
+            },
+          });
+        }
+      }
+    }
+
+    return {
+      semestres: createdSemestres.size > 0 ? createdSemestres.size : semesterMap.size,
+      ues: createdUEs.size > 0 ? createdUEs.size : ueMap.size,
+      ecues: createdECUEs.size > 0 ? createdECUEs.size : ecueMap.size,
+    };
+  }, { timeout: 30000 });
+
+  return result;
+}
+

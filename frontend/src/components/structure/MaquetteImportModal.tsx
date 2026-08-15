@@ -13,7 +13,6 @@ import {
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 import { StructureImportItem, StructureImportSummary } from '../../types/structure';
-import { importStructureBatch } from '../../services/academicStructureService';
 import { API_BASE_URL } from '../../services/apiClient';
 import {
   X,
@@ -135,6 +134,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [excludedUEKeys, setExcludedUEKeys] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [importSummary, setImportSummary] = useState<StructureImportSummary | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const modalCardRef = useRef<HTMLDivElement>(null);
@@ -788,27 +788,54 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   };
 
   const handleFinalSubmit = async () => {
-    const finalItems = parsedItemsData.items.filter((it) => {
-      const ueKey = `${it.semesterNumber}:${it.ueCode || ''}___${it.ueTitle}`;
-      return !excludedUEKeys.has(ueKey);
-    });
-
-    if (finalItems.length === 0) {
+    if (rawRows.length === 0) {
       setError("Aucun élément à importer.");
       return;
     }
 
     setSubmitting(true);
     setError(null);
+    setSuccessBanner(null);
+
     try {
-      const res = await importStructureBatch({ items: finalItems });
-      if (res.success && res.data) {
-        setImportSummary(res.data);
-      } else {
-        setError(res.error?.message || "Erreur lors de l'importation de la maquette.");
+      const token = localStorage.getItem('studyvault_access_token') || '';
+      const dataRows = headerIndex > 0 ? rawRows.slice(headerIndex + 1) : rawRows;
+
+      const response = await fetch(`${API_BASE_URL}/academic-structure/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          rows: dataRows,
+        }),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || errJson?.message || "Erreur lors de l'importation de la maquette.");
       }
-    } catch (_err) {
-      setError("Erreur de connexion avec le serveur.");
+
+      const resData = await response.json();
+      const summary = resData.data || {};
+
+      setImportSummary({
+        created: {
+          ues: summary.ues || 0,
+          ecues: summary.ecues || 0,
+          subjects: summary.ecues || 0,
+        },
+        skipped: { ues: 0, ecues: 0, subjects: 0 },
+        totalRows: dataRows.length,
+      });
+
+      const msg = `✅ Import terminé : ${summary.semestres || 0} semestres, ${summary.ues || 0} UE, ${summary.ecues || 0} ECUE ajoutés`;
+      setSuccessBanner(msg);
+
+      onSuccess();
+    } catch (err: any) {
+      setError(err?.message || "Erreur lors de l'importation en masse de la maquette.");
     } finally {
       setSubmitting(false);
     }
@@ -1165,6 +1192,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
         {step === 3 && (
           <div className="step-content">
+            {successBanner && (
+              <div className="alert alert-success" style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#047857', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={20} />
+                <span>{successBanner}</span>
+              </div>
+            )}
             {importSummary ? (
               <div className="summary-success-box">
                 <CheckCircle2 size={48} className="text-emerald" />
