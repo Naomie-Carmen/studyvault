@@ -102,6 +102,7 @@ export const ecueSchema = z.object({
   ueId: z.string().min(1, { message: 'L\'UE parente est obligatoire.' }),
   title: z.string().trim().min(2, { message: 'L\'intitulé de l\'ECUE est obligatoire (min 2 caractères).' }),
   code: z.string().trim().optional(),
+  ects: z.number().positive().optional().nullable(),
 });
 
 export const subjectSchema = z.object({

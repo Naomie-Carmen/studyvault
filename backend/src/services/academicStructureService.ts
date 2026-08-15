@@ -250,6 +250,7 @@ export async function createECUE(userId: string, input: ECUEInput) {
       ueId: input.ueId,
       title: input.title,
       code: input.code || null,
+      ects: input.ects !== undefined && input.ects !== null ? Number(input.ects) : null,
     },
   });
 }

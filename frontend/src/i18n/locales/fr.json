@@ -66,6 +66,14 @@
       "globalMode": "Même barème pour toutes les matières",
       "perEcueMode": "Barème personnalisé par matière",
       "simpleModeLabel": "Moyenne simple (toutes les notes comptent pareil)"
+    },
+    "structure": {
+      "title": "Mode de Structure Pédagogique",
+      "desc": "Définissez la relation entre les ECUE et les matières de cours",
+      "ecueIsSubject": "ECUE = Matière (Recommandé)",
+      "ecueIsSubjectDesc": "Chaque ECUE agit directement comme matière de cours.",
+      "ecueHasSubjects": "ECUE multi-matières",
+      "ecueHasSubjectsDesc": "Chaque ECUE contient plusieurs sous-matières de cours."
     }
   },
   "timetable": {
@@ -158,6 +166,9 @@
     "ecueTitlePlaceholder": "ex: Microéconomie Approfondie",
     "ecueCodeLabel": "Code ECUE (Optionnel)",
     "ecueCodePlaceholder": "ex: ECUE1",
+    "ecueEctsLabel": "Crédits ECTS / Coefficient (Optionnel)",
+    "ecueEctsPlaceholder": "ex: 3.0",
+    "ecueEctsInvalid": "Le coefficient ECTS doit être un nombre positif.",
     "createECUE": "Créer l'ECUE",
     "subNameReq": "Le nom de la matière est obligatoire.",
     "subSaveErr": "Erreur lors de l'enregistrement de la matière.",

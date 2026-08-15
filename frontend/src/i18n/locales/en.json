@@ -66,6 +66,14 @@
       "globalMode": "Same grading scale for all subjects",
       "perEcueMode": "Custom grading scale per subject",
       "simpleModeLabel": "Simple average (all grades weigh equally)"
+    },
+    "structure": {
+      "title": "Course Structure Mode",
+      "desc": "Define how ECUEs relate to course subjects",
+      "ecueIsSubject": "ECUE = Subject (Recommended)",
+      "ecueIsSubjectDesc": "Each ECUE directly acts as a course subject.",
+      "ecueHasSubjects": "Multi-subject ECUE",
+      "ecueHasSubjectsDesc": "Each ECUE contains multiple sub-subjects (Lectures/Tutorials)."
     }
   },
   "timetable": {
@@ -196,6 +204,9 @@
     "ecueTitlePlaceholder": "e.g. Advanced Microeconomics",
     "ecueCodeLabel": "ECUE Code (Optional)",
     "ecueCodePlaceholder": "e.g. ECUE1",
+    "ecueEctsLabel": "ECTS Credits / Coefficient (Optional)",
+    "ecueEctsPlaceholder": "e.g. 3.0",
+    "ecueEctsInvalid": "ECTS coefficient must be a positive number.",
     "createECUE": "Create ECUE",
     "subNameReq": "Subject name is required.",
     "subSaveErr": "Error saving subject.",

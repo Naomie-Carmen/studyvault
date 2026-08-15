@@ -13,7 +13,9 @@ import {
   Info, 
   ExternalLink,
   Check,
-  ChevronRight
+  ChevronRight,
+  Layers,
+  BookOpen
 } from 'lucide-react';
 import { GradeConfigSection } from '../components/settings/GradeConfigSection';
 
@@ -23,6 +25,7 @@ interface SettingsPageProps {
 
 const THEME_KEY = 'studyvault_theme';
 const NOTIF_KEY = 'studyvault_desktop_notifications';
+const STRUCTURE_MODE_KEY = 'studyvault_structure_mode';
 
 const isTauri = typeof window !== 'undefined' && Boolean(
   (window as any).__TAURI__ ||
@@ -42,6 +45,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
     return localStorage.getItem(NOTIF_KEY) === 'true';
   });
+  const [structureMode, setStructureMode] = useState<'ecue_is_subject' | 'ecue_has_subjects'>(() => {
+    return (localStorage.getItem(STRUCTURE_MODE_KEY) as 'ecue_is_subject' | 'ecue_has_subjects') || 'ecue_is_subject';
+  });
+
+  const handleStructureModeChange = (mode: 'ecue_is_subject' | 'ecue_has_subjects') => {
+    setStructureMode(mode);
+    localStorage.setItem(STRUCTURE_MODE_KEY, mode);
+  };
 
   // Apply theme to document element
   const applyTheme = (theme: 'light' | 'dark' | 'system') => {
@@ -204,6 +215,47 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
         {/* Section 3.5: Barème de notation */}
         <GradeConfigSection />
+
+        {/* Section 3.6: Structure Pédagogique */}
+        <div className="glass-card settings-card">
+          <div className="card-header">
+            <Layers size={22} className="section-icon" />
+            <div>
+              <h3>{t('settings.structure.title', 'Mode de Structure Pédagogique')}</h3>
+              <p>{t('settings.structure.desc', 'Définissez la relation entre les ECUE et les matières de cours')}</p>
+            </div>
+          </div>
+
+          <div className="options-grid">
+            <button
+              className={`option-btn ${structureMode === 'ecue_is_subject' ? 'active' : ''}`}
+              onClick={() => handleStructureModeChange('ecue_is_subject')}
+            >
+              <Layers size={20} />
+              <div style={{ textAlign: 'left' }}>
+                <span className="option-label" style={{ fontWeight: 600 }}>{t('settings.structure.ecueIsSubject', 'ECUE = Matière (Recommandé)')}</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.75, display: 'block' }}>
+                  {t('settings.structure.ecueIsSubjectDesc', 'Chaque ECUE agit directement comme matière de cours.')}
+                </span>
+              </div>
+              {structureMode === 'ecue_is_subject' && <Check size={18} className="check-mark" />}
+            </button>
+
+            <button
+              className={`option-btn ${structureMode === 'ecue_has_subjects' ? 'active' : ''}`}
+              onClick={() => handleStructureModeChange('ecue_has_subjects')}
+            >
+              <BookOpen size={20} />
+              <div style={{ textAlign: 'left' }}>
+                <span className="option-label" style={{ fontWeight: 600 }}>{t('settings.structure.ecueHasSubjects', 'ECUE multi-matières')}</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.75, display: 'block' }}>
+                  {t('settings.structure.ecueHasSubjectsDesc', 'Chaque ECUE contient plusieurs sous-matières de cours.')}
+                </span>
+              </div>
+              {structureMode === 'ecue_has_subjects' && <Check size={18} className="check-mark" />}
+            </button>
+          </div>
+        </div>
 
         {/* Section 4: Compte & Données */}
         <div className="glass-card settings-card">

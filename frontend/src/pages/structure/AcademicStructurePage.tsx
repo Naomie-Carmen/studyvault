@@ -185,7 +185,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   };
 
   // ECUE Actions
-  const handleSaveECUE = async (data: { ueId: string; title: string; code?: string }) => {
+  const handleSaveECUE = async (data: { ueId: string; title: string; code?: string; ects?: number }) => {
     if (editingECUE) {
       await structureService.updateECUE(editingECUE.id, data);
     } else {

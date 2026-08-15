@@ -509,7 +509,15 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                         <HighlightText text={ecue.title} query={q} />
                                       </span>
                                       {renderBadge(getEcueAvg(ecue.id))}
-                                      <span className={`ects-badge ${!ecue.ects || Number(ecue.ects) <= 0 ? 'no-coef' : ''}`} title={!ecue.ects || Number(ecue.ects) <= 0 ? t('grades.noCoefTooltip', 'Coefficient inconnu — 1 utilisé par défaut.') : undefined}>
+                                      <span
+                                        className={`ects-badge ${!ecue.ects || Number(ecue.ects) <= 0 ? 'no-coef' : ''}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEditECUE(ecue);
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                        title={!ecue.ects || Number(ecue.ects) <= 0 ? t('grades.noCoefTooltip', 'Coefficient inconnu — 1 utilisé par défaut. Cliquez pour corriger.') : t('grades.clickToEditCoef', 'Cliquer pour modifier le coefficient')}
+                                      >
                                         {ecue.ects && Number(ecue.ects) > 0 ? `${ecue.ects} ECTS` : 'coef ?'}
                                       </span>
                                     </div>

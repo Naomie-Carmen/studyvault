@@ -6,7 +6,7 @@ import { Layers, X, Save } from 'lucide-react';
 interface ECUEModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { ueId: string; title: string; code?: string }) => Promise<void>;
+  onSubmit: (data: { ueId: string; title: string; code?: string; ects?: number }) => Promise<void>;
   ueId: string;
   editECUE?: ECUE | null;
 }
@@ -21,6 +21,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
+  const [ects, setEcts] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,9 +29,11 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
     if (editECUE) {
       setTitle(editECUE.title);
       setCode(editECUE.code || '');
+      setEcts(editECUE.ects !== undefined && editECUE.ects !== null ? String(editECUE.ects) : '');
     } else {
       setTitle('');
       setCode('');
+      setEcts('');
     }
   }, [editECUE, isOpen]);
 
@@ -45,12 +48,19 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
       return;
     }
 
+    const parsedEcts = ects.trim() ? parseFloat(ects) : undefined;
+    if (parsedEcts !== undefined && (isNaN(parsedEcts) || parsedEcts <= 0)) {
+      setError(t('modal.ecueEctsInvalid', 'Le coefficient ECTS doit être un nombre positif.'));
+      return;
+    }
+
     setLoading(true);
     try {
       await onSubmit({
         ueId,
         title: title.trim(),
         code: code.trim() || undefined,
+        ects: parsedEcts,
       });
       onClose();
     } catch (err: unknown) {
@@ -94,6 +104,19 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
               placeholder={t('modal.ecueCodePlaceholder', 'ex: ECUE1')}
               value={code}
               onChange={(e) => setCode(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>{t('modal.ecueEctsLabel', 'Crédits ECTS / Coefficient (Optionnel)')}</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0.5"
+              max="30"
+              placeholder={t('modal.ecueEctsPlaceholder', 'ex: 3.0')}
+              value={ects}
+              onChange={(e) => setEcts(e.target.value)}
             />
           </div>
 
