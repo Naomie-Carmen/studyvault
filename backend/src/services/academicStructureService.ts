@@ -547,6 +547,10 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
       let ectsStr = '';
       let enseignant = '';
 
+      let ueEctsVal: number | null = null;
+      let ecueEctsVal: number | null = null;
+      let subjectName = '';
+
       if (Array.isArray(row)) {
         semVal = String(row[0] || '').trim();
         codeUE = String(row[1] || '').trim();
@@ -555,14 +559,33 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
         intituleECUE = String(row[4] || '').trim();
         ectsStr = String(row[5] || '').trim();
         enseignant = String(row[6] || '').trim();
+        if (ectsStr) {
+          const parsed = parseFloat(ectsStr.replace(',', '.'));
+          if (!isNaN(parsed) && parsed > 0) {
+            ueEctsVal = parsed;
+            ecueEctsVal = parsed;
+          }
+        }
       } else if (typeof row === 'object') {
         semVal = String(row.semestre || row.semesterNumber || row.Semestre || '').trim();
         codeUE = String(row.codeUE || row.ueCode || row.CodeUE || '').trim();
         intituleUE = String(row.intituleUE || row.ueTitle || row.IntituleUE || '').trim();
         codeECUE = String(row.codeECUE || row.ecueCode || row.CodeECUE || '').trim();
-        intituleECUE = String(row.intituleECUE || row.ecueTitle || row.IntituleECUE || row.subjectName || '').trim();
-        ectsStr = String(row.ects || row.ECTS || '').trim();
+        intituleECUE = String(row.intituleECUE || row.ecueTitle || row.IntituleECUE || '').trim();
+        subjectName = String(row.subjectName || '').trim();
         enseignant = String(row.enseignant || row.instructor || row.Enseignant || '').trim();
+
+        if (row.ueEcts !== undefined && row.ueEcts !== null && !isNaN(Number(row.ueEcts))) {
+          ueEctsVal = Number(row.ueEcts);
+        }
+        if (row.ecueEcts !== undefined && row.ecueEcts !== null && !isNaN(Number(row.ecueEcts))) {
+          ecueEctsVal = Number(row.ecueEcts);
+        }
+        if (row.ects !== undefined && row.ects !== null && !isNaN(Number(row.ects))) {
+          const genEcts = Number(row.ects);
+          if (ueEctsVal === null) ueEctsVal = genEcts;
+          if (ecueEctsVal === null) ecueEctsVal = genEcts;
+        }
       }
 
       // Ignorer l'en-tête si présent dans rawRows
@@ -616,19 +639,22 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
       let ueObj = ueMap.get(ueKey);
 
       if (!ueObj) {
-        const parsedEcts = parseFloat(ectsStr.replace(',', '.'));
-        const ectsVal = !isNaN(parsedEcts) && parsedEcts > 0 ? parsedEcts : null;
-
         ueObj = await tx.uE.create({
           data: {
             semesterId: semObj.id,
             title: intituleUE,
             code: codeUE || null,
-            ects: ectsVal,
+            ects: ueEctsVal,
           },
         });
         createdUEs.add(ueObj.id);
         ueMap.set(ueKey, ueObj);
+      } else if (!ueObj.ects && ueEctsVal) {
+        await tx.uE.update({
+          where: { id: ueObj.id },
+          data: { ects: ueEctsVal },
+        });
+        ueObj.ects = ueEctsVal;
       }
 
       // 3. ECUE & Matière
@@ -643,20 +669,35 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
               ueId: ueObj.id,
               title: finalEcueTitle,
               code: codeECUE || null,
+              ects: ecueEctsVal,
             },
           });
           createdECUEs.add(ecueObj.id);
           ecueMap.set(ecueKey, ecueObj);
-
-          await tx.subject.create({
-            data: {
-              name: finalEcueTitle.trim(),
-              instructor: enseignant || null,
-              color: '#6366f1',
-              ecueId: ecueObj.id,
-              ueId: null,
-            },
+        } else if (!ecueObj.ects && ecueEctsVal) {
+          await tx.eCUE.update({
+            where: { id: ecueObj.id },
+            data: { ects: ecueEctsVal },
           });
+          ecueObj.ects = ecueEctsVal;
+        }
+
+        // Créer une sous-matière UNIQUEMENT si subjectName est explicitement fourni et DIFFÉRENT de finalEcueTitle
+        if (subjectName && subjectName.trim().length >= 2 && normalize(subjectName) !== normalize(finalEcueTitle)) {
+          const existingSub = await tx.subject.findFirst({
+            where: { ecueId: ecueObj.id, name: subjectName.trim() },
+          });
+          if (!existingSub) {
+            await tx.subject.create({
+              data: {
+                name: subjectName.trim(),
+                instructor: enseignant || null,
+                color: '#6366f1',
+                ecueId: ecueObj.id,
+                ueId: null,
+              },
+            });
+          }
         }
       }
     }
