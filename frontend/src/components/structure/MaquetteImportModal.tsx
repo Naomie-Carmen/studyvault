@@ -1959,72 +1959,57 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           }
 
           .btn-submit, .btn-continue-step1, .btn-ai-extract {
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 0.6rem !important;
-            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: #6C63FF !important;
             color: #ffffff !important;
-            font-weight: 700 !important;
-            padding: 12px 24px !important;
-            border-radius: 12px !important;
+            font-weight: 600 !important;
+            padding: 12px 20px !important;
+            border-radius: 10px !important;
             border: none !important;
-            font-size: 0.95rem !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
-          }
-
-          .btn-submit *, .btn-continue-step1 *, .btn-ai-extract * {
-            color: #ffffff !important;
-            stroke: #ffffff !important;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
           }
 
           .btn-submit:hover:not(:disabled), .btn-continue-step1:hover:not(:disabled), .btn-ai-extract:hover:not(:disabled) {
-            background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%) !important;
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6) !important;
-            transform: translateY(-1px);
+            background: #5b52e0 !important;
+            box-shadow: 0 4px 14px rgba(108, 99, 255, 0.4);
           }
 
           .btn-submit:disabled, .btn-continue-step1:disabled, .btn-ai-extract:disabled {
-            opacity: 0.55 !important;
+            opacity: 0.5 !important;
             color: #ffffff !important;
             cursor: not-allowed !important;
-            background: #4f46e5 !important;
-            box-shadow: none !important;
-            transform: none !important;
+            background: #6C63FF !important;
           }
 
           .btn-cancel, .btn-local-extract {
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 0.6rem !important;
-            background: rgba(255, 255, 255, 0.12) !important;
-            color: #ffffff !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: #f1f5f9 !important;
             font-weight: 600 !important;
-            padding: 12px 24px !important;
-            border-radius: 12px !important;
-            border: 1px solid rgba(255, 255, 255, 0.25) !important;
-            font-size: 0.95rem !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-          }
-
-          .btn-cancel *, .btn-local-extract * {
-            color: #ffffff !important;
-            stroke: #ffffff !important;
+            padding: 12px 20px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
           }
 
           .btn-cancel:hover:not(:disabled), .btn-local-extract:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.22) !important;
-            border-color: rgba(255, 255, 255, 0.4) !important;
+            background: rgba(255, 255, 255, 0.15) !important;
             color: #ffffff !important;
           }
 
           .btn-cancel:disabled, .btn-local-extract:disabled {
-            opacity: 0.45 !important;
-            color: #ffffff !important;
+            opacity: 0.5 !important;
+            color: #f1f5f9 !important;
             cursor: not-allowed !important;
           }
 
