@@ -45,9 +45,13 @@ export async function uploadDocuments(
   if (params.subjectId) {
     const subject = await prisma.subject.findUnique({
       where: { id: params.subjectId },
-      include: { ue: { include: { semester: { include: { academicYear: true } } } } },
+      include: {
+        ue: { include: { semester: { include: { academicYear: true } } } },
+        ecue: { include: { ue: { include: { semester: { include: { academicYear: true } } } } } },
+      },
     });
-    if (!subject || subject.ue?.semester.academicYear.userId !== userId) {
+    const ownerId = subject?.ue?.semester.academicYear.userId || subject?.ecue?.ue.semester.academicYear.userId;
+    if (!subject || ownerId !== userId) {
       throw ApiError.notFound('Matière introuvable ou accès refusé.');
     }
   }

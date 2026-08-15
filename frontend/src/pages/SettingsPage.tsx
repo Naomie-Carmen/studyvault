@@ -314,9 +314,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
       <style>{`
         .page-container {
-          max-width: 900px;
-          margin: 0 auto;
-          padding: 2rem 1.5rem;
+          max-width: 100%;
+          width: 100%;
+          margin: 0;
+          padding: 1.5rem 0;
         }
         .page-header {
           margin-bottom: 2rem;

@@ -266,7 +266,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           )}
         </div>
         <style>{`
-          .academic-structure-container { max-width: 900px; margin: 2rem auto; }
+          .academic-structure-container { width: 100%; max-width: 100%; margin: 0; }
           .unconfigured-card { padding: 3rem 2rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
           .unconfigured-card h2 { font-size: 1.5rem; }
           .unconfigured-card p { color: var(--text-muted); max-width: 500px; font-size: 0.9rem; }

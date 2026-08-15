@@ -96,9 +96,9 @@ export const AppShell: React.FC<AppShellProps> = ({
         .app-main-layout {
           flex: 1;
           display: flex;
-          max-width: 1400px;
+          max-width: 100%;
           width: 100%;
-          margin: 0 auto;
+          margin: 0;
           padding: var(--space-xl);
           gap: var(--space-xl);
         }
