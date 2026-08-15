@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
 import { env } from '../config/env';
@@ -173,7 +174,18 @@ export async function extractMaquette(req: Request, res: Response, next: NextFun
       throw ApiError.badRequest('Aucune image fournie.', 'MISSING_IMAGE');
     }
 
-    const base64image = files[0].buffer.toString('base64');
+    const file = files[0];
+    let base64image = '';
+    if (file.buffer) {
+      base64image = file.buffer.toString('base64');
+    } else if (file.path && fs.existsSync(file.path)) {
+      base64image = fs.readFileSync(file.path).toString('base64');
+    }
+
+    if (!base64image) {
+      throw ApiError.badRequest('Impossible de lire le contenu de l\'image téléversée.', 'INVALID_FILE_CONTENT');
+    }
+
     const prompt = `Extract this academic curriculum table into JSON: array of objects with keys semestre, codeUE, intituleUE, codeECUE, intituleECUE, ects, enseignant. One object per ECUE row. Return ONLY valid JSON, no markdown.`;
 
     const { modelName, data } = await callVision(prompt, base64image);
@@ -218,7 +230,18 @@ export async function extractTimetable(req: Request, res: Response, next: NextFu
       throw ApiError.badRequest('Aucune image fournie.', 'MISSING_IMAGE');
     }
 
-    const base64image = files[0].buffer.toString('base64');
+    const file = files[0];
+    let base64image = '';
+    if (file.buffer) {
+      base64image = file.buffer.toString('base64');
+    } else if (file.path && fs.existsSync(file.path)) {
+      base64image = fs.readFileSync(file.path).toString('base64');
+    }
+
+    if (!base64image) {
+      throw ApiError.badRequest('Impossible de lire le contenu de l\'image téléversée.', 'INVALID_FILE_CONTENT');
+    }
+
     const prompt = `Extract this timetable table into JSON: array of objects with keys jour, startTime, endTime, matiere, salle, enseignant, groupe, type. One object per session. Return ONLY valid JSON, no markdown.`;
 
     const { modelName, data } = await callVision(prompt, base64image);
