@@ -14,6 +14,18 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Global Reset for Native Input Spin Buttons (Hide ugly white browser arrows everywhere in app) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
