@@ -55,14 +55,26 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Flatten all subjects from structure tree
+  // Flatten all subjects and ECUEs from structure tree
   const allSubjects: { id: string; name: string }[] = [];
   if (tree) {
     tree.semesters.forEach((sem) => {
       sem.ues.forEach((ue) => {
-        ue.directSubjects.forEach((sub) => allSubjects.push(sub));
+        ue.directSubjects.forEach((sub) => {
+          allSubjects.push({
+            id: sub.id,
+            name: `S${sem.number} — ${ue.code ? ue.code + ' : ' : ''}${sub.name}`,
+          });
+        });
         ue.ecues.forEach((ecue) => {
-          ecue.subjects.forEach((sub) => allSubjects.push(sub));
+          if (ecue.subjects && ecue.subjects.length > 0) {
+            ecue.subjects.forEach((sub) => {
+              allSubjects.push({
+                id: sub.id,
+                name: `S${sem.number} — ${ecue.code ? '[' + ecue.code + '] ' : ''}${sub.name}`,
+              });
+            });
+          }
         });
       });
     });
@@ -71,14 +83,14 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   const handleCreateQuickSubject = async () => {
     if (!newSubjectName.trim() || !selectedUeId) return;
     try {
-      const res = await structureService.createSubject({
-        name: newSubjectName.trim(),
+      const res = await structureService.createECUE({
+        title: newSubjectName.trim(),
         ueId: selectedUeId,
       });
-      if (res.success && res.data) {
-        setSubjectId(res.data.id);
+      if (res.success) {
         setShowQuickSubject(false);
         setNewSubjectName('');
+        onSuccess();
       }
     } catch (_e) {
       /* ignore */
@@ -147,17 +159,17 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           )}
 
-          {/* Subject Picker with Quick Create Trigger */}
+          {/* Subject / ECUE Picker with Quick Create Trigger */}
           <div className="form-group">
             <div className="label-row">
-              <label>Matière d'enseignement *</label>
+              <label>ECUE / Matière d'enseignement *</label>
               <button
                 type="button"
                 className="btn-quick-create"
                 onClick={() => setShowQuickSubject(!showQuickSubject)}
               >
                 <Plus size={12} />
-                <span>Créer une matière</span>
+                <span>Créer une ECUE</span>
               </button>
             </div>
 
@@ -165,7 +177,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               <div className="quick-subject-subform glass-card">
                 <input
                   type="text"
-                  placeholder="Nom de la matière (ex: Microéconomie II)"
+                  placeholder="Intitulé de l'ECUE (ex: Microéconomie II)"
                   value={newSubjectName}
                   onChange={(e) => setNewSubjectName(e.target.value)}
                 />
@@ -196,7 +208,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 onChange={(e) => setSubjectId(e.target.value)}
                 required
               >
-                <option value="">Sélectionnez une matière...</option>
+                <option value="">Sélectionnez une ECUE / matière...</option>
                 {allSubjects.map((sub) => (
                   <option key={sub.id} value={sub.id}>
                     {sub.name}

@@ -246,7 +246,7 @@ export async function deleteUE(userId: string, ueId: string) {
 export async function createECUE(userId: string, input: ECUEInput) {
   await verifyUEOwnership(userId, input.ueId);
 
-  return prisma.eCUE.create({
+  const ecue = await prisma.eCUE.create({
     data: {
       ueId: input.ueId,
       title: input.title,
@@ -255,12 +255,25 @@ export async function createECUE(userId: string, input: ECUEInput) {
       instructor: input.instructor || null,
     },
   });
+
+  // Garantir la création d'une matière liée pour les plannings et téléversements de cours
+  await prisma.subject.create({
+    data: {
+      name: input.title.trim(),
+      instructor: input.instructor || null,
+      color: '#6366f1',
+      ecueId: ecue.id,
+      ueId: null,
+    },
+  });
+
+  return ecue;
 }
 
 export async function updateECUE(userId: string, ecueId: string, input: Partial<ECUEInput> & { ects?: number | null; instructor?: string | null }) {
   await verifyECUEOwnership(userId, ecueId);
 
-  return prisma.eCUE.update({
+  const updatedECUE = await prisma.eCUE.update({
     where: { id: ecueId },
     data: {
       ...(input.title ? { title: input.title } : {}),
@@ -269,6 +282,34 @@ export async function updateECUE(userId: string, ecueId: string, input: Partial<
       ...(input.instructor !== undefined ? { instructor: input.instructor } : {}),
     },
   });
+
+  // Synchroniser la matière primaire si l'intitulé ou l'enseignant est modifié
+  if (input.title || input.instructor !== undefined) {
+    const existingSubject = await prisma.subject.findFirst({
+      where: { ecueId },
+    });
+    if (existingSubject) {
+      await prisma.subject.update({
+        where: { id: existingSubject.id },
+        data: {
+          ...(input.title ? { name: input.title.trim() } : {}),
+          ...(input.instructor !== undefined ? { instructor: input.instructor || null } : {}),
+        },
+      });
+    } else if (input.title) {
+      await prisma.subject.create({
+        data: {
+          name: input.title.trim(),
+          instructor: input.instructor || null,
+          color: '#6366f1',
+          ecueId: updatedECUE.id,
+          ueId: null,
+        },
+      });
+    }
+  }
+
+  return updatedECUE;
 }
 
 export async function deleteECUE(userId: string, ecueId: string) {
