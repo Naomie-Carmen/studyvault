@@ -21,7 +21,8 @@ import {
   BarChart3,
   RotateCcw,
   RefreshCw,
-  Settings
+  Settings,
+  Calculator
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
@@ -204,6 +205,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Calendar size={18} />
               <span>Emploi du Temps (OCR)</span>
+            </button>
+
+            <button
+              className={`nav-item ${selectedTab === 'grades' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
+              onClick={() => hasConfiguredProfile && handleNav('grades')}
+              disabled={!hasConfiguredProfile}
+              title={!hasConfiguredProfile ? 'Veuillez configurer votre profil d\'abord' : ''}
+            >
+              <Calculator size={18} />
+              <span>{t('nav.grades', 'Notes & Moyennes')}</span>
             </button>
           </div>
 

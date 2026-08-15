@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SemesterTree, UE, ECUE, Subject } from '../../types/structure';
+import { getAverages, GradeAveragesResponse } from '../../services/gradeService';
 import { 
   FolderTree, 
   Layers, 
@@ -39,6 +40,45 @@ export const TreeView: React.FC<TreeViewProps> = ({
 }) => {
   const [collapsedSemesters, setCollapsedSemesters] = useState<Record<string, boolean>>({});
   const [collapsedUEs, setCollapsedUEs] = useState<Record<string, boolean>>({});
+  const [averagesData, setAveragesData] = useState<GradeAveragesResponse | null>(null);
+
+  useEffect(() => {
+    getAverages().then((res) => {
+      if (res.success && res.data) {
+        setAveragesData(res.data);
+      }
+    });
+  }, []);
+
+  const getSemAvg = (semNumber: number) => {
+    return averagesData?.semesters.find((s) => s.semesterNumber === semNumber)?.average ?? null;
+  };
+
+  const getUeAvg = (ueId: string) => {
+    for (const sem of averagesData?.semesters || []) {
+      const ue = sem.ues.find((u) => u.ueId === ueId);
+      if (ue) return ue.average;
+    }
+    return null;
+  };
+
+  const getEcueAvg = (ecueId: string) => {
+    for (const sem of averagesData?.semesters || []) {
+      for (const ue of sem.ues) {
+        const ecue = ue.ecues.find((e) => e.ecueId === ecueId);
+        if (ecue) return ecue.average;
+      }
+    }
+    return null;
+  };
+
+  const renderBadge = (avg: number | null) => {
+    if (avg === null || avg === undefined) return null;
+    let badgeClass = 'badge-green';
+    if (avg < 7.0) badgeClass = 'badge-red';
+    else if (avg < 10.0) badgeClass = 'badge-orange';
+    return <span className={`tree-avg-badge ${badgeClass}`}>{avg.toFixed(2)} / 20</span>;
+  };
 
   const toggleSemester = (id: string) => {
     setCollapsedSemesters((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -63,6 +103,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                 </button>
                 <span className="semester-pill">S{sem.number}</span>
                 <span className="semester-label">{sem.label}</span>
+                {renderBadge(getSemAvg(sem.number))}
                 {!sem.isActive && <span className="inactive-badge">Inactif</span>}
               </div>
 
@@ -103,6 +144,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                             <FolderTree size={18} className="text-indigo" />
                             {ue.code && <span className="code-tag">{ue.code}</span>}
                             <span className="ue-title">{ue.title}</span>
+                            {renderBadge(getUeAvg(ue.id))}
                             {ue.ects && <span className="ects-badge">{ue.ects} ECTS</span>}
                           </div>
 
@@ -143,6 +185,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                     <Layers size={16} className="text-purple" />
                                     {ecue.code && <span className="code-tag purple">{ecue.code}</span>}
                                     <span className="ecue-title">{ecue.title}</span>
+                                    {renderBadge(getEcueAvg(ecue.id))}
                                   </div>
 
                                   <div className="node-actions">
@@ -492,6 +535,16 @@ export const TreeView: React.FC<TreeViewProps> = ({
           padding: 0.15rem 0.45rem;
           border-radius: var(--radius-full);
         }
+
+        .tree-avg-badge {
+          font-size: 0.725rem;
+          font-weight: 700;
+          padding: 0.15rem 0.5rem;
+          border-radius: 12px;
+        }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
 
         .text-indigo { color: var(--primary); }
         .text-purple { color: var(--accent-purple); }

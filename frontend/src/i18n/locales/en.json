@@ -8,6 +8,7 @@
     "academicStructure": "Course Hierarchy (UE / ECUE / Subjects)",
     "academicDocuments": "Course Library",
     "timetable": "Timetable (OCR)",
+    "grades": "Grades & Averages",
     "confidentialSpace": "CONFIDENTIAL SPACE",
     "personalVault": "Personal Vault",
     "privacySettings": "GDPR Privacy",
@@ -64,6 +65,22 @@
     "title": "Schedule & Timetable",
     "subtitle": "Manage your weekly classes and revisions.",
     "printWeek": "Print My Week"
+  },
+  "grades": {
+    "title": "Grades & Averages",
+    "subtitle": "Enter your grades out of 20 to compute live ECUE, UE, semester, and annual averages.",
+    "loading": "Calculating averages and preparing report card…",
+    "saving": "Saving…",
+    "saved": "Saved ✓",
+    "annual": "Annual View",
+    "statAnnual": "Semester Average",
+    "statAnnualAvg": "Overall Average",
+    "statCredits": "Passed Credits (ECTS)",
+    "statusPassed": "Passed",
+    "statusFailed": "Failed",
+    "statusPending": "In progress",
+    "emptyTitle": "No UEs registered",
+    "emptySub": "Import your academic structure to start entering grades."
   },
   "print": {
     "title": "My Week",

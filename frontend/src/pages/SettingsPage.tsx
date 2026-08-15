@@ -15,6 +15,7 @@ import {
   Check,
   ChevronRight
 } from 'lucide-react';
+import { GradeConfigSection } from '../components/settings/GradeConfigSection';
 
 interface SettingsPageProps {
   onNavigate?: (tab: string) => void;
@@ -200,6 +201,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
             </button>
           </div>
         </div>
+
+        {/* Section 3.5: Barème de notation */}
+        <GradeConfigSection />
 
         {/* Section 4: Compte & Données */}
         <div className="glass-card settings-card">

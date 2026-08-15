@@ -8,6 +8,7 @@
     "academicStructure": "Arborescence (UE / ECUE / Matières)",
     "academicDocuments": "Bibliothèque de Cours",
     "timetable": "Emploi du Temps (OCR)",
+    "grades": "Notes & Moyennes",
     "confidentialSpace": "ESPACE CONFIDENTIEL",
     "personalVault": "Coffre-fort Personnel",
     "privacySettings": "Confidentialité RGPD",
@@ -64,6 +65,22 @@
     "title": "Planning & Emploi du Temps",
     "subtitle": "Gérez vos séances hebdomadaires et vos révisions.",
     "printWeek": "Imprimer ma semaine"
+  },
+  "grades": {
+    "title": "Notes & Moyennes",
+    "subtitle": "Saisissez vos notes /20 pour calculer en direct vos moyennes d'ECUE, d'UE, de semestre et d'année.",
+    "loading": "Calcul des moyennes et préparation du carnet de notes…",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré ✓",
+    "annual": "Vue Annuelle",
+    "statAnnual": "Moyenne Annuelle",
+    "statAnnualAvg": "Moyenne Générale",
+    "statCredits": "Crédits Validés (ECTS)",
+    "statusPassed": "Validé",
+    "statusFailed": "Ajourné",
+    "statusPending": "En cours",
+    "emptyTitle": "Aucune UE enregistrée",
+    "emptySub": "Importez votre maquette académique pour saisir vos notes."
   },
   "print": {
     "title": "Ma Semaine",

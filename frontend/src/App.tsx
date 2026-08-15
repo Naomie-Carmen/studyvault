@@ -16,6 +16,7 @@ import { AcademicDocumentsPage } from './pages/documents/AcademicDocumentsPage';
 import { PersonalVaultPage } from './pages/documents/PersonalVaultPage';
 import { SearchPage } from './pages/search/SearchPage';
 import { TimetablePage } from './pages/timetable/TimetablePage';
+import { GradesPage } from './pages/grades/GradesPage';
 import { PrivacySettingsPage } from './pages/rgpd/PrivacySettingsPage';
 import { getHealthCheck } from './services/healthService';
 import { HealthCheckData } from './types/api';
@@ -286,6 +287,9 @@ export const App: React.FC = () => {
             onNavigateToDocuments={() => handleTabChange('academic-documents')}
           />
         );
+
+      case 'grades':
+        return <GradesPage />;
 
       case 'personal-vault':
         return <PersonalVaultPage />;

@@ -44,6 +44,8 @@ model User {
   classificationSuggestions ClassificationSuggestion[]
   consents                  UserConsent[]
   feedbacks                 Feedback[]
+  noteTypes                 NoteType[]
+  notes                     Note[]
 
   @@index([email])
 }
@@ -133,14 +135,16 @@ model UE {
 }
 
 model ECUE {
-  id        String    @id @default(uuid())
+  id        String     @id @default(uuid())
   ueId      String
-  ue        UE        @relation(fields: [ueId], references: [id], onDelete: Cascade)
+  ue        UE         @relation(fields: [ueId], references: [id], onDelete: Cascade)
   code      String?
   title     String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   subjects  Subject[]
+  noteTypes NoteType[]
+  notes     Note[]
 
   @@index([ueId])
 }
@@ -394,4 +398,40 @@ model Feedback {
 
   @@index([userId])
   @@index([type])
+}
+
+// Phase 14 Models — Notes & Moyennes (v1.0.8)
+
+model NoteType {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ecueId    String?
+  ecue      ECUE?    @relation(fields: [ecueId], references: [id], onDelete: Cascade)
+  name      String
+  weight    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  notes     Note[]
+
+  @@unique([userId, ecueId, name])
+  @@index([userId])
+  @@index([ecueId])
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ecueId     String
+  ecue       ECUE     @relation(fields: [ecueId], references: [id], onDelete: Cascade)
+  noteTypeId String
+  noteType   NoteType @relation(fields: [noteTypeId], references: [id], onDelete: Cascade)
+  value      Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, ecueId, noteTypeId])
+  @@index([userId])
+  @@index([ecueId])
 }
