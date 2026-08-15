@@ -57,6 +57,8 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   const [editingUE, setEditingUE] = useState<UE | null>(null);
   const [editingECUE, setEditingECUE] = useState<ECUE | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [isECUEModalOpen, setIsECUEModalOpen] = useState(false);
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
 
   // Delete All State
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
@@ -402,21 +404,25 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           onAddECUE={(ueId) => {
             setActiveUEId(ueId);
             setEditingECUE(null);
+            setIsECUEModalOpen(true);
           }}
           onEditECUE={(ecue) => {
             setActiveUEId(ecue.ueId);
             setEditingECUE(ecue);
+            setIsECUEModalOpen(true);
           }}
           onDeleteECUE={(ecue) => setDeleteTarget({ type: 'ECUE', id: ecue.id, name: `${ecue.code ? ecue.code + ' — ' : ''}${ecue.title}` })}
           onAddSubject={({ ueId, ecueId }) => {
             setActiveUEId(ueId || null);
             setActiveECUEId(ecueId || null);
             setEditingSubject(null);
+            setIsSubjectModalOpen(true);
           }}
           onEditSubject={(sub) => {
             setActiveUEId(sub.ueId || null);
             setActiveECUEId(sub.ecueId || null);
             setEditingSubject(sub);
+            setIsSubjectModalOpen(true);
           }}
           onDeleteSubject={(sub) => setDeleteTarget({ type: 'Matière', id: sub.id, name: sub.name })}
         />
@@ -437,10 +443,11 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       )}
 
       {/* ECUE Modal */}
-      {activeUEId && !editingSubject && (
+      {isECUEModalOpen && activeUEId && (
         <ECUEModal
-          isOpen={!!activeUEId && !editingSubject}
+          isOpen={isECUEModalOpen}
           onClose={() => {
+            setIsECUEModalOpen(false);
             setActiveUEId(null);
             setEditingECUE(null);
           }}
@@ -451,10 +458,11 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       )}
 
       {/* Subject Modal */}
-      {(activeUEId || activeECUEId || editingSubject) && (
+      {isSubjectModalOpen && (activeUEId || activeECUEId || editingSubject) && (
         <SubjectModal
-          isOpen={!!(activeUEId || activeECUEId || editingSubject)}
+          isOpen={isSubjectModalOpen}
           onClose={() => {
+            setIsSubjectModalOpen(false);
             setActiveUEId(null);
             setActiveECUEId(null);
             setEditingSubject(null);
