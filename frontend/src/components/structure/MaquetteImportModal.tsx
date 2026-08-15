@@ -491,32 +491,20 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setAiLoading(true);
     setAiError(null);
     setError(null);
-    setAiStepMessage("1/2 Lecture locale de la photo…");
 
     try {
-      // 1. Lance l'OCR Tesseract local existant pour extraire le texte brut
-      let allWordsText: string[] = [];
-      for (const fileItem of selectedFiles) {
-        const details = await extractTableWithDetails(fileItem);
-        const imgText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
-        allWordsText.push(imgText);
-      }
-      const rawOcrText = allWordsText.join('\n');
+      // 1. Envoie l'IMAGE directement à /api/v1/ai/extract-maquette (Vision directe multi-fournisseurs)
+      setAiStepMessage("1/2 Analyse Visuelle IA de la photo…");
+      const formData = new FormData();
+      selectedFiles.forEach((f) => formData.append('images', f));
 
-      setAiStepMessage("2/2 Reconstruction par IA…");
-
-      // 2. Envoie le texte brut à POST /api/v1/ai/structure
       const token = localStorage.getItem('studyvault_access_token') || '';
-      const response = await fetch(`${API_BASE_URL}/ai/structure`, {
+      const response = await fetch(`${API_BASE_URL}/ai/extract-maquette`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          text: rawOcrText,
-          kind: 'maquette',
-        }),
+        body: formData,
       });
 
       if (response.ok) {
@@ -538,13 +526,56 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         }
       }
 
-      // 3. Fallback : Si /ai/structure échoue, utiliser le tableau OCR local autonome
-      console.warn('[AI Structure] Fallback sur l\'OCR local autonome...');
+      // 2. Si la vision directe échoue, fallback hybride (OCR local + /ai/structure)
+      console.warn('[Vision Fallback] Passage sur le mode hybride OCR local + LLM texte...');
+      setAiStepMessage("2/2 Fallback : Extraction OCR + IA texte…");
+
+      let allWordsText: string[] = [];
+      for (const fileItem of selectedFiles) {
+        const details = await extractTableWithDetails(fileItem);
+        const imgText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
+        allWordsText.push(imgText);
+      }
+      const rawOcrText = allWordsText.join('\n');
+
+      const textResponse = await fetch(`${API_BASE_URL}/ai/structure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          text: rawOcrText,
+          kind: 'maquette',
+        }),
+      });
+
+      if (textResponse.ok) {
+        const data = await textResponse.json();
+        let extractedRows: string[][] = Array.isArray(data.data?.rows) ? data.data.rows : [];
+
+        if (extractedRows.length > 0) {
+          const defaultHeader = ["Semestre", "Code UE", "Intitulé UE", "Code ECUE", "Intitulé ECUE", "ECTS", "Enseignant"];
+          const firstRowStr = (extractedRows[0] || []).join(' ').toLowerCase();
+          const hasHeaderKeywords = ['code', 'intitule', 'ue', 'semestre', 'ecue'].some((kw) => firstRowStr.includes(kw));
+
+          if (!hasHeaderKeywords) {
+            extractedRows = [defaultHeader, ...extractedRows];
+          }
+
+          setRawRows(extractedRows);
+          autoDetect(extractedRows);
+          return;
+        }
+      }
+
+      // 3. Fallback final : Si tout échoue, utiliser le tableau OCR local autonome
+      console.warn('[Vision Fallback] Passage sur l\'OCR local autonome...');
       const rows = await extractTableFromMultipleImages(selectedFiles);
       setRawRows(rows);
       autoDetect(rows);
     } catch (_err) {
-      console.warn('[AI Structure Error] Fallback sur l\'OCR local autonome...');
+      console.warn('[AI Vision Error] Fallback sur l\'OCR local autonome...');
       try {
         const rows = await extractTableFromMultipleImages(selectedFiles);
         setRawRows(rows);
