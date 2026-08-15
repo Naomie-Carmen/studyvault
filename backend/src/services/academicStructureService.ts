@@ -480,7 +480,7 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
         codeUE = String(row.codeUE || row.ueCode || row.CodeUE || '').trim();
         intituleUE = String(row.intituleUE || row.ueTitle || row.IntituleUE || '').trim();
         codeECUE = String(row.codeECUE || row.ecueCode || row.CodeECUE || '').trim();
-        intituleECUE = String(row.intituleECUE || row.ecueTitle || row.IntituleECUE || '').trim();
+        intituleECUE = String(row.intituleECUE || row.ecueTitle || row.IntituleECUE || row.subjectName || '').trim();
         ectsStr = String(row.ects || row.ECTS || '').trim();
         enseignant = String(row.enseignant || row.instructor || row.Enseignant || '').trim();
       }

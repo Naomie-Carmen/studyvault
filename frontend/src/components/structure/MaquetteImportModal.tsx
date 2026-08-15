@@ -759,6 +759,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       let semNum = prevSemester;
       if (columnMapping.semester === -1) {
         semNum = fallbackSemester;
+        prevSemester = fallbackSemester;
       } else if (rawSemesterStr) {
         const normSem = rawSemesterStr.toLowerCase().trim();
         if (/s\s*1|semestre\s*1|1er\s*sem|semester\s*1|^1$/i.test(normSem)) {
@@ -856,7 +857,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   };
 
   const handleFinalSubmit = async () => {
-    if (rawRows.length === 0) {
+    if (parsedItemsData.items.length === 0) {
       setError("Aucun élément à importer.");
       return;
     }
@@ -865,9 +866,21 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     setError(null);
     setSuccessBanner(null);
 
+    // Filtrer les items des UEs non exclues
+    const itemsToImport = parsedItemsData.items.filter((item) => {
+      const ueKey = `${item.ueCode || ''}___${item.ueTitle}`;
+      const fullKey = `${item.semesterNumber}:${ueKey}`;
+      return !excludedUEKeys.has(fullKey);
+    });
+
+    if (itemsToImport.length === 0) {
+      setError("Toutes les UEs sont exclues. Sélectionnez au moins une UE.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('studyvault_access_token') || '';
-      const dataRows = headerIndex > 0 ? rawRows.slice(headerIndex + 1) : rawRows;
 
       const response = await fetch(`${API_BASE_URL}/academic-structure/bulk`, {
         method: 'POST',
@@ -876,7 +889,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          rows: dataRows,
+          rows: itemsToImport,
         }),
       });
 
@@ -895,10 +908,10 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           subjects: summary.ecues || 0,
         },
         skipped: { ues: 0, ecues: 0, subjects: 0 },
-        totalRows: dataRows.length,
+        totalRows: itemsToImport.length,
       });
 
-      const msg = `✅ Import terminé : ${summary.semestres || 0} semestres, ${summary.ues || 0} UE, ${summary.ecues || 0} ECUE ajoutés`;
+      const msg = `✅ Import terminé : ${summary.semestres || 0} semestre(s), ${summary.ues || 0} UE, ${summary.ecues || 0} ECUE ajoutés`;
       setSuccessBanner(msg);
 
       onSuccess();
