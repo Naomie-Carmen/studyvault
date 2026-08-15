@@ -79,3 +79,15 @@ export async function deleteSubject(id: string): Promise<ApiResponse<{ message: 
     method: 'DELETE',
   });
 }
+
+export async function reorderStructure(data: {
+  type: 'ue' | 'ecue';
+  id: string;
+  newParentId?: string;
+  newIndex: number;
+}): Promise<ApiResponse<{ success: boolean }>> {
+  return fetchApi<{ success: boolean }>('/academic-structure/reorder', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}

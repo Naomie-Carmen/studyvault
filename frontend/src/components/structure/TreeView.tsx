@@ -10,7 +10,8 @@ import {
   Plus, 
   Edit3, 
   Trash2,
-  UserCheck
+  UserCheck,
+  GripVertical
 } from 'lucide-react';
 
 export function normalizeStr(str: string): string {
@@ -63,6 +64,7 @@ interface TreeViewProps {
   onAddSubject: (target: { ueId?: string; ecueId?: string }) => void;
   onEditSubject: (subject: Subject) => void;
   onDeleteSubject: (subject: Subject) => void;
+  onReorder?: (data: { type: 'ue' | 'ecue'; id: string; newParentId?: string; newIndex: number }) => void;
 }
 
 export const TreeView: React.FC<TreeViewProps> = ({
@@ -77,10 +79,20 @@ export const TreeView: React.FC<TreeViewProps> = ({
   onAddSubject,
   onEditSubject,
   onDeleteSubject,
+  onReorder,
 }) => {
   const [collapsedSemesters, setCollapsedSemesters] = useState<Record<string, boolean>>({});
   const [collapsedUEs, setCollapsedUEs] = useState<Record<string, boolean>>({});
   const [averagesData, setAveragesData] = useState<GradeAveragesResponse | null>(null);
+
+  // Drag and Drop States
+  const [draggedItem, setDraggedItem] = useState<{ type: 'ue' | 'ecue'; id: string; parentId: string } | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{
+    targetType: 'ue' | 'ecue' | 'semester';
+    targetId: string;
+    parentId: string;
+    position: 'before' | 'after' | 'inside';
+  } | null>(null);
 
   useEffect(() => {
     getAverages().then((res) => {
@@ -175,6 +187,113 @@ export const TreeView: React.FC<TreeViewProps> = ({
     setCollapsedUEs((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Drag & Drop Handlers
+  const handleDragStart = (e: React.DragEvent, type: 'ue' | 'ecue', id: string, parentId: string) => {
+    e.stopPropagation();
+    setDraggedItem({ type, id, parentId });
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverInfo(null);
+  };
+
+  const handleUEHeaderDragOver = (e: React.DragEvent, targetUe: UE, semId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem) return;
+
+    if (draggedItem.type === 'ue') {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const position = e.clientY < midY ? 'before' : 'after';
+      setDragOverInfo({ targetType: 'ue', targetId: targetUe.id, parentId: semId, position });
+    } else if (draggedItem.type === 'ecue') {
+      // Dragging ECUE onto a UE (move into UE)
+      setDragOverInfo({ targetType: 'ue', targetId: targetUe.id, parentId: targetUe.id, position: 'inside' });
+    }
+  };
+
+  const handleUEDrop = (e: React.DragEvent, targetUe: UE, sem: SemesterTree) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem || !onReorder) return;
+
+    if (draggedItem.type === 'ue') {
+      const indexInSem = sem.ues.findIndex((u) => u.id === targetUe.id);
+      const newIndex = dragOverInfo?.position === 'after' ? indexInSem + 1 : indexInSem;
+      onReorder({
+        type: 'ue',
+        id: draggedItem.id,
+        newParentId: sem.id,
+        newIndex: Math.max(0, newIndex),
+      });
+    } else if (draggedItem.type === 'ecue') {
+      // Move ECUE to end of target UE
+      onReorder({
+        type: 'ecue',
+        id: draggedItem.id,
+        newParentId: targetUe.id,
+        newIndex: targetUe.ecues.length,
+      });
+    }
+    handleDragEnd();
+  };
+
+  const handleSemesterDragOver = (e: React.DragEvent, semId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedItem?.type === 'ue') {
+      setDragOverInfo({ targetType: 'semester', targetId: semId, parentId: semId, position: 'inside' });
+    }
+  };
+
+  const handleSemesterDrop = (e: React.DragEvent, sem: SemesterTree) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem || !onReorder) return;
+
+    if (draggedItem.type === 'ue') {
+      onReorder({
+        type: 'ue',
+        id: draggedItem.id,
+        newParentId: sem.id,
+        newIndex: sem.ues.length,
+      });
+    }
+    handleDragEnd();
+  };
+
+  const handleECUEHeaderDragOver = (e: React.DragEvent, targetEcue: ECUE, ueId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem || draggedItem.type !== 'ecue') return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? 'before' : 'after';
+    setDragOverInfo({ targetType: 'ecue', targetId: targetEcue.id, parentId: ueId, position });
+  };
+
+  const handleECUEDrop = (e: React.DragEvent, targetEcue: ECUE, ue: UE) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem || draggedItem.type !== 'ecue' || !onReorder) return;
+
+    const indexInUe = ue.ecues.findIndex((e) => e.id === targetEcue.id);
+    const newIndex = dragOverInfo?.position === 'after' ? indexInUe + 1 : indexInUe;
+
+    onReorder({
+      type: 'ecue',
+      id: draggedItem.id,
+      newParentId: ue.id,
+      newIndex: Math.max(0, newIndex),
+    });
+    handleDragEnd();
+  };
+
   const q = searchQuery.trim();
 
   return (
@@ -205,8 +324,18 @@ export const TreeView: React.FC<TreeViewProps> = ({
           return null;
         }
 
+        const isSemDropTarget =
+          dragOverInfo?.targetType === 'semester' && dragOverInfo.targetId === sem.id;
+
         return (
-          <div key={sem.id} className={`semester-tree-node ${!sem.isActive ? 'disabled-semester' : ''}`}>
+          <div
+            key={sem.id}
+            className={`semester-tree-node ${!sem.isActive ? 'disabled-semester' : ''} ${
+              isSemDropTarget ? 'drop-target-inside' : ''
+            }`}
+            onDragOver={(e) => handleSemesterDragOver(e, sem.id)}
+            onDrop={(e) => handleSemesterDrop(e, sem)}
+          >
             {/* Semester Header */}
             <div className="semester-node-header" onClick={() => toggleSemester(sem.id)}>
               <div className="node-title-group">
@@ -246,6 +375,10 @@ export const TreeView: React.FC<TreeViewProps> = ({
                     const isUECollapsed = !!collapsedUEs[ue.id];
                     const ueMatchesSelf = q ? matchSearch(ue.code, q) || matchSearch(ue.title, q) : false;
 
+                    const isDraggedUE = draggedItem?.type === 'ue' && draggedItem.id === ue.id;
+                    const isUeDropOver = dragOverInfo?.targetId === ue.id;
+                    const dropClass = isUeDropOver ? `drop-target-${dragOverInfo.position}` : '';
+
                     const filteredECUEs = ue.ecues.filter((ecue) => {
                       if (!q || ueMatchesSelf) return true;
                       const ecueMatchesSelf = matchSearch(ecue.code, q) || matchSearch(ecue.title, q);
@@ -261,10 +394,24 @@ export const TreeView: React.FC<TreeViewProps> = ({
                     });
 
                     return (
-                      <div key={ue.id} className="ue-tree-node">
+                      <div
+                        key={ue.id}
+                        className={`ue-tree-node ${isDraggedUE ? 'is-dragging' : ''} ${dropClass}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, 'ue', ue.id, sem.id)}
+                        onDragEnd={handleDragEnd}
+                      >
                         {/* UE Header */}
-                        <div className="ue-node-header" onClick={() => toggleUE(ue.id)}>
+                        <div
+                          className="ue-node-header"
+                          onClick={() => toggleUE(ue.id)}
+                          onDragOver={(e) => handleUEHeaderDragOver(e, ue, sem.id)}
+                          onDrop={(e) => handleUEDrop(e, ue, sem)}
+                        >
                           <div className="node-title-group">
+                            <span title="Glisser pour réorganiser">
+                              <GripVertical size={16} className="drag-handle-icon" />
+                            </span>
                             <button className="collapse-toggle">
                               {isUECollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                             </button>
@@ -318,10 +465,27 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                 return matchSearch(sub.name, q) || matchSearch(sub.instructor, q);
                               });
 
+                              const isDraggedECUE = draggedItem?.type === 'ecue' && draggedItem.id === ecue.id;
+                              const isEcueDropOver = dragOverInfo?.targetId === ecue.id;
+                              const ecueDropClass = isEcueDropOver ? `drop-target-${dragOverInfo.position}` : '';
+
                               return (
-                                <div key={ecue.id} className="ecue-tree-node">
-                                  <div className="ecue-node-header">
+                                <div
+                                  key={ecue.id}
+                                  className={`ecue-tree-node ${isDraggedECUE ? 'is-dragging' : ''} ${ecueDropClass}`}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, 'ecue', ecue.id, ue.id)}
+                                  onDragEnd={handleDragEnd}
+                                >
+                                  <div
+                                    className="ecue-node-header"
+                                    onDragOver={(e) => handleECUEHeaderDragOver(e, ecue, ue.id)}
+                                    onDrop={(e) => handleECUEDrop(e, ecue, ue)}
+                                  >
                                     <div className="node-title-group">
+                                      <span title="Glisser pour réorganiser">
+                                        <GripVertical size={14} className="drag-handle-icon" />
+                                      </span>
                                       <Layers size={16} className="text-purple" />
                                       {ecue.code && (
                                         <span className="code-tag purple">
@@ -442,6 +606,44 @@ export const TreeView: React.FC<TreeViewProps> = ({
           font-weight: 700;
           padding: 0 3px;
           border-radius: 3px;
+        }
+
+        .drag-handle-icon {
+          color: var(--text-muted);
+          opacity: 0.35;
+          cursor: grab;
+          transition: opacity 0.2s ease, color 0.2s ease;
+        }
+        .ue-node-header:hover .drag-handle-icon,
+        .ecue-node-header:hover .drag-handle-icon {
+          opacity: 1;
+          color: #818cf8;
+        }
+
+        .is-dragging {
+          opacity: 0.35 !important;
+          filter: grayscale(0.5);
+        }
+
+        .drop-target-inside {
+          border: 2px dashed #10b981 !important;
+          background: rgba(16, 185, 129, 0.1) !important;
+        }
+
+        .drop-target-before {
+          border-top: 3px solid #3b82f6 !important;
+          box-shadow: 0 -4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .drop-target-after {
+          border-bottom: 3px solid #3b82f6 !important;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .semester-tree-node,
+        .ue-tree-node,
+        .ecue-tree-node {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .semester-tree-node {

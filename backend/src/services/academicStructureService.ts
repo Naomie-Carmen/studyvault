@@ -83,8 +83,10 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
         orderBy: { number: 'asc' },
         include: {
           ues: {
+            orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
             include: {
               ecues: {
+                orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                 include: {
                   subjects: true,
                 },
@@ -587,5 +589,118 @@ export async function bulkImportRows(userId: string, rawRows: any[]) {
   }, { timeout: 30000 });
 
   return result;
+}
+
+export interface ReorderInput {
+  type: 'ue' | 'ecue';
+  id: string;
+  newParentId?: string;
+  newIndex: number;
+}
+
+export async function reorderStructureItem(userId: string, input: ReorderInput) {
+  const { type, id, newParentId, newIndex } = input;
+
+  if (type === 'ue') {
+    await verifyUEOwnership(userId, id);
+    const targetUe = await prisma.uE.findUnique({
+      where: { id },
+      include: { semester: { include: { academicYear: true } } },
+    });
+    if (!targetUe) throw ApiError.notFound('UE introuvable.');
+
+    const targetSemesterId = newParentId || targetUe.semesterId;
+    await verifySemesterOwnership(userId, targetSemesterId);
+
+    const targetUes = await prisma.uE.findMany({
+      where: { semesterId: targetSemesterId },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const filtered = targetUes.filter((u) => u.id !== id);
+    const clampedIndex = Math.max(0, Math.min(newIndex, filtered.length));
+    filtered.splice(clampedIndex, 0, targetUe);
+
+    return prisma.$transaction(async (tx) => {
+      if (targetSemesterId !== targetUe.semesterId) {
+        await tx.uE.update({
+          where: { id },
+          data: { semesterId: targetSemesterId },
+        });
+
+        const sourceUes = await tx.uE.findMany({
+          where: { semesterId: targetUe.semesterId },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        });
+        for (let i = 0; i < sourceUes.length; i++) {
+          await tx.uE.update({
+            where: { id: sourceUes[i].id },
+            data: { order: i },
+          });
+        }
+      }
+
+      for (let i = 0; i < filtered.length; i++) {
+        await tx.uE.update({
+          where: { id: filtered[i].id },
+          data: { order: i, semesterId: targetSemesterId },
+        });
+      }
+
+      return { success: true };
+    });
+  }
+
+  if (type === 'ecue') {
+    await verifyECUEOwnership(userId, id);
+    const targetEcue = await prisma.eCUE.findUnique({
+      where: { id },
+      include: { ue: true },
+    });
+    if (!targetEcue) throw ApiError.notFound('ECUE introuvable.');
+
+    const targetUeId = newParentId || targetEcue.ueId;
+    await verifyUEOwnership(userId, targetUeId);
+
+    const targetEcues = await prisma.eCUE.findMany({
+      where: { ueId: targetUeId },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const filtered = targetEcues.filter((e) => e.id !== id);
+    const clampedIndex = Math.max(0, Math.min(newIndex, filtered.length));
+    filtered.splice(clampedIndex, 0, targetEcue);
+
+    return prisma.$transaction(async (tx) => {
+      if (targetUeId !== targetEcue.ueId) {
+        await tx.eCUE.update({
+          where: { id },
+          data: { ueId: targetUeId },
+        });
+
+        const sourceEcues = await tx.eCUE.findMany({
+          where: { ueId: targetEcue.ueId },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        });
+        for (let i = 0; i < sourceEcues.length; i++) {
+          await tx.eCUE.update({
+            where: { id: sourceEcues[i].id },
+            data: { order: i },
+          });
+        }
+      }
+
+      for (let i = 0; i < filtered.length; i++) {
+        await tx.eCUE.update({
+          where: { id: filtered[i].id },
+          data: { order: i, ueId: targetUeId },
+        });
+      }
+
+      return { success: true };
+    });
+  }
+
+  throw ApiError.badRequest('Type invalide (ue ou ecue).');
 }
 

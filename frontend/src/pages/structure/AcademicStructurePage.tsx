@@ -288,6 +288,16 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         <TreeView
           semesters={tree.semesters}
           searchQuery={debouncedSearchQuery}
+          onReorder={async (data) => {
+            try {
+              const res = await structureService.reorderStructure(data);
+              if (res.success) {
+                fetchTree();
+              }
+            } catch (_err) {
+              setError('Erreur lors de la réorganisation.');
+            }
+          }}
           onAddUE={(semesterId) => {
             setActiveSemesterId(semesterId);
             setEditingUE(null);

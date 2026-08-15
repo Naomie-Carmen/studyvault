@@ -154,3 +154,22 @@ export async function bulkImportStructure(req: Request, res: Response, next: Nex
   }
 }
 
+export async function reorderStructure(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { type, id, newParentId, newIndex } = req.body;
+    if (!type || !id || newIndex === undefined) {
+      throw ApiError.badRequest('Type, id et newIndex sont requis.');
+    }
+    const result = await structureService.reorderStructureItem(req.user.id, {
+      type,
+      id,
+      newParentId,
+      newIndex: Number(newIndex),
+    });
+    sendSuccess(res, result, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
