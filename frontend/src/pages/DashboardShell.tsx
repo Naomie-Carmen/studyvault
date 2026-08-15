@@ -12,6 +12,7 @@ import { FilePreviewModal } from '../components/documents/FilePreviewModal';
 import { useAuth } from '../context/useAuth';
 import { useAcademic } from '../context/useAcademic';
 import * as searchService from '../services/searchService';
+import { useTranslation } from 'react-i18next';
 import { 
   ShieldCheck, 
   Sparkles, 
@@ -53,6 +54,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 }) => {
   const { user, isAuthenticated } = useAuth();
   const { profile, hasConfiguredProfile } = useAcademic();
+  const { t } = useTranslation();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [quickAccessList, setQuickAccessList] = useState<QuickAccessItem[]>([]);
@@ -79,9 +81,9 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
             <>
               <div className="hero-badge auth-badge">
                 <User size={14} />
-                <span>Session Étudiante Active</span>
+                <span>{t('dashboard.activeSession', 'Session Étudiante Active')}</span>
               </div>
-              <h1>Bienvenue, {user.fullName} 👋</h1>
+              <h1>{t('dashboard.welcomeUser', 'Bienvenue, {{name}} 👋', { name: user.fullName })}</h1>
 
               {hasConfiguredProfile && profile ? (
                 <div className="academic-context-box">
@@ -109,7 +111,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
                 </div>
               ) : (
                 <p className="hero-description">
-                  Votre compte est connecté. Configurez votre <strong>profil universitaire</strong> pour débloquer votre coffre-fort et vos cours.
+                  {t('dashboard.configureProfileHelp', 'Votre compte est connecté. Configurez votre profil universitaire pour débloquer votre coffre-fort et vos cours.')}
                 </p>
               )}
             </>
@@ -117,11 +119,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
             <>
               <div className="hero-badge">
                 <Sparkles size={14} />
-                <span>StudyVault — Plateforme Académique</span>
+                <span>{t('dashboard.heroBadge', 'StudyVault — Plateforme Académique')}</span>
               </div>
-              <h1>Organisez vos cours universitaires sans effort</h1>
+              <h1>{t('dashboard.heroTitle', 'Organisez vos cours universitaires sans effort')}</h1>
               <p className="hero-description">
-                Connectez-vous pour débloquer votre bibliothèque numérique, votre visionneuse avancée et votre coffre-fort confidentiel.
+                {t('dashboard.heroDesc', 'Connectez-vous pour débloquer votre bibliothèque numérique, votre visionneuse avancée et votre coffre-fort confidentiel.')}
               </p>
             </>
           )}

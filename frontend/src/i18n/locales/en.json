@@ -71,7 +71,34 @@
   "timetable": {
     "title": "Schedule & Timetable",
     "subtitle": "Manage your weekly sessions and study plans.",
-    "printWeek": "Print my week"
+    "printWeek": "Print my week",
+    "viewGridTitle": "Weekly Grid View",
+    "viewGrid": "Grid",
+    "viewListTitle": "Chronological List View",
+    "viewList": "List",
+    "importBtn": "Import PDF/Image (OCR)",
+    "addSessionBtn": "Add a Session",
+    "loadingText": "Loading weekly schedule...",
+    "emptyTitle": "No sessions scheduled",
+    "emptySub": "Add your courses and study plans manually, or import your timetable via OCR.",
+    "hoursCol": "Hours",
+    "days": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    }
+  },
+  "dashboard": {
+    "activeSession": "Active Student Session",
+    "welcomeUser": "Welcome, {{name}} 👋",
+    "configureProfileHelp": "Your account is signed in. Configure your academic profile to unlock your vault and courses.",
+    "heroBadge": "StudyVault — Academic Platform",
+    "heroTitle": "Organize your university courses effortlessly",
+    "heroDesc": "Sign in to unlock your digital library, advanced viewer, and confidential vault."
   },
   "grades": {
     "title": "Grades & Averages",
@@ -90,6 +117,17 @@
     "emptySub": "Import your academic structure to start entering grades."
   },
   "structure": {
+    "pageTitle": "Academic Course Structure",
+    "pageSubtitle": "Structure your courses by Semester, Teaching Units (UE), ECUE, and Subjects.",
+    "deleteAllTitle": "Delete all to start from scratch",
+    "deleteAllBtn": "Delete All",
+    "importTitle": "Import syllabus (Excel/CSV)",
+    "importBtn": "Import Syllabus (Excel/CSV)",
+    "refreshTitle": "Refresh",
+    "refreshBtn": "Refresh",
+    "deletingAll": "Deleting all structure…",
+    "loadingTree": "Loading academic structure...",
+    "noResultsHelp": "Check the spelling or try another term (e.g. UE code, subject, instructor name).",
     "searchPlaceholder": "Search for UE, ECUE, instructor...",
     "noResults": "No results found for",
     "resultFound": "result found",

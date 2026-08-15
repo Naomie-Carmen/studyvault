@@ -26,16 +26,6 @@ interface TimetablePageProps {
   onNavigateToDocuments?: (subjectId: string) => void;
 }
 
-const DAYS = [
-  { key: 0, label: 'Lundi' },
-  { key: 1, label: 'Mardi' },
-  { key: 2, label: 'Mercredi' },
-  { key: 3, label: 'Jeudi' },
-  { key: 4, label: 'Vendredi' },
-  { key: 5, label: 'Samedi' },
-  { key: 6, label: 'Dimanche' },
-];
-
 const TIME_SLOTS = [
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
   '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
@@ -83,6 +73,16 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     loadData();
   }, []);
 
+  const DAYS = [
+    { key: 0, label: t('timetable.days.mon', 'Lundi') },
+    { key: 1, label: t('timetable.days.tue', 'Mardi') },
+    { key: 2, label: t('timetable.days.wed', 'Mercredi') },
+    { key: 3, label: t('timetable.days.thu', 'Jeudi') },
+    { key: 4, label: t('timetable.days.fri', 'Vendredi') },
+    { key: 5, label: t('timetable.days.sat', 'Samedi') },
+    { key: 6, label: t('timetable.days.sun', 'Dimanche') },
+  ];
+
   const hasAnySession =
     !!weekData && DAYS.some((day) => Array.isArray(weekData[day.key]) && weekData[day.key].length > 0);
 
@@ -100,8 +100,8 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
             <CalendarIcon size={24} />
           </div>
           <div className="header-title-box">
-            <h1>Planning &amp; Emploi du Temps</h1>
-            <p className="subtitle">Gérez vos séances hebdomadaires et vos révisions.</p>
+            <h1>{t('timetable.title', 'Planning & Emploi du Temps')}</h1>
+            <p className="subtitle">{t('timetable.subtitle', 'Gérez vos séances hebdomadaires et vos révisions.')}</p>
           </div>
         </div>
 
@@ -110,18 +110,18 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
             <button
               className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
               onClick={() => setViewMode('grid')}
-              title="Vue Grille Hebdomadaire"
+              title={t('timetable.viewGridTitle', 'Vue Grille Hebdomadaire')}
             >
               <Grid size={16} />
-              <span>Grille</span>
+              <span>{t('timetable.viewGrid', 'Grille')}</span>
             </button>
             <button
               className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
               onClick={() => setViewMode('list')}
-              title="Vue Liste Chronologique"
+              title={t('timetable.viewListTitle', 'Vue Liste Chronologique')}
             >
               <List size={16} />
-              <span>Liste</span>
+              <span>{t('timetable.viewList', 'Liste')}</span>
             </button>
           </div>
 
@@ -132,12 +132,12 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
 
           <button className="btn-import-file" onClick={() => setIsImportOpen(true)}>
             <UploadCloud size={16} />
-            <span>Importer PDF/Image (OCR)</span>
+            <span>{t('timetable.importBtn', 'Importer PDF/Image (OCR)')}</span>
           </button>
 
           <button className="btn-add-session" onClick={() => setIsFormOpen(true)}>
             <Plus size={16} />
-            <span>Ajouter une séance</span>
+            <span>{t('timetable.addSessionBtn', 'Ajouter une séance')}</span>
           </button>
         </div>
       </div>
@@ -146,21 +146,21 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
       {loading ? (
         <div className="timetable-loading glass-card">
           <Clock size={24} className="animate-spin text-indigo" />
-          <span>Chargement du planning hebdomadaire...</span>
+          <span>{t('timetable.loadingText', 'Chargement du planning hebdomadaire...')}</span>
         </div>
       ) : !hasAnySession ? (
         <div className="empty-state">
           <div className="empty-icon-circle">
             <CalendarIcon size={32} />
           </div>
-          <h3>Aucune séance programmée</h3>
-          <p>Ajoutez vos cours et révisions manuellement, ou importez votre emploi du temps via l'OCR.</p>
+          <h3>{t('timetable.emptyTitle', 'Aucune séance programmée')}</h3>
+          <p>{t('timetable.emptySub', 'Ajoutez vos cours et révisions manuellement, ou importez votre emploi du temps via l\'OCR.')}</p>
         </div>
       ) : viewMode === 'grid' ? (
         /* Grid View */
         <div className="grid-container glass-card">
           <div className="grid-header-row">
-            <div className="time-col-header">Heures</div>
+            <div className="time-col-header">{t('timetable.hoursCol', 'Heures')}</div>
             {DAYS.map((d) => (
               <div key={d.key} className="day-col-header">
                 {d.label}

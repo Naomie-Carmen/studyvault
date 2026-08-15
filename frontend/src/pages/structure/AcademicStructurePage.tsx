@@ -284,9 +284,9 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
             <GraduationCap size={24} />
           </div>
           <div className="header-title-box">
-            <h1>Maquette des Enseignements</h1>
+            <h1>{t('structure.pageTitle', 'Maquette des Enseignements')}</h1>
             <p className="subtitle">
-              Structurez vos cours par Semestre, Unités d'Enseignement (UE), ECUE et Matières.
+              {t('structure.pageSubtitle', 'Structurez vos cours par Semestre, Unités d\'Enseignement (UE), ECUE et Matières.')}
             </p>
           </div>
         </div>
@@ -296,23 +296,23 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
             <button
               className="refresh-btn delete-all-btn"
               onClick={() => setIsDeleteAllModalOpen(true)}
-              title="Tout supprimer pour repartir de zéro"
+              title={t('structure.deleteAllTitle', 'Tout supprimer pour repartir de zéro')}
             >
               <Trash2 size={16} />
-              <span>Tout supprimer</span>
+              <span>{t('structure.deleteAllBtn', 'Tout supprimer')}</span>
             </button>
           )}
           <button
             className="refresh-btn import-btn"
             onClick={() => setIsImportOpen(true)}
-            title="Importer une maquette (Excel/CSV)"
+            title={t('structure.importTitle', 'Importer une maquette (Excel/CSV)')}
           >
             <UploadCloud size={16} />
-            <span>Importer maquette (Excel/CSV)</span>
+            <span>{t('structure.importBtn', 'Importer maquette (Excel/CSV)')}</span>
           </button>
-          <button className="refresh-btn" onClick={fetchTree} disabled={loading} title="Rafraîchir">
+          <button className="refresh-btn" onClick={fetchTree} disabled={loading} title={t('structure.refreshTitle', 'Rafraîchir')}>
             <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-            <span>Actualiser</span>
+            <span>{t('structure.refreshBtn', 'Actualiser')}</span>
           </button>
         </div>
       </div>
@@ -333,7 +333,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
               type="button"
               className="search-clear-btn"
               onClick={() => setSearchQuery('')}
-              title="Effacer la recherche"
+              title={t('common.clearSearch', 'Effacer la recherche')}
             >
               <X size={16} />
             </button>
@@ -368,13 +368,13 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       {loading || deletingAll ? (
         <div className="loading-card glass-card">
           <RefreshCw size={24} className="spinning text-indigo" />
-          <p>{deletingAll ? 'Suppression de toute l\'arborescence…' : 'Chargement de la structure académique...'}</p>
+          <p>{deletingAll ? t('structure.deletingAll', 'Suppression de toute l\'arborescence…') : t('structure.loadingTree', 'Chargement de la structure académique...')}</p>
         </div>
       ) : debouncedSearchQuery.trim() !== '' && matchCount === 0 ? (
         <div className="glass-card no-search-results-card">
           <FileQuestion size={40} className="text-muted" />
           <h3>{t('structure.noResults', 'Aucun résultat pour')} « {debouncedSearchQuery} »</h3>
-          <p>Vérifiez l'orthographe ou essayez un autre terme (ex: code UE, matière, nom d'enseignant).</p>
+          <p>{t('structure.noResultsHelp', 'Vérifiez l\'orthographe ou essayez un autre terme (ex: code UE, matière, nom d\'enseignant).')}</p>
         </div>
       ) : (
         <TreeView

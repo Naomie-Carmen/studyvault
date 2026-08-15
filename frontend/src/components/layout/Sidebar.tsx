@@ -145,14 +145,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation Sections */}
         <nav className="sidebar-nav">
           <div className="nav-section">
-            <span className="section-title">GÉNÉRAL</span>
+            <span className="section-title">{t('nav.general', 'GÉNÉRAL')}</span>
             
             <button
               className={`nav-item ${selectedTab === 'dashboard' ? 'active' : ''}`}
               onClick={() => handleNav('dashboard')}
             >
               <LayoutDashboard size={18} />
-              <span>Tableau de Bord</span>
+              <span>{t('nav.dashboard', 'Tableau de Bord')}</span>
             </button>
 
             {isAuthenticated && (
@@ -161,57 +161,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleNav('search')}
               >
                 <Search size={18} />
-                <span>Recherche Globale</span>
+                <span>{t('nav.search', 'Recherche Globale')}</span>
               </button>
             )}
           </div>
 
           <div className="nav-section">
-            <span className="section-title">ESPACE ACADÉMIQUE</span>
+            <span className="section-title">{t('nav.academicSpace', 'ESPACE ACADÉMIQUE')}</span>
 
             <button
               className={`nav-item ${selectedTab === 'academic-profile' ? 'active' : ''}`}
               onClick={() => handleNav('academic-profile')}
             >
               <GraduationCap size={18} />
-              <span>Profil Universitaire</span>
+              <span>{t('nav.academicProfile', 'Profil Universitaire')}</span>
             </button>
 
             <button
               className={`nav-item ${selectedTab === 'academic-structure' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
               onClick={() => hasConfiguredProfile && handleNav('academic-structure')}
               disabled={!hasConfiguredProfile}
-              title={!hasConfiguredProfile ? 'Veuillez configurer votre profil d\'abord' : ''}
+              title={!hasConfiguredProfile ? t('nav.profileRequired', 'Veuillez configurer votre profil d\'abord') : ''}
             >
               <Layers size={18} />
-              <span>Arborescence (UE / ECUE / Matières)</span>
+              <span>{t('nav.academicStructure', 'Arborescence (UE / ECUE / Matières)')}</span>
             </button>
 
             <button
               className={`nav-item ${selectedTab === 'academic-documents' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
               onClick={() => hasConfiguredProfile && handleNav('academic-documents')}
               disabled={!hasConfiguredProfile}
-              title={!hasConfiguredProfile ? 'Veuillez configurer votre profil d\'abord' : ''}
+              title={!hasConfiguredProfile ? t('nav.profileRequired', 'Veuillez configurer votre profil d\'abord') : ''}
             >
               <FileText size={18} />
-              <span>Bibliothèque de Cours</span>
+              <span>{t('nav.academicDocuments', 'Bibliothèque de Cours')}</span>
             </button>
 
             <button
               className={`nav-item ${selectedTab === 'timetable' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
               onClick={() => hasConfiguredProfile && handleNav('timetable')}
               disabled={!hasConfiguredProfile}
-              title={!hasConfiguredProfile ? 'Veuillez configurer votre profil d\'abord' : ''}
+              title={!hasConfiguredProfile ? t('nav.profileRequired', 'Veuillez configurer votre profil d\'abord') : ''}
             >
               <Calendar size={18} />
-              <span>Emploi du Temps (OCR)</span>
+              <span>{t('nav.timetable', 'Emploi du Temps (OCR)')}</span>
             </button>
 
             <button
               className={`nav-item ${selectedTab === 'grades' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
               onClick={() => hasConfiguredProfile && handleNav('grades')}
               disabled={!hasConfiguredProfile}
-              title={!hasConfiguredProfile ? 'Veuillez configurer votre profil d\'abord' : ''}
+              title={!hasConfiguredProfile ? t('nav.profileRequired', 'Veuillez configurer votre profil d\'abord') : ''}
             >
               <Calculator size={18} />
               <span>{t('nav.grades', 'Notes & Moyennes')}</span>
@@ -219,14 +219,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="nav-section">
-            <span className="section-title">ESPACE CONFIDENTIEL</span>
+            <span className="section-title">{t('nav.confidentialSpace', 'ESPACE CONFIDENTIEL')}</span>
 
             <button
               className={`nav-item ${selectedTab === 'personal-vault' ? 'active' : ''}`}
               onClick={() => handleNav('personal-vault')}
             >
               <ShieldCheck size={18} />
-              <span>Coffre-fort Personnel</span>
+              <span>{t('nav.personalVault', 'Coffre-fort Personnel')}</span>
             </button>
 
             <button
@@ -234,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleNav('privacy-settings')}
             >
               <Lock size={18} />
-              <span>Confidentialité RGPD</span>
+              <span>{t('nav.privacySettings', 'Confidentialité RGPD')}</span>
             </button>
 
             <button
@@ -242,25 +242,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleNav('my-data')}
             >
               <Database size={18} />
-              <span>Mes Données</span>
+              <span>{t('nav.myData', 'Mes Données')}</span>
             </button>
           </div>
 
           {isAuthenticated && user?.role === 'admin' && (
             <div className="nav-section">
-              <span className="section-title">ADMINISTRATION</span>
+              <span className="section-title">{t('nav.administration', 'ADMINISTRATION')}</span>
               <button
                 className={`nav-item ${selectedTab === 'admin-dashboard' ? 'active' : ''}`}
                 onClick={() => handleNav('admin-dashboard')}
               >
                 <BarChart3 size={18} />
-                <span>Dashboard Bêta (Admin)</span>
+                <span>{t('nav.adminDashboard', 'Dashboard Bêta (Admin)')}</span>
               </button>
             </div>
           )}
 
           <div className="nav-section">
-            <span className="section-title">AIDE & RESSOURCES</span>
+            <span className="section-title">{t('nav.helpResources', 'AIDE & RESSOURCES')}</span>
 
             <button
               className={`nav-item ${selectedTab === 'updates' ? 'active' : ''}`}
@@ -268,7 +268,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               style={{ position: 'relative' }}
             >
               <RefreshCw size={18} />
-              <span>Mises à jour</span>
+              <span>{t('nav.updates', 'Mises à jour')}</span>
               {hasUpdateAvailable && (
                 <span
                   style={{
@@ -279,7 +279,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     marginLeft: 'auto',
                     boxShadow: '0 0 6px rgba(249, 115, 22, 0.8)',
                   }}
-                  title="Mise à jour disponible"
+                  title={t('nav.updateAvailable', 'Mise à jour disponible')}
                 />
               )}
             </button>
