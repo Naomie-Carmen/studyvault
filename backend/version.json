@@ -1,5 +1,5 @@
 {
-  "version": "1.2.5",
+  "version": "1.2.6",
   "releaseDate": "2026-08-15",
   "channel": "stable",
   "notes": [
@@ -13,6 +13,20 @@
     "Internationalisation (i18n) complète en anglais et français"
   ],
   "history": [
+    {
+      "version": "1.2.5",
+      "releaseDate": "2026-08-15",
+      "highlights": [
+        "Coefficients ECTS par ECUE : édition en direct et recalcul immédiat des moyennes",
+        "Structure pédagogique flexible : support du mode ECUE = Matière et ECUE multi-matières",
+        "Barre latérale redimensionnable par glisser-déposer (jusqu'à double largeur max)",
+        "Importation de maquette : attribution automatique des coefficients ECUE & sélecteur S1/S2",
+        "Carnet de notes : validation stricte [0-20] et masquage global des flèches natifs d'inputs",
+        "Maquette académique : importation intelligente avec auto-détection",
+        "Recherche globale multi-critères sur tous vos documents et cours",
+        "Internationalisation (i18n) complète en anglais et français"
+      ]
+    },
     {
       "version": "1.2.4",
       "releaseDate": "2026-08-15",
