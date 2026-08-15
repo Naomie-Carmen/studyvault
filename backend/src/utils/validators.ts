@@ -152,9 +152,11 @@ export const structureImportItemSchema = z.object({
   semesterNumber: z.number().int().min(1).max(12).default(1),
   ueTitle: z.string().trim().min(2, { message: "L'intitulé de l'UE doit contenir au moins 2 caractères." }),
   ueCode: z.string().trim().optional(),
+  ueEcts: z.number().positive().optional().nullable(),
   ects: z.number().positive().optional().nullable(),
   ecueTitle: z.string().trim().min(2).optional(),
   ecueCode: z.string().trim().optional(),
+  ecueEcts: z.number().positive().optional().nullable(),
   subjectName: z.string().trim().min(2).optional(),
   instructor: z.string().trim().optional(),
 });

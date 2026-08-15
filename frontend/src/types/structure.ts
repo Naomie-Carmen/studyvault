@@ -44,9 +44,11 @@ export interface StructureImportItem {
   semesterNumber: number;
   ueTitle: string;
   ueCode?: string;
+  ueEcts?: number | null;
   ects?: number | null;
   ecueTitle?: string;
   ecueCode?: string;
+  ecueEcts?: number | null;
   subjectName?: string;
   instructor?: string;
 }

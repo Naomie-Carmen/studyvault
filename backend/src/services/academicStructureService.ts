@@ -375,7 +375,14 @@ export async function importStructureBatch(userId: string, items: StructureImpor
           return normalize(u.title) === normUeTitle;
         });
 
+        const ueEctsVal = item.ueEcts || item.ects || null;
         if (foundUE) {
+          if (!foundUE.ects && ueEctsVal) {
+            await tx.uE.update({
+              where: { id: foundUE.id },
+              data: { ects: ueEctsVal },
+            });
+          }
           ueEntry = { ue: foundUE, isNew: false };
           skippedUEs++;
         } else {
@@ -384,7 +391,7 @@ export async function importStructureBatch(userId: string, items: StructureImpor
               semesterId: sem.id,
               title: item.ueTitle,
               code: item.ueCode || null,
-              ects: item.ects || null,
+              ects: ueEctsVal,
             },
           });
           ueEntry = { ue: newUE, isNew: true };
@@ -416,11 +423,12 @@ export async function importStructureBatch(userId: string, items: StructureImpor
             return normalize(e.title) === normEcueTitle;
           });
 
+          const ecueEctsVal = item.ecueEcts || item.ects || null;
           if (foundECUE) {
-            if (!foundECUE.ects && item.ects) {
+            if (!foundECUE.ects && ecueEctsVal) {
               await tx.eCUE.update({
                 where: { id: foundECUE.id },
-                data: { ects: item.ects },
+                data: { ects: ecueEctsVal },
               });
             }
             ecueEntry = { ecue: foundECUE, isNew: false };
@@ -431,7 +439,7 @@ export async function importStructureBatch(userId: string, items: StructureImpor
                 ueId: ue.id,
                 title: item.ecueTitle,
                 code: item.ecueCode || null,
-                ects: item.ects || null,
+                ects: ecueEctsVal,
               },
             });
             ecueEntry = { ecue: newECUE, isNew: true };

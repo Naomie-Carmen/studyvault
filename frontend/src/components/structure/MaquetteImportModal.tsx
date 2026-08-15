@@ -53,10 +53,12 @@ interface MaquetteImportModalProps {
 type FieldKey =
   | 'ue_title'
   | 'ue_code'
-  | 'ects'
-  | 'semester'
+  | 'ue_ects'
   | 'ecue_title'
   | 'ecue_code'
+  | 'ecue_ects'
+  | 'ects'
+  | 'semester'
   | 'subject_name'
   | 'instructor';
 
@@ -84,13 +86,13 @@ const FIELD_CONFIGS: FieldConfig[] = [
     matchers: [/code.*ue/i, /code_ue/i, /codification/i, /code.*unité/i, /code.*unite/i],
   },
   {
-    key: 'ects',
-    label: "Crédits ECTS / Coefficient",
-    matchers: [/ects/i, /credit/i, /crédit/i, /coef/i, /ch/i],
+    key: 'ue_ects',
+    label: "Crédits ECTS de l'UE",
+    matchers: [/ects.*ue/i, /credit.*ue/i, /crédit.*ue/i],
   },
   {
     key: 'ecue_title',
-    label: "Intitulé de l'ECUE / Matière",
+    label: "Intitulé de l'ECUE (Matière)",
     matchers: [/intitule.*ecue/i, /intitulé.*ecue/i, /^ecue$/i, /element.*constitutif/i, /élément.*constitutif/i, /nom.*ecue/i],
   },
   {
@@ -99,9 +101,14 @@ const FIELD_CONFIGS: FieldConfig[] = [
     matchers: [/code.*ecue/i, /code_ecue/i, /code.*matière/i, /code.*matiere/i],
   },
   {
+    key: 'ecue_ects',
+    label: "Coefficient / ECTS de l'ECUE",
+    matchers: [/coef.*ecue/i, /ects.*ecue/i, /coef/i, /ects/i, /credit/i, /crédit/i, /ch/i],
+  },
+  {
     key: 'subject_name',
-    label: "Nom de la Matière / Cours",
-    matchers: [/matiere/i, /matière/i, /cours/i, /enseignement/i, /discipline/i, /subject/i, /intitule/i, /intitulé/i],
+    label: "Nom de la Sous-Matière (Sous-cours)",
+    matchers: [/matiere/i, /matière/i, /cours/i, /enseignement/i, /discipline/i, /subject/i],
   },
   {
     key: 'instructor',
@@ -130,10 +137,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   const [columnMapping, setColumnMapping] = useState<Record<FieldKey, number>>({
     ue_title: -1,
     ue_code: -1,
+    ue_ects: -1,
     ects: -1,
     semester: -1,
     ecue_title: -1,
     ecue_code: -1,
+    ecue_ects: -1,
     subject_name: -1,
     instructor: -1,
   });
@@ -223,10 +232,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
       setColumnMapping({
         ue_title: -1,
         ue_code: -1,
+        ue_ects: -1,
         ects: -1,
         semester: -1,
         ecue_title: -1,
         ecue_code: -1,
+        ecue_ects: -1,
         subject_name: -1,
         instructor: -1,
       });
@@ -280,10 +291,12 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
     const newMapping: Record<FieldKey, number> = {
       ue_title: -1,
       ue_code: -1,
+      ue_ects: -1,
       ects: -1,
       semester: -1,
       ecue_title: -1,
       ecue_code: -1,
+      ecue_ects: -1,
       subject_name: -1,
       instructor: -1,
     };
@@ -705,7 +718,9 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
 
       let rawUeTitle = getVal('ue_title');
       let rawUeCode = getVal('ue_code');
-      let rawEctsStr = getVal('ects');
+      let rawUeEctsStr = getVal('ue_ects');
+      let rawEcueEctsStr = getVal('ecue_ects') || getVal('ects');
+      let rawEctsStr = getVal('ects') || rawEcueEctsStr || rawUeEctsStr;
       let rawSemesterStr = getVal('semester');
       let rawEcueTitle = getVal('ecue_title');
       let rawEcueCode = getVal('ecue_code');
@@ -720,7 +735,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         if (prevUeTitle) {
           rawUeTitle = prevUeTitle;
           rawUeCode = prevUeCode;
-          rawEctsStr = prevEcts !== null ? String(prevEcts) : '';
+          if (!rawUeEctsStr && prevEcts !== null) rawUeEctsStr = String(prevEcts);
         } else {
           warningsCount++;
           continue;
@@ -732,7 +747,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         }
         prevUeTitle = rawUeTitle;
         prevUeCode = rawUeCode;
-        const parsedEcts = parseFloat(rawEctsStr.replace(',', '.'));
+        const parsedEcts = parseFloat((rawUeEctsStr || rawEctsStr).replace(',', '.'));
         prevEcts = !isNaN(parsedEcts) && parsedEcts > 0 ? parsedEcts : null;
       }
 
@@ -756,8 +771,13 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         prevSemester = semNum;
       }
 
-      const parsedEcts = parseFloat(rawEctsStr.replace(',', '.'));
-      const ectsVal = !isNaN(parsedEcts) && parsedEcts > 0 ? parsedEcts : prevEcts;
+      const pUeEcts = parseFloat(rawUeEctsStr.replace(',', '.'));
+      const pEcueEcts = parseFloat(rawEcueEctsStr.replace(',', '.'));
+      const pEcts = parseFloat(rawEctsStr.replace(',', '.'));
+
+      const itemUeEcts = !isNaN(pUeEcts) && pUeEcts > 0 ? pUeEcts : prevEcts;
+      const itemEcueEcts = !isNaN(pEcueEcts) && pEcueEcts > 0 ? pEcueEcts : (!isNaN(pEcts) && pEcts > 0 ? pEcts : null);
+      const itemEcts = itemEcueEcts || itemUeEcts;
 
       // Héritage ECUE
       if (!rawEcueTitle && prevEcueTitle) {
@@ -772,9 +792,11 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         semesterNumber: semNum,
         ueTitle: rawUeTitle,
         ueCode: rawUeCode || undefined,
-        ects: ectsVal,
+        ueEcts: itemUeEcts,
+        ects: itemEcts,
         ecueTitle: rawEcueTitle || undefined,
         ecueCode: rawEcueCode || undefined,
+        ecueEcts: itemEcueEcts,
         subjectName: rawSubjectName || undefined,
         instructor: rawInstructor || undefined,
       });
@@ -1259,7 +1281,13 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
             </div>
 
             <div className="mapping-grid">
-              {FIELD_CONFIGS.map((cfg) => (
+              {FIELD_CONFIGS.filter((cfg) => {
+                const structureMode = (localStorage.getItem('studyvault_structure_mode') as 'ecue_is_subject' | 'ecue_has_subjects') || 'ecue_is_subject';
+                if (structureMode === 'ecue_is_subject' && cfg.key === 'subject_name') {
+                  return false;
+                }
+                return true;
+              }).map((cfg) => (
                 <div key={cfg.key} className="form-group mapping-card">
                   <label>
                     {cfg.label} {cfg.required && <span className="text-red">*</span>}
