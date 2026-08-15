@@ -1,18 +1,32 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "releaseDate": "2026-08-15",
   "channel": "stable",
   "notes": [
-    "Maquette académique : importation intelligente avec auto-détection & Semestres S1/S2",
-    "Squelette dynamique par défaut (Semestres S1 & S2 automatiquement garantis)",
-    "Planning & Emploi du Temps : importation OCR/IA actionnable et personnalisée",
-    "Notes & Moyennes : calcul en direct avec carnet de notes interactif",
+    "Coefficients ECTS par ECUE : édition en direct et recalcul immédiat des moyennes",
+    "Structure pédagogique flexible : support du mode ECUE = Matière et ECUE multi-matières",
+    "Barre latérale redimensionnable par glisser-déposer (jusqu'à double largeur max)",
+    "Importation de maquette : attribution automatique des coefficients ECUE & sélecteur S1/S2",
+    "Carnet de notes : validation stricte [0-20] et masquage global des flèches natifs d'inputs",
+    "Maquette académique : importation intelligente avec auto-détection",
     "Recherche globale multi-critères sur tous vos documents et cours",
-    "Internationalisation (i18n) complète en anglais et français",
-    "Design système unifié haute fidélité avec modales optimisées",
-    "Conformité RGPD intégrale & stockage sécurisé"
+    "Internationalisation (i18n) complète en anglais et français"
   ],
   "history": [
+    {
+      "version": "1.1.0",
+      "releaseDate": "2026-08-15",
+      "highlights": [
+        "Maquette académique : importation intelligente avec auto-détection & Semestres S1/S2",
+        "Squelette dynamique par défaut (Semestres S1 & S2 automatiquement garantis)",
+        "Planning & Emploi du Temps : importation OCR/IA actionnable et personnalisée",
+        "Notes & Moyennes : calcul en direct avec carnet de notes interactif",
+        "Recherche globale multi-critères sur tous vos documents et cours",
+        "Internationalisation (i18n) complète en anglais et français",
+        "Design système unifié haute fidélité avec modales optimisées",
+        "Conformité RGPD intégrale & stockage sécurisé"
+      ]
+    },
     {
       "version": "1.0.9",
       "releaseDate": "2026-08-15",
