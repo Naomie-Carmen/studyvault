@@ -82,6 +82,12 @@
     "emptyTitle": "Aucune UE enregistrée",
     "emptySub": "Importez votre maquette académique pour saisir vos notes."
   },
+  "structure": {
+    "searchPlaceholder": "Rechercher une UE, ECUE, enseignant...",
+    "noResults": "Aucun résultat pour",
+    "resultFound": "résultat trouvé",
+    "resultsFound": "résultats trouvés"
+  },
   "print": {
     "title": "Ma Semaine",
     "from": "DU :",

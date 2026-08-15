@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree, UE, ECUE, Subject } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
-import { TreeView } from '../../components/structure/TreeView';
+import { TreeView, matchSearch } from '../../components/structure/TreeView';
 import { UEModal } from '../../components/structure/UEModal';
 import { ECUEModal } from '../../components/structure/ECUEModal';
 import { SubjectModal } from '../../components/structure/SubjectModal';
@@ -15,7 +16,10 @@ import {
   AlertCircle, 
   GraduationCap, 
   ArrowRight,
-  UploadCloud
+  UploadCloud,
+  Search,
+  X,
+  FileQuestion
 } from 'lucide-react';
 
 import { SubjectInput } from '../../types/validators';
@@ -27,17 +31,26 @@ interface AcademicStructurePageProps {
 export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   onNavigateAcademicProfile,
 }) => {
+  const { t } = useTranslation();
   const { hasConfiguredProfile } = useAcademic();
   const [tree, setTree] = useState<AcademicStructureTree | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Search State with 300ms Debounce
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Modal States
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
   const [activeUEId, setActiveUEId] = useState<string | null>(null);
   const [activeECUEId, setActiveECUEId] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
-
 
   // Editing Item States
   const [editingUE, setEditingUE] = useState<UE | null>(null);
@@ -71,6 +84,36 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
+
+  // Compute total match count across the tree
+  const matchCount = React.useMemo(() => {
+    const q = debouncedSearchQuery.trim();
+    if (!q || !tree || !Array.isArray(tree.semesters)) return 0;
+    let count = 0;
+    tree.semesters.forEach((sem) => {
+      sem.ues.forEach((ue) => {
+        if (matchSearch(ue.code, q) || matchSearch(ue.title, q)) {
+          count++;
+        }
+        ue.ecues.forEach((ecue) => {
+          if (matchSearch(ecue.code, q) || matchSearch(ecue.title, q)) {
+            count++;
+          }
+          ecue.subjects.forEach((sub) => {
+            if (matchSearch(sub.name, q) || (sub.instructor && matchSearch(sub.instructor, q))) {
+              count++;
+            }
+          });
+        });
+        ue.directSubjects.forEach((sub) => {
+          if (matchSearch(sub.name, q) || (sub.instructor && matchSearch(sub.instructor, q))) {
+            count++;
+          }
+        });
+      });
+    });
+    return count;
+  }, [debouncedSearchQuery, tree]);
 
   // UE Actions
   const handleSaveUE = async (data: { semesterId: string; title: string; code?: string; ects?: number }) => {
@@ -165,7 +208,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
         <div className="header-content">
           <div className="header-badge">
             <Sparkles size={14} />
-            <span>Arborescence Pédagogique (Phase 4)</span>
+            <span>Arborescence Pédagogique</span>
           </div>
           <h2>Maquette des Enseignements</h2>
           <p>
@@ -187,7 +230,39 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
             <span>Actualiser</span>
           </button>
         </div>
+      </div>
 
+      {/* Instant Search Bar */}
+      <div className="structure-search-container">
+        <div className="structure-search-box glass-card">
+          <Search size={18} className="search-icon text-indigo" />
+          <input
+            type="text"
+            placeholder={t('structure.searchPlaceholder', 'Rechercher une UE, ECUE, enseignant...')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="structure-search-input"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => setSearchQuery('')}
+              title="Effacer la recherche"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {debouncedSearchQuery.trim() !== '' && (
+          <div className="search-counter-tag">
+            {matchCount}{' '}
+            {matchCount <= 1
+              ? t('structure.resultFound', 'résultat trouvé')
+              : t('structure.resultsFound', 'résultats trouvés')}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -203,9 +278,16 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           <RefreshCw size={24} className="spinning text-indigo" />
           <p>Chargement de la structure académique...</p>
         </div>
+      ) : debouncedSearchQuery.trim() !== '' && matchCount === 0 ? (
+        <div className="glass-card no-search-results-card">
+          <FileQuestion size={40} className="text-muted" />
+          <h3>{t('structure.noResults', 'Aucun résultat pour')} « {debouncedSearchQuery} »</h3>
+          <p>Vérifiez l'orthographe ou essayez un autre terme (ex: code UE, matière, nom d'enseignant).</p>
+        </div>
       ) : tree && Array.isArray(tree.semesters) && tree.semesters.length > 0 ? (
         <TreeView
           semesters={tree.semesters}
+          searchQuery={debouncedSearchQuery}
           onAddUE={(semesterId) => {
             setActiveSemesterId(semesterId);
             setEditingUE(null);
@@ -357,6 +439,75 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
           font-size: 0.85rem;
         }
 
+        .structure-search-container {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .structure-search-box {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 12px 16px;
+          border-radius: 12px;
+          background: rgba(30, 41, 59, 0.6);
+          border: 1px solid var(--border-color);
+          width: 100%;
+          max-width: 600px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+          transition: border-color 0.2s ease;
+        }
+
+        .structure-search-box:focus-within {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+        }
+
+        .structure-search-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          color: var(--text-primary);
+          font-size: 0.95rem;
+          outline: none;
+        }
+
+        .search-clear-btn {
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          color: var(--text-muted);
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .search-clear-btn:hover {
+          background: rgba(239, 68, 68, 0.2);
+          color: #f87171;
+        }
+
+        .search-counter-tag {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          margin-left: 0.5rem;
+          font-weight: 500;
+        }
+
+        .no-search-results-card {
+          padding: 3rem;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          color: var(--text-muted);
+        }
+
         .refresh-btn {
           display: flex;
           align-items: center;
@@ -421,5 +572,4 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       `}</style>
     </div>
   );
-
 };

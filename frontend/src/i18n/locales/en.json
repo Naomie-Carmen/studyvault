@@ -82,6 +82,12 @@
     "emptyTitle": "No UEs registered",
     "emptySub": "Import your academic structure to start entering grades."
   },
+  "structure": {
+    "searchPlaceholder": "Search UE, ECUE, instructor...",
+    "noResults": "No results for",
+    "resultFound": "result found",
+    "resultsFound": "results found"
+  },
   "print": {
     "title": "My Week",
     "from": "FROM:",

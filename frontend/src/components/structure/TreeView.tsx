@@ -13,8 +13,47 @@ import {
   UserCheck
 } from 'lucide-react';
 
+export function normalizeStr(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+export function matchSearch(text: string | null | undefined, query: string): boolean {
+  if (!text || !query || !query.trim()) return false;
+  return normalizeStr(text).includes(normalizeStr(query.trim()));
+}
+
+export const HighlightText: React.FC<{ text: string | null | undefined; query?: string }> = ({ text, query }) => {
+  if (!text) return null;
+  if (!query || !query.trim()) return <>{text}</>;
+
+  const normQuery = normalizeStr(query.trim());
+  const normText = normalizeStr(text);
+  const matchIndex = normText.indexOf(normQuery);
+
+  if (matchIndex === -1) return <>{text}</>;
+
+  const before = text.slice(0, matchIndex);
+  const match = text.slice(matchIndex, matchIndex + query.trim().length);
+  const after = text.slice(matchIndex + query.trim().length);
+
+  return (
+    <>
+      {before}
+      <mark className="search-highlight-mark">
+        {match}
+      </mark>
+      {after}
+    </>
+  );
+};
+
 interface TreeViewProps {
   semesters: SemesterTree[];
+  searchQuery?: string;
   onAddUE: (semesterId: string) => void;
   onEditUE: (ue: UE) => void;
   onDeleteUE: (ue: UE) => void;
@@ -28,6 +67,7 @@ interface TreeViewProps {
 
 export const TreeView: React.FC<TreeViewProps> = ({
   semesters,
+  searchQuery = '',
   onAddUE,
   onEditUE,
   onDeleteUE,
@@ -49,6 +89,53 @@ export const TreeView: React.FC<TreeViewProps> = ({
       }
     });
   }, []);
+
+  // Auto-expand nodes on active search query
+  useEffect(() => {
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.trim();
+      const newSemCollapsed: Record<string, boolean> = {};
+      const newUeCollapsed: Record<string, boolean> = {};
+
+      semesters.forEach((sem) => {
+        let semHasMatch = false;
+
+        sem.ues.forEach((ue) => {
+          const ueMatchesSelf = matchSearch(ue.code, q) || matchSearch(ue.title, q);
+          let ueHasMatch = ueMatchesSelf;
+
+          ue.ecues.forEach((ecue) => {
+            const ecueMatchesSelf = matchSearch(ecue.code, q) || matchSearch(ecue.title, q);
+            const subMatches = ecue.subjects.some(
+              (s) => matchSearch(s.name, q) || matchSearch(s.instructor, q)
+            );
+            if (ecueMatchesSelf || subMatches) {
+              ueHasMatch = true;
+            }
+          });
+
+          const directSubMatches = ue.directSubjects.some(
+            (s) => matchSearch(s.name, q) || matchSearch(s.instructor, q)
+          );
+          if (directSubMatches) {
+            ueHasMatch = true;
+          }
+
+          if (ueHasMatch) {
+            newUeCollapsed[ue.id] = false;
+            semHasMatch = true;
+          }
+        });
+
+        if (semHasMatch) {
+          newSemCollapsed[sem.id] = false;
+        }
+      });
+
+      setCollapsedSemesters(newSemCollapsed);
+      setCollapsedUEs(newUeCollapsed);
+    }
+  }, [searchQuery, semesters]);
 
   const getSemAvg = (semNumber: number) => {
     return averagesData?.semesters.find((s) => s.semesterNumber === semNumber)?.average ?? null;
@@ -88,10 +175,35 @@ export const TreeView: React.FC<TreeViewProps> = ({
     setCollapsedUEs((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const q = searchQuery.trim();
+
   return (
     <div className="tree-view-root">
       {semesters.map((sem) => {
         const isSemCollapsed = !!collapsedSemesters[sem.id];
+
+        // Filter UEs if searching
+        const filteredUEs = sem.ues.filter((ue) => {
+          if (!q) return true;
+          const ueMatchesSelf = matchSearch(ue.code, q) || matchSearch(ue.title, q);
+          if (ueMatchesSelf) return true;
+
+          const ecueMatches = ue.ecues.some(
+            (ecue) =>
+              matchSearch(ecue.code, q) ||
+              matchSearch(ecue.title, q) ||
+              ecue.subjects.some((s) => matchSearch(s.name, q) || matchSearch(s.instructor, q))
+          );
+          const directSubMatches = ue.directSubjects.some(
+            (s) => matchSearch(s.name, q) || matchSearch(s.instructor, q)
+          );
+
+          return ecueMatches || directSubMatches;
+        });
+
+        if (q && filteredUEs.length === 0) {
+          return null;
+        }
 
         return (
           <div key={sem.id} className={`semester-tree-node ${!sem.isActive ? 'disabled-semester' : ''}`}>
@@ -122,7 +234,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
             {/* Semester Content / UEs list */}
             {!isSemCollapsed && (
               <div className="semester-children">
-                {sem.ues.length === 0 ? (
+                {filteredUEs.length === 0 ? (
                   <div className="empty-tree-node">
                     <p>Aucune Unité d'Enseignement (UE) créée dans ce semestre.</p>
                     <button className="btn-link" onClick={() => onAddUE(sem.id)}>
@@ -130,8 +242,23 @@ export const TreeView: React.FC<TreeViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  sem.ues.map((ue) => {
+                  filteredUEs.map((ue) => {
                     const isUECollapsed = !!collapsedUEs[ue.id];
+                    const ueMatchesSelf = q ? matchSearch(ue.code, q) || matchSearch(ue.title, q) : false;
+
+                    const filteredECUEs = ue.ecues.filter((ecue) => {
+                      if (!q || ueMatchesSelf) return true;
+                      const ecueMatchesSelf = matchSearch(ecue.code, q) || matchSearch(ecue.title, q);
+                      const subMatches = ecue.subjects.some(
+                        (s) => matchSearch(s.name, q) || matchSearch(s.instructor, q)
+                      );
+                      return ecueMatchesSelf || subMatches;
+                    });
+
+                    const filteredDirectSubjects = ue.directSubjects.filter((sub) => {
+                      if (!q || ueMatchesSelf) return true;
+                      return matchSearch(sub.name, q) || matchSearch(sub.instructor, q);
+                    });
 
                     return (
                       <div key={ue.id} className="ue-tree-node">
@@ -142,8 +269,14 @@ export const TreeView: React.FC<TreeViewProps> = ({
                               {isUECollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                             </button>
                             <FolderTree size={18} className="text-indigo" />
-                            {ue.code && <span className="code-tag">{ue.code}</span>}
-                            <span className="ue-title">{ue.title}</span>
+                            {ue.code && (
+                              <span className="code-tag">
+                                <HighlightText text={ue.code} query={q} />
+                              </span>
+                            )}
+                            <span className="ue-title">
+                              <HighlightText text={ue.title} query={q} />
+                            </span>
                             {renderBadge(getUeAvg(ue.id))}
                             {ue.ects && <span className="ects-badge">{ue.ects} ECTS</span>}
                           </div>
@@ -178,68 +311,84 @@ export const TreeView: React.FC<TreeViewProps> = ({
                         {!isUECollapsed && (
                           <div className="ue-children">
                             {/* ECUE List */}
-                            {ue.ecues.map((ecue) => (
-                              <div key={ecue.id} className="ecue-tree-node">
-                                <div className="ecue-node-header">
-                                  <div className="node-title-group">
-                                    <Layers size={16} className="text-purple" />
-                                    {ecue.code && <span className="code-tag purple">{ecue.code}</span>}
-                                    <span className="ecue-title">{ecue.title}</span>
-                                    {renderBadge(getEcueAvg(ecue.id))}
-                                  </div>
+                            {filteredECUEs.map((ecue) => {
+                              const ecueMatchesSelf = q ? matchSearch(ecue.code, q) || matchSearch(ecue.title, q) : false;
+                              const filteredSubjects = ecue.subjects.filter((sub) => {
+                                if (!q || ueMatchesSelf || ecueMatchesSelf) return true;
+                                return matchSearch(sub.name, q) || matchSearch(sub.instructor, q);
+                              });
 
-                                  <div className="node-actions">
-                                    <button
-                                      className="add-btn btn-subject"
-                                      onClick={() => onAddSubject({ ecueId: ecue.id })}
-                                    >
-                                      <Plus size={13} />
-                                      <span>Matière</span>
-                                    </button>
-                                    <button className="icon-action-btn" onClick={() => onEditECUE(ecue)}>
-                                      <Edit3 size={14} />
-                                    </button>
-                                    <button className="icon-action-btn btn-delete" onClick={() => onDeleteECUE(ecue)}>
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Subjects under ECUE */}
-                                <div className="subjects-container">
-                                  {ecue.subjects.map((sub) => (
-                                    <div key={sub.id} className="subject-leaf-node">
-                                      <div className="node-title-group">
-                                        <div
-                                          className="color-dot"
-                                          style={{ backgroundColor: sub.color || '#6366f1' }}
-                                        />
-                                        <BookOpen size={15} className="text-cyan" />
-                                        <span className="subject-name">{sub.name}</span>
-                                        {sub.instructor && (
-                                          <span className="instructor-tag">
-                                            <UserCheck size={12} />
-                                            {sub.instructor}
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      <div className="node-actions">
-                                        <button className="icon-action-btn" onClick={() => onEditSubject(sub)}>
-                                          <Edit3 size={13} />
-                                        </button>
-                                        <button className="icon-action-btn btn-delete" onClick={() => onDeleteSubject(sub)}>
-                                          <Trash2 size={13} />
-                                        </button>
-                                      </div>
+                              return (
+                                <div key={ecue.id} className="ecue-tree-node">
+                                  <div className="ecue-node-header">
+                                    <div className="node-title-group">
+                                      <Layers size={16} className="text-purple" />
+                                      {ecue.code && (
+                                        <span className="code-tag purple">
+                                          <HighlightText text={ecue.code} query={q} />
+                                        </span>
+                                      )}
+                                      <span className="ecue-title">
+                                        <HighlightText text={ecue.title} query={q} />
+                                      </span>
+                                      {renderBadge(getEcueAvg(ecue.id))}
                                     </div>
-                                  ))}
+
+                                    <div className="node-actions">
+                                      <button
+                                        className="add-btn btn-subject"
+                                        onClick={() => onAddSubject({ ecueId: ecue.id })}
+                                      >
+                                        <Plus size={13} />
+                                        <span>Matière</span>
+                                      </button>
+                                      <button className="icon-action-btn" onClick={() => onEditECUE(ecue)}>
+                                        <Edit3 size={14} />
+                                      </button>
+                                      <button className="icon-action-btn btn-delete" onClick={() => onDeleteECUE(ecue)}>
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Subjects under ECUE */}
+                                  <div className="subjects-container">
+                                    {filteredSubjects.map((sub) => (
+                                      <div key={sub.id} className="subject-leaf-node">
+                                        <div className="node-title-group">
+                                          <div
+                                            className="color-dot"
+                                            style={{ backgroundColor: sub.color || '#6366f1' }}
+                                          />
+                                          <BookOpen size={15} className="text-cyan" />
+                                          <span className="subject-name">
+                                            <HighlightText text={sub.name} query={q} />
+                                          </span>
+                                          {sub.instructor && (
+                                            <span className="instructor-tag">
+                                              <UserCheck size={12} />
+                                              <HighlightText text={sub.instructor} query={q} />
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="node-actions">
+                                          <button className="icon-action-btn" onClick={() => onEditSubject(sub)}>
+                                            <Edit3 size={13} />
+                                          </button>
+                                          <button className="icon-action-btn btn-delete" onClick={() => onDeleteSubject(sub)}>
+                                            <Trash2 size={13} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
 
                             {/* Direct Subjects under UE (without ECUE) */}
-                            {ue.directSubjects.map((sub) => (
+                            {filteredDirectSubjects.map((sub) => (
                               <div key={sub.id} className="subject-leaf-node direct-subject">
                                 <div className="node-title-group">
                                   <div
@@ -247,11 +396,13 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                     style={{ backgroundColor: sub.color || '#6366f1' }}
                                   />
                                   <BookOpen size={15} className="text-cyan" />
-                                  <span className="subject-name">{sub.name}</span>
+                                  <span className="subject-name">
+                                    <HighlightText text={sub.name} query={q} />
+                                  </span>
                                   {sub.instructor && (
                                     <span className="instructor-tag">
                                       <UserCheck size={12} />
-                                      {sub.instructor}
+                                      <HighlightText text={sub.instructor} query={q} />
                                     </span>
                                   )}
                                 </div>
@@ -283,6 +434,14 @@ export const TreeView: React.FC<TreeViewProps> = ({
           display: flex;
           flex-direction: column;
           gap: 1.25rem;
+        }
+
+        .search-highlight-mark {
+          background-color: rgba(254, 240, 138, 0.35);
+          color: #fef08a;
+          font-weight: 700;
+          padding: 0 3px;
+          border-radius: 3px;
         }
 
         .semester-tree-node {
