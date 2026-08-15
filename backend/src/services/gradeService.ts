@@ -119,6 +119,15 @@ export async function saveGrades(
   if (!ecueId) throw ApiError.badRequest("L'ID de l'ECUE est requis.");
   if (!Array.isArray(notes)) throw ApiError.badRequest('Le tableau de notes est requis.');
 
+  for (const item of notes) {
+    if (item.value !== null && item.value !== undefined && !isNaN(Number(item.value))) {
+      const val = Number(item.value);
+      if (val < 0 || val > 20) {
+        throw ApiError.unprocessableEntity('Les notes doivent être comprises entre 0 et 20.', 'INVALID_GRADE_RANGE');
+      }
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const results = [];
     for (const item of notes) {

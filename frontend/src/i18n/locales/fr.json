@@ -96,7 +96,8 @@
     "clickToEditCoef": "Cliquer pour modifier le coefficient",
     "formulaHelp": "Moyenne UE = Σ(moyenne ECUE × coef) ÷ Σ coef",
     "coefTag": "coef {{coef}}",
-    "coefUnknown": "coef ?"
+    "coefUnknown": "coef ?",
+    "invalidRange": "Les notes doivent être comprises entre 0 et 20."
   },
   "structure": {
     "searchPlaceholder": "Rechercher une UE, ECUE, enseignant...",

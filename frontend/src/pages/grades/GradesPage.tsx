@@ -87,6 +87,10 @@ export const GradesPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  // Range validation state (0-20)
+  const [rangeError, setRangeError] = useState<boolean>(false);
+  const rangeErrorTimeoutRef = useRef<any>(null);
+
   // Handle note value change with 500ms debounce auto-save
   const handleGradeInputChange = (
     ecueId: string,
@@ -95,6 +99,22 @@ export const GradesPage: React.FC = () => {
     allEcueNoteTypes: { noteTypeId: string }[]
   ) => {
     const key = `${ecueId}:${noteTypeId}`;
+    const cleanStr = valStr.trim().replace(',', '.');
+
+    if (cleanStr !== '') {
+      const numVal = parseFloat(cleanStr);
+      if (!isNaN(numVal) && (numVal < 0 || numVal > 20)) {
+        // Show red message for 3 seconds
+        setRangeError(true);
+        if (rangeErrorTimeoutRef.current) clearTimeout(rangeErrorTimeoutRef.current);
+        rangeErrorTimeoutRef.current = setTimeout(() => {
+          setRangeError(false);
+        }, 3000);
+        // Reject invalid value, revert to previous valid value
+        return;
+      }
+    }
+
     setInputValues((prev) => ({ ...prev, [key]: valStr }));
     setSaveStatus('saving');
 
@@ -110,7 +130,7 @@ export const GradesPage: React.FC = () => {
         const numVal = rawVal.trim() === '' ? null : parseFloat(rawVal.replace(',', '.'));
         return {
           noteTypeId: nt.noteTypeId,
-          value: numVal !== null && !isNaN(numVal) ? Math.min(20, Math.max(0, numVal)) : null,
+          value: numVal !== null && !isNaN(numVal) && numVal >= 0 && numVal <= 20 ? numVal : null,
         };
       });
 
@@ -411,23 +431,51 @@ export const GradesPage: React.FC = () => {
                           return (
                             <td key={note.noteTypeId} className="grade-input-cell">
                               <div className="input-with-max">
-                                <input
-                                  type="number"
-                                  step="0.25"
-                                  min="0"
-                                  max="20"
-                                  placeholder="—"
-                                  className="grade-input"
-                                  value={currentValStr}
-                                  onChange={(e) =>
-                                    handleGradeInputChange(
-                                      ecue.ecueId,
-                                      note.noteTypeId,
-                                      e.target.value,
-                                      ecue.notes
-                                    )
-                                  }
-                                />
+                                <div className="grade-input-wrapper">
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    max="20"
+                                    placeholder="—"
+                                    className="grade-input"
+                                    value={currentValStr}
+                                    onChange={(e) =>
+                                      handleGradeInputChange(
+                                        ecue.ecueId,
+                                        note.noteTypeId,
+                                        e.target.value,
+                                        ecue.notes
+                                      )
+                                    }
+                                  />
+                                  <div className="custom-stepper-controls">
+                                    <button
+                                      type="button"
+                                      tabIndex={-1}
+                                      className="stepper-btn"
+                                      onClick={() => {
+                                        const currentNum = parseFloat(currentValStr.replace(',', '.')) || 0;
+                                        const nextVal = Math.min(20, Math.max(0, currentNum + 0.5));
+                                        handleGradeInputChange(ecue.ecueId, note.noteTypeId, String(nextVal), ecue.notes);
+                                      }}
+                                    >
+                                      ▲
+                                    </button>
+                                    <button
+                                      type="button"
+                                      tabIndex={-1}
+                                      className="stepper-btn"
+                                      onClick={() => {
+                                        const currentNum = parseFloat(currentValStr.replace(',', '.')) || 0;
+                                        const nextVal = Math.min(20, Math.max(0, currentNum - 0.5));
+                                        handleGradeInputChange(ecue.ecueId, note.noteTypeId, String(nextVal), ecue.notes);
+                                      }}
+                                    >
+                                      ▼
+                                    </button>
+                                  </div>
+                                </div>
                                 <span className="max-tag">/20</span>
                               </div>
                             </td>
@@ -451,6 +499,12 @@ export const GradesPage: React.FC = () => {
             </div>
           ))}
 
+          {rangeError && (
+            <div className="grade-range-error-banner">
+              ⚠️ {t('grades.invalidRange', 'Les notes doivent être comprises entre 0 et 20.')}
+            </div>
+          )}
+
           {(!activeSemester || activeSemester.ues.length === 0) && (
             <div className="empty-state">
               <div className="empty-icon-circle">
@@ -464,6 +518,95 @@ export const GradesPage: React.FC = () => {
       )}
 
       <style>{`
+        .grade-input-wrapper {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .grade-input {
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 10px;
+          color: #ffffff;
+          text-align: center;
+          padding: 8px 24px 8px 10px;
+          width: 72px;
+          font-size: 0.9rem;
+          font-weight: 600;
+          transition: all 0.2s ease;
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
+
+        .grade-input::-webkit-inner-spin-button,
+        .grade-input::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        .grade-input::placeholder {
+          color: rgba(255, 255, 255, 0.35);
+        }
+
+        .grade-input:focus {
+          outline: none;
+          border-color: #6C63FF;
+          box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.25);
+          background: rgba(108, 99, 255, 0.08);
+        }
+
+        .custom-stepper-controls {
+          position: absolute;
+          right: 4px;
+          top: 50%;
+          transform: translateY(-50%);
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          pointer-events: none;
+        }
+
+        .grade-input-wrapper:hover .custom-stepper-controls {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .stepper-btn {
+          background: transparent;
+          border: none;
+          color: #6C63FF;
+          cursor: pointer;
+          padding: 0 2px;
+          line-height: 1;
+          font-size: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 10px;
+          border-radius: 2px;
+          transition: background 0.15s;
+        }
+
+        .stepper-btn:hover {
+          background: rgba(108, 99, 255, 0.25);
+          color: #ffffff;
+        }
+
+        .grade-range-error-banner {
+          margin-top: 0.75rem;
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.4);
+          color: #ef4444;
+          font-size: 0.85rem;
+          font-weight: 600;
+          text-align: center;
+        }
+
         .ecue-coef-badge {
           display: inline-flex;
           align-items: center;

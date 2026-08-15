@@ -123,7 +123,8 @@
     "clickToEditCoef": "Click to edit coefficient",
     "formulaHelp": "UE Average = Σ(ECUE average × coef) ÷ Σ coef",
     "coefTag": "coef {{coef}}",
-    "coefUnknown": "coef ?"
+    "coefUnknown": "coef ?",
+    "invalidRange": "Grades must be between 0 and 20."
   },
   "structure": {
     "pageTitle": "Academic Course Structure",
