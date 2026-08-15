@@ -10,7 +10,6 @@ import { DeleteConfirmModal } from '../../components/structure/DeleteConfirmModa
 import { MaquetteImportModal } from '../../components/structure/MaquetteImportModal';
 import { useAcademic } from '../../context/useAcademic';
 import { 
-  Sparkles, 
   RefreshCw, 
   AlertCircle, 
   GraduationCap, 
@@ -279,19 +278,20 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
   return (
     <div className="academic-structure-container">
       {/* Header Banner */}
-      <div className="glass-card page-header-card">
-        <div className="header-content">
-          <div className="header-badge">
-            <Sparkles size={14} />
-            <span>Arborescence Pédagogique</span>
+      <div className="page-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="page-header-icon">
+            <GraduationCap size={24} />
           </div>
-          <h2>Maquette des Enseignements</h2>
-          <p>
-            Structurez vos cours par Semestre, Unités d'Enseignement (UE), ECUE et Matières.
-          </p>
+          <div className="header-title-box">
+            <h1>Maquette des Enseignements</h1>
+            <p className="subtitle">
+              Structurez vos cours par Semestre, Unités d'Enseignement (UE), ECUE et Matières.
+            </p>
+          </div>
         </div>
 
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {tree && Array.isArray(tree.semesters) && tree.semesters.some(s => s.ues.length > 0) && (
             <button
               className="refresh-btn delete-all-btn"

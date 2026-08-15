@@ -87,12 +87,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div className="header-title">
-          <Settings size={28} className="header-icon" />
-          <div>
-            <h1>{t('settings.title', 'Paramètres')}</h1>
-            <p className="subtitle">{t('settings.subtitle', 'Personnalisez votre expérience et gérez vos préférences')}</p>
-          </div>
+        <div className="page-header-icon">
+          <Settings size={24} />
+        </div>
+        <div className="header-title-box">
+          <h1>{t('settings.title', 'Paramètres')}</h1>
+          <p className="subtitle">{t('settings.subtitle', 'Personnalisez votre expérience et gérez vos préférences')}</p>
         </div>
       </div>
 

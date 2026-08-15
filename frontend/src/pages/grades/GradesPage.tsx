@@ -133,28 +133,30 @@ export const GradesPage: React.FC = () => {
   return (
     <div className="grades-page-container">
       {/* Header Page */}
-      <div className="page-header-row">
-        <div>
-          <div className="page-title-badge">
-            <Calculator size={22} className="text-indigo" />
-            <h1>{t('grades.title', 'Notes & Moyennes')}</h1>
+      <div className="page-header" style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="page-header-icon">
+            <Calculator size={24} />
           </div>
-          <p className="page-subtitle">
-            {t(
-              'grades.subtitle',
-              'Saisissez vos notes /20 pour calculer en direct vos moyennes d\'ECUE, d\'UE, de semestre et d\'année.'
-            )}
-          </p>
+          <div className="header-title-box">
+            <h1>{t('grades.title', 'Notes & Moyennes')}</h1>
+            <p className="subtitle">
+              {t(
+                'grades.subtitle',
+                'Saisissez vos notes /20 pour calculer en direct vos moyennes d\'ECUE, d\'UE, de semestre et d\'année.'
+              )}
+            </p>
+          </div>
         </div>
 
         {saveStatus === 'saving' && (
-          <div className="save-status-badge saving">
+          <div className="save-status-badge saving" style={{ marginLeft: 'auto' }}>
             <RefreshCw size={14} className="spinning" />
             <span>{t('grades.saving', 'Enregistrement…')}</span>
           </div>
         )}
         {saveStatus === 'saved' && (
-          <div className="save-status-badge saved">
+          <div className="save-status-badge saved" style={{ marginLeft: 'auto' }}>
             <Check size={14} />
             <span>{t('grades.saved', 'Enregistré ✓')}</span>
           </div>
@@ -380,8 +382,10 @@ export const GradesPage: React.FC = () => {
           ))}
 
           {(!activeSemester || activeSemester.ues.length === 0) && (
-            <div className="empty-grades-state glass-card">
-              <AlertCircle size={36} className="text-muted" />
+            <div className="empty-state">
+              <div className="empty-icon-circle">
+                <AlertCircle size={32} />
+              </div>
               <h4>{t('grades.emptyTitle', 'Aucune UE enregistrée')}</h4>
               <p>{t('grades.emptySub', 'Importez votre maquette académique pour saisir vos notes.')}</p>
             </div>

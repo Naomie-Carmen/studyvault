@@ -94,16 +94,18 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   return (
     <div className="timetable-page">
       {/* Top Action Header */}
-      <div className="timetable-header">
-        <div className="title-group">
-          <CalendarIcon size={24} className="text-indigo" />
-          <div>
-            <h2>Planning &amp; Emploi du Temps</h2>
-            <p className="sub-title">Gérez vos séances hebdomadaires et vos révisions.</p>
+      <div className="page-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="page-header-icon">
+            <CalendarIcon size={24} />
+          </div>
+          <div className="header-title-box">
+            <h1>Planning &amp; Emploi du Temps</h1>
+            <p className="subtitle">Gérez vos séances hebdomadaires et vos révisions.</p>
           </div>
         </div>
 
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="view-toggle glass-card">
             <button
               className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -147,8 +149,10 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
           <span>Chargement du planning hebdomadaire...</span>
         </div>
       ) : !hasAnySession ? (
-        <div className="glass-card empty-card">
-          <CalendarIcon size={40} className="text-indigo" />
+        <div className="empty-state">
+          <div className="empty-icon-circle">
+            <CalendarIcon size={32} />
+          </div>
           <h3>Aucune séance programmée</h3>
           <p>Ajoutez vos cours et révisions manuellement, ou importez votre emploi du temps via l'OCR.</p>
         </div>

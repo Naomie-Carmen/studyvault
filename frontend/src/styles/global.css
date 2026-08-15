@@ -430,8 +430,137 @@ button {
 }
 
 /* ========================================================== */
-/* LIGHT MODE ELEGANT THEME STYLES                            */
+/* APP STANDARD UNIFIED DESIGN SYSTEM STYLES                 */
 /* ========================================================== */
+
+.page-container,
+.app-page-container,
+.grades-page-container,
+.academic-structure-container,
+.timetable-page,
+.dashboard-shell {
+  max-width: 1000px !important;
+  margin: 0 auto !important;
+  padding: 32px 24px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.page-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 16px !important;
+  margin-bottom: 32px !important;
+}
+
+.page-header-icon,
+.header-icon-box {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #6C63FF 0%, #8B5CF6 100%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #FFFFFF !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 4px 14px rgba(108, 99, 255, 0.35) !important;
+}
+
+.header-title-box,
+.header-text-box {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.page-header h1,
+.page-header h2,
+.header-title-box h1,
+.header-title-box h2 {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary, #ffffff) !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.25 !important;
+}
+
+.page-header p.subtitle,
+.page-header .subtitle,
+.header-title-box p,
+.header-title-box .subtitle {
+  font-size: 14px !important;
+  color: var(--text-muted, #94a3b8) !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.glass-card,
+.content-card {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.empty-state-card,
+.empty-state,
+.empty-grades-state,
+.empty-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 48px 24px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  margin: 16px 0 !important;
+}
+
+.empty-icon-circle {
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: 50% !important;
+  background: rgba(108, 99, 255, 0.15) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #8B5CF6 !important;
+  margin-bottom: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.empty-state-card h3,
+.empty-state-card h4,
+.empty-state h3,
+.empty-state h4,
+.empty-grades-state h4,
+.empty-card h3 {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--text-primary, #ffffff) !important;
+  margin: 0 0 8px 0 !important;
+  text-align: center !important;
+}
+
+.empty-state-card p,
+.empty-state p,
+.empty-grades-state p,
+.empty-card p {
+  font-size: 14px !important;
+  color: var(--text-muted, #94a3b8) !important;
+  margin: 0 0 24px 0 !important;
+  text-align: center !important;
+  max-width: 450px !important;
+  line-height: 1.5 !important;
+}
 
 :root.light body {
   background-color: #f8fafc;

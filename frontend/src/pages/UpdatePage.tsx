@@ -109,22 +109,24 @@ export const UpdatePage: React.FC = () => {
     return (
       <div className="page-container">
         <div className="page-header">
-          <div className="header-title">
-            <RefreshCw size={28} className="header-icon" />
-            <div>
-              <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
-              <p className="subtitle">{t('update.webSubtitle', 'Gestion des versions de l\'application StudyVault')}</p>
-            </div>
+          <div className="page-header-icon">
+            <RefreshCw size={24} />
+          </div>
+          <div className="header-title-box">
+            <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
+            <p className="subtitle">{t('update.webSubtitle', 'Gestion des versions de l\'application StudyVault')}</p>
           </div>
         </div>
 
-        <div className="glass-card web-notice-card">
-          <Laptop size={48} className="notice-icon" />
+        <div className="empty-state">
+          <div className="empty-icon-circle">
+            <Laptop size={32} />
+          </div>
           <h3>{t('update.webNoticeTitle', 'Application Web')}</h3>
           <p>
             {t('update.webNoticeText', 'Les mises à jour automatiques sont disponibles dans l\'application desktop StudyVault.')}
           </p>
-          <p className="notice-sub">
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
             {t('update.webNoticeSub', 'Sur le Web, vous profitez toujours automatiquement de la version serveur la plus récente.')}
           </p>
         </div>
@@ -135,12 +137,12 @@ export const UpdatePage: React.FC = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div className="header-title">
-          <RefreshCw size={28} className="header-icon" />
-          <div>
-            <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
-            <p className="subtitle">{t('update.subtitle', 'Gestion et installation des versions de StudyVault Desktop')}</p>
-          </div>
+        <div className="page-header-icon">
+          <RefreshCw size={24} />
+        </div>
+        <div className="header-title-box">
+          <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
+          <p className="subtitle">{t('update.subtitle', 'Gestion et installation des versions de StudyVault Desktop')}</p>
         </div>
       </div>
 
