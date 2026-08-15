@@ -12,11 +12,34 @@ if (!fs.existsSync(TEMP_DIR)) {
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
+  'application/x-pdf',
   'image/jpeg',
   'image/png',
   'image/jpg',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/svg+xml',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/rtf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/octet-stream',
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt',
+  '.xls', '.xlsx', '.csv', '.ods',
+  '.ppt', '.pptx', '.odp',
+  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg',
+  '.zip', '.rar', '.7z'
 ]);
 
 const storage = multer.diskStorage({
@@ -36,12 +59,15 @@ export const uploadMiddleware = multer({
     fileSize: 50 * 1024 * 1024, // 50 MB Max
   },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.has(file.mimetype.toLowerCase())) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype.toLowerCase();
+
+    if (ALLOWED_MIME_TYPES.has(mime) || ALLOWED_EXTENSIONS.has(ext) || mime.startsWith('image/')) {
       cb(null, true);
     } else {
       cb(
         ApiError.badRequest(
-          'Format de fichier non autorisé. Formats acceptés : PDF, JPG, PNG, DOC, DOCX.',
+          `Format de fichier non autorisé (${ext || mime}). Formats acceptés : PDF, Word, Excel, PowerPoint, Text, Images (PNG, JPG, WEBP), ZIP.`,
           'INVALID_FILE_TYPE'
         )
       );

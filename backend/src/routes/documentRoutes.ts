@@ -23,6 +23,7 @@ import {
 } from '../controllers/documentController';
 import { requireAuth, requireAuthOrToken } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
+import { ApiError } from '../utils/apiError';
 
 const router = Router();
 
@@ -36,7 +37,15 @@ router.get('/:id/download', requireAuthOrToken, downloadFile);
 router.use(requireAuth);
 
 // Document Endpoints
-router.post('/upload', uploadMiddleware.array('files', 10), uploadFiles);
+router.post('/upload', (req, res, next) => {
+  uploadMiddleware.array('files', 10)(req, res, (err) => {
+    if (err) {
+      if (err instanceof ApiError) return next(err);
+      return next(ApiError.badRequest(err.message || 'Erreur lors du téléversement du fichier.'));
+    }
+    next();
+  });
+}, uploadFiles);
 router.get('/', listDocuments);
 router.get('/quota', getQuota);
 router.get('/trash', listTrash);
