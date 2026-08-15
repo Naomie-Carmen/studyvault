@@ -12,6 +12,7 @@ export interface ECUE {
   ueId: string;
   code?: string | null;
   title: string;
+  ects?: number | null;
   subjects: Subject[];
 }
 

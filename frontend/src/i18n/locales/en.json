@@ -114,7 +114,16 @@
     "statusFailed": "Failed",
     "statusPending": "In progress",
     "emptyTitle": "No UEs recorded",
-    "emptySub": "Import your academic structure to start entering grades."
+    "emptySub": "Import your academic structure to start entering grades.",
+    "ueAverage": "UE Average",
+    "ecueSubjectCol": "ECUE / Subject",
+    "ecueAverageCol": "ECUE Average",
+    "sumEcueCoefs": "= sum of ECUE coefficients",
+    "noCoefTooltip": "Unknown coefficient — 1 used by default. Click to edit.",
+    "clickToEditCoef": "Click to edit coefficient",
+    "formulaHelp": "UE Average = Σ(ECUE average × coef) ÷ Σ coef",
+    "coefTag": "coef {{coef}}",
+    "coefUnknown": "coef ?"
   },
   "structure": {
     "pageTitle": "Academic Course Structure",

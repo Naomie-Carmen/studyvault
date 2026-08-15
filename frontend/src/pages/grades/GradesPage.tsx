@@ -13,6 +13,7 @@ import {
 import {
   getAverages,
   saveGrades,
+  updateEcueCoef,
   GradeAveragesResponse,
   SemesterGradeSummary,
 } from '../../services/gradeService';
@@ -27,6 +28,33 @@ export const GradesPage: React.FC = () => {
   // Input states map: key = `${ecueId}:${noteTypeId}`, value = string
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const saveTimeoutRef = useRef<Record<string, any>>({});
+
+  // Coef inline editing state
+  const [editingCoefId, setEditingCoefId] = useState<string | null>(null);
+  const [coefInputs, setCoefInputs] = useState<Record<string, string>>({});
+
+  const handleUpdateCoef = async (ecueId: string, valStr: string) => {
+    setEditingCoefId(null);
+    const parsed = parseFloat(valStr);
+    if (isNaN(parsed) || parsed < 0.5 || parsed > 30) return;
+
+    try {
+      setSaveStatus('saving');
+      const res = await updateEcueCoef(ecueId, parsed);
+      if (res.success) {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+        // Reload data live so all averages and UE badges recalculate instantly
+        const avgRes = await getAverages();
+        if (avgRes.success && avgRes.data) {
+          setData(avgRes.data);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating ECUE coef:', err);
+      setSaveStatus('idle');
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -300,11 +328,13 @@ export const GradesPage: React.FC = () => {
                 <div className="ue-info">
                   <span className="ue-code-badge">{ue.code || 'UE'}</span>
                   <h3>{ue.title}</h3>
-                  {ue.ects && <span className="ue-ects-tag">{ue.ects} ECTS</span>}
+                  <span className="ue-ects-tag" title={t('grades.sumEcueCoefs', '= somme des coefs ECUE')}>
+                    {ue.ects || 0} ECTS
+                  </span>
                 </div>
 
                 <div className="ue-avg-box">
-                  <span className="label">Moyenne UE</span>
+                  <span className="label">{t('grades.ueAverage', 'Moyenne UE')}</span>
                   <span className={`ue-avg-pill ${getBadgeColorClass(ue.average)}`}>
                     {formatAvg(ue.average)} / 20
                   </span>
@@ -316,22 +346,58 @@ export const GradesPage: React.FC = () => {
                 <table className="ecues-table">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: '220px' }}>ECUE / Matière</th>
+                      <th style={{ minWidth: '220px' }}>{t('grades.ecueSubjectCol', 'ECUE / Matière')}</th>
                       {/* Unique Note Types headers */}
                       {ue.ecues[0]?.notes.map((n) => (
                         <th key={n.noteTypeId} style={{ width: '130px', textAlign: 'center' }}>
                           {data?.mode === 'simple' ? n.noteTypeName : `${n.noteTypeName} (${n.weight}%)`}
                         </th>
                       ))}
-                      <th style={{ width: '130px', textAlign: 'center' }}>Moyenne ECUE</th>
+                      <th style={{ width: '130px', textAlign: 'center' }}>{t('grades.ecueAverageCol', 'Moyenne ECUE')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ue.ecues.map((ecue) => (
                       <tr key={ecue.ecueId}>
                         <td className="ecue-name-cell">
-                          <span className="ecue-title-text">{ecue.title}</span>
-                          {ecue.code && <span className="ecue-code-sub">({ecue.code})</span>}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span className="ecue-title-text">{ecue.title}</span>
+                            {ecue.code && <span className="ecue-code-sub">({ecue.code})</span>}
+                            
+                            {/* Coef Badge / Inline Edit */}
+                            {editingCoefId === ecue.ecueId ? (
+                              <input
+                                type="number"
+                                min="1"
+                                max="30"
+                                step="0.5"
+                                className="coef-inline-input"
+                                autoFocus
+                                value={coefInputs[ecue.ecueId] !== undefined ? coefInputs[ecue.ecueId] : String(ecue.coef || ecue.ects || 1)}
+                                onChange={(e) => setCoefInputs({ ...coefInputs, [ecue.ecueId]: e.target.value })}
+                                onBlur={(e) => handleUpdateCoef(ecue.ecueId, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleUpdateCoef(ecue.ecueId, (e.target as HTMLInputElement).value);
+                                  if (e.key === 'Escape') setEditingCoefId(null);
+                                }}
+                              />
+                            ) : (
+                              <span
+                                className={`ecue-coef-badge ${ecue.noCoef ? 'no-coef' : ''}`}
+                                onClick={() => {
+                                  setEditingCoefId(ecue.ecueId);
+                                  setCoefInputs({ ...coefInputs, [ecue.ecueId]: String(ecue.coef || ecue.ects || 1) });
+                                }}
+                                title={
+                                  ecue.noCoef
+                                    ? t('grades.noCoefTooltip', 'Coefficient inconnu — 1 utilisé par défaut. Cliquez pour corriger.')
+                                    : t('grades.clickToEditCoef', 'Cliquer pour modifier le coefficient')
+                                }
+                              >
+                                {ecue.noCoef ? t('grades.coefUnknown', 'coef ?') : `coef ${ecue.coef || ecue.ects || 1}`}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {ecue.notes.map((note) => {
@@ -378,6 +444,10 @@ export const GradesPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              <div className="grade-formula-help-card">
+                💡 {t('grades.formulaHelp', 'Moyenne UE = Σ(moyenne ECUE × coef) ÷ Σ coef')}
+              </div>
             </div>
           ))}
 
@@ -394,6 +464,54 @@ export const GradesPage: React.FC = () => {
       )}
 
       <style>{`
+        .ecue-coef-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          background: rgba(99, 102, 241, 0.15);
+          color: #818cf8;
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .ecue-coef-badge:hover {
+          background: rgba(99, 102, 241, 0.3);
+          transform: scale(1.05);
+        }
+
+        .ecue-coef-badge.no-coef {
+          background: rgba(245, 158, 11, 0.15);
+          color: #fbbf24;
+          border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .coef-inline-input {
+          width: 55px;
+          padding: 2px 6px;
+          border-radius: 8px;
+          border: 1px solid #6366f1;
+          background: #1e1e2d;
+          color: #ffffff;
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-align: center;
+        }
+
+        .grade-formula-help-card {
+          margin-top: 1rem;
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px dashed rgba(255, 255, 255, 0.1);
+          font-size: 0.825rem;
+          color: var(--text-muted);
+          text-align: center;
+        }
+
         .grades-page-container {
           padding: 1.5rem;
           display: flex;

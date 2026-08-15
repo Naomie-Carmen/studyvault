@@ -34,8 +34,18 @@ export interface EcueGradeSummary {
   ecueId: string;
   code: string | null;
   title: string;
+  ects?: number | null;
+  coef?: number;
+  noCoef?: boolean;
   average: number | null;
   notes: NoteItemDetail[];
+}
+
+export async function updateEcueCoef(ecueId: string, ects: number): Promise<ApiResponse<any>> {
+  return fetchApi(`/academic-structure/ecue/${ecueId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ects }),
+  });
 }
 
 export interface UeGradeSummary {

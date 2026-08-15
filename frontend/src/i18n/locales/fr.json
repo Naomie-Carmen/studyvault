@@ -87,7 +87,16 @@
     "statusFailed": "Ajourné",
     "statusPending": "En cours",
     "emptyTitle": "Aucune UE enregistrée",
-    "emptySub": "Importez votre maquette académique pour saisir vos notes."
+    "emptySub": "Importez votre maquette académique pour saisir vos notes.",
+    "ueAverage": "Moyenne UE",
+    "ecueSubjectCol": "ECUE / Matière",
+    "ecueAverageCol": "Moyenne ECUE",
+    "sumEcueCoefs": "= somme des coefs ECUE",
+    "noCoefTooltip": "Coefficient inconnu — 1 utilisé par défaut. Cliquez pour corriger.",
+    "clickToEditCoef": "Cliquer pour modifier le coefficient",
+    "formulaHelp": "Moyenne UE = Σ(moyenne ECUE × coef) ÷ Σ coef",
+    "coefTag": "coef {{coef}}",
+    "coefUnknown": "coef ?"
   },
   "structure": {
     "searchPlaceholder": "Rechercher une UE, ECUE, enseignant...",

@@ -12,6 +12,7 @@ export interface ECUEDTO {
   ueId: string;
   code?: string | null;
   title: string;
+  ects?: number | null;
   subjects: SubjectDTO[];
 }
 

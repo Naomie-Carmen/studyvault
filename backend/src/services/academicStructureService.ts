@@ -190,6 +190,7 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
           ueId: ecue.ueId,
           code: ecue.code,
           title: ecue.title,
+          ects: ecue.ects,
           subjects: ecue.subjects.map((sub) => ({
             id: sub.id,
             ecueId: sub.ecueId,
@@ -253,7 +254,7 @@ export async function createECUE(userId: string, input: ECUEInput) {
   });
 }
 
-export async function updateECUE(userId: string, ecueId: string, input: Partial<ECUEInput>) {
+export async function updateECUE(userId: string, ecueId: string, input: Partial<ECUEInput> & { ects?: number | null }) {
   await verifyECUEOwnership(userId, ecueId);
 
   return prisma.eCUE.update({
@@ -261,6 +262,7 @@ export async function updateECUE(userId: string, ecueId: string, input: Partial<
     data: {
       ...(input.title ? { title: input.title } : {}),
       ...(input.code !== undefined ? { code: input.code } : {}),
+      ...(input.ects !== undefined ? { ects: input.ects !== null && !isNaN(Number(input.ects)) ? Number(input.ects) : null } : {}),
     },
   });
 }

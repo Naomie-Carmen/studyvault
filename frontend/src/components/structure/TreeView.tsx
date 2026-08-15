@@ -400,6 +400,10 @@ export const TreeView: React.FC<TreeViewProps> = ({
                       return matchSearch(sub.name, q) || matchSearch(sub.instructor, q);
                     });
 
+                    const calculatedUeEcts = ue.ecues && ue.ecues.length > 0
+                      ? ue.ecues.reduce((sum, e) => sum + (e.ects && Number(e.ects) > 0 ? Number(e.ects) : 1), 0)
+                      : (ue.ects && Number(ue.ects) > 0 ? Number(ue.ects) : 0);
+
                     return (
                       <div
                         key={ue.id}
@@ -432,7 +436,9 @@ export const TreeView: React.FC<TreeViewProps> = ({
                               <HighlightText text={ue.title} query={q} />
                             </span>
                             {renderBadge(getUeAvg(ue.id))}
-                            {ue.ects && <span className="ects-badge">{ue.ects} ECTS</span>}
+                            <span className="ects-badge" title={t('grades.sumEcueCoefs', '= somme des coefs ECUE')}>
+                              {calculatedUeEcts} ECTS
+                            </span>
                           </div>
 
                           <div className="node-actions" onClick={(e) => e.stopPropagation()}>
@@ -503,6 +509,9 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                         <HighlightText text={ecue.title} query={q} />
                                       </span>
                                       {renderBadge(getEcueAvg(ecue.id))}
+                                      <span className={`ects-badge ${!ecue.ects || Number(ecue.ects) <= 0 ? 'no-coef' : ''}`} title={!ecue.ects || Number(ecue.ects) <= 0 ? t('grades.noCoefTooltip', 'Coefficient inconnu — 1 utilisé par défaut.') : undefined}>
+                                        {ecue.ects && Number(ecue.ects) > 0 ? `${ecue.ects} ECTS` : 'coef ?'}
+                                      </span>
                                     </div>
 
                                     <div className="node-actions">

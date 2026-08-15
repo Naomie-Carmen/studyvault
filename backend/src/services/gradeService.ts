@@ -258,12 +258,11 @@ export async function getAverages(userId: string) {
     const uesDTO = sem.ues.map((ue) => {
       let ueWeightedSum = 0;
       let ueCreditSum = 0;
-      let ueEcts = ue.ects || 0;
 
-      // Si ECTS non spécifié sur l'UE, on somme l'ECTS estimé
-      if (!ueEcts && ue.ecues.length > 0) {
-        ueEcts = ue.ecues.length * 3;
-      }
+      // Coef UE = Somme des coefs (ects) de ses ECUEs
+      const calculatedUeCoef = ue.ecues.length > 0
+        ? ue.ecues.reduce((acc, e) => acc + (e.ects && Number(e.ects) > 0 ? Number(e.ects) : 1), 0)
+        : (ue.ects && Number(ue.ects) > 0 ? Number(ue.ects) : 0);
 
       const ecuesDTO = ue.ecues.map((ecue) => {
         // Types de notes spécifiques à l'ECUE ou par défaut
@@ -273,17 +272,19 @@ export async function getAverages(userId: string) {
         const ecueNotes = allNotes.filter((n) => n.ecueId === ecue.id);
         const { average } = calculateEcueAverage(activeTypes, ecueNotes, gradeMode);
 
-        const ecueEcts = ueEcts > 0 && ue.ecues.length > 0 ? ueEcts / ue.ecues.length : 3;
+        const hasValidEcts = ecue.ects !== null && ecue.ects !== undefined && Number(ecue.ects) > 0;
+        const ecueCoef = hasValidEcts ? Number(ecue.ects) : 1;
+        const noCoef = !hasValidEcts;
 
         if (average !== null) {
-          ueWeightedSum += average * ecueEcts;
-          ueCreditSum += ecueEcts;
+          ueWeightedSum += average * ecueCoef;
+          ueCreditSum += ecueCoef;
 
           if (average >= 10.0) {
-            totalValidatedCredits += ecueEcts;
+            totalValidatedCredits += ecueCoef;
           }
         }
-        totalCredits += ecueEcts;
+        totalCredits += ecueCoef;
 
         const notesDetail = activeTypes.map((nt) => {
           const foundNote = ecueNotes.find((n) => n.noteTypeId === nt.id);
@@ -299,6 +300,9 @@ export async function getAverages(userId: string) {
           ecueId: ecue.id,
           code: ecue.code,
           title: ecue.title,
+          ects: ecue.ects,
+          coef: ecueCoef,
+          noCoef,
           average,
           notes: notesDetail,
         };
@@ -307,16 +311,17 @@ export async function getAverages(userId: string) {
       let ueAverage: number | null = null;
       if (ueCreditSum > 0) {
         ueAverage = Math.round((ueWeightedSum / ueCreditSum) * 100) / 100;
-        semWeightedSum += ueAverage * ueEcts;
-        semCreditSum += ueEcts;
+        semWeightedSum += ueAverage * calculatedUeCoef;
+        semCreditSum += calculatedUeCoef;
       }
-      semTotalEcts += ueEcts;
+      semTotalEcts += calculatedUeCoef;
 
       return {
         ueId: ue.id,
         code: ue.code,
         title: ue.title,
-        ects: ue.ects,
+        ects: calculatedUeCoef,
+        coefUE: calculatedUeCoef,
         average: ueAverage,
         ecues: ecuesDTO,
       };
