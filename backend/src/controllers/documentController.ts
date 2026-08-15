@@ -16,7 +16,13 @@ export async function uploadFiles(req: Request, res: Response, next: NextFunctio
   try {
     if (!req.user) throw ApiError.unauthorized();
 
-    const files = req.files as Express.Multer.File[];
+    const rawFiles = req.files;
+    const files: Express.Multer.File[] = Array.isArray(rawFiles)
+      ? rawFiles
+      : rawFiles
+      ? (Object.values(rawFiles).flat() as Express.Multer.File[])
+      : [];
+
     const { subjectId, personalFolderId, docType } = req.body;
 
     const docs = await docService.uploadDocuments(req.user.id, files, {

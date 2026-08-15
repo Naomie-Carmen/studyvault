@@ -38,7 +38,7 @@ router.use(requireAuth);
 
 // Document Endpoints
 router.post('/upload', (req, res, next) => {
-  uploadMiddleware.array('files', 10)(req, res, (err) => {
+  uploadMiddleware.any()(req, res, (err) => {
     if (err) {
       if (err instanceof ApiError) return next(err);
       return next(ApiError.badRequest(err.message || 'Erreur lors du téléversement du fichier.'));
