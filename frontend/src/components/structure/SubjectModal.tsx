@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Subject } from '../../types/structure';
 import { BookOpen, X, Save } from 'lucide-react';
 
@@ -29,6 +30,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
   ecueId,
   editSubject,
 }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [instructor, setInstructor] = useState('');
   const [color, setColor] = useState('#6366f1');
@@ -54,7 +56,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     setError(null);
 
     if (!name.trim()) {
-      setError('Le nom de la matière est obligatoire.');
+      setError(t('modal.subNameReq', 'Le nom de la matière est obligatoire.'));
       return;
     }
 
@@ -69,7 +71,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       });
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement de la matière.');
+      setError(err instanceof Error ? err.message : t('modal.subSaveErr', 'Erreur lors de l\'enregistrement de la matière.'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
         <div className="modal-header">
           <div className="title-group">
             <BookOpen size={20} className="text-cyan" />
-            <h3>{editSubject ? 'Modifier la Matière' : 'Nouvelle Matière d\'Enseignement'}</h3>
+            <h3>{editSubject ? t('modal.editSubject', 'Modifier la Matière') : t('modal.newSubject', 'Nouvelle Matière d\'Enseignement')}</h3>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
@@ -92,10 +94,10 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
-            <label>Nom de la Matière *</label>
+            <label>{t('modal.subNameLabel', 'Nom de la Matière *')}</label>
             <input
               type="text"
-              placeholder="ex: Travaux Dirigés de Microéconomie"
+              placeholder={t('modal.subNamePlaceholder', 'ex: Travaux Dirigés de Microéconomie')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -103,17 +105,17 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           </div>
 
           <div className="form-group">
-            <label>Enseignant / Professeur (Optionnel)</label>
+            <label>{t('modal.subInstructorLabel', 'Enseignant / Professeur (Optionnel)')}</label>
             <input
               type="text"
-              placeholder="ex: Pr. Martin"
+              placeholder={t('modal.subInstructorPlaceholder', 'ex: Pr. Martin')}
               value={instructor}
               onChange={(e) => setInstructor(e.target.value)}
             />
           </div>
 
           <div className="form-group">
-            <label>Couleur d'Identification</label>
+            <label>{t('modal.subColorLabel', 'Couleur d\'Identification')}</label>
             <div className="color-picker-group">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -129,11 +131,11 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
-              Annuler
+              {t('common.cancel', 'Annuler')}
             </button>
             <button type="submit" className="btn-submit" disabled={loading}>
               <Save size={16} />
-              <span>{loading ? 'Enregistrement...' : editSubject ? 'Enregistrer' : 'Créer la Matière'}</span>
+              <span>{loading ? t('common.saving', 'Enregistrement...') : editSubject ? t('common.save', 'Enregistrer') : t('modal.createSubject', 'Créer la Matière')}</span>
             </button>
           </div>
         </form>

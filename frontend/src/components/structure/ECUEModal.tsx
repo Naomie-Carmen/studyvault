@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ECUE } from '../../types/structure';
 import { Layers, X, Save } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
   ueId,
   editECUE,
 }) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,7 +41,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
     setError(null);
 
     if (!title.trim()) {
-      setError('L\'intitulé de l\'ECUE est obligatoire.');
+      setError(t('modal.ecueTitleReq', 'L\'intitulé de l\'ECUE est obligatoire.'));
       return;
     }
 
@@ -52,7 +54,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
       });
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement de l\'ECUE.');
+      setError(err instanceof Error ? err.message : t('modal.ecueSaveErr', 'Erreur lors de l\'enregistrement de l\'ECUE.'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
         <div className="modal-header">
           <div className="title-group">
             <Layers size={20} className="text-purple" />
-            <h3>{editECUE ? 'Modifier l\'ECUE' : 'Nouvel ECUE (Élément Constitutif)'}</h3>
+            <h3>{editECUE ? t('modal.editECUE', 'Modifier l\'ECUE') : t('modal.newECUE', 'Nouvel ECUE (Élément Constitutif)')}</h3>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
@@ -75,10 +77,10 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
-            <label>Intitulé de l'ECUE *</label>
+            <label>{t('modal.ecueTitleLabel', 'Intitulé de l\'ECUE *')}</label>
             <input
               type="text"
-              placeholder="ex: Microéconomie Approfondie"
+              placeholder={t('modal.ecueTitlePlaceholder', 'ex: Microéconomie Approfondie')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -86,10 +88,10 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
           </div>
 
           <div className="form-group">
-            <label>Code ECUE (Optionnel)</label>
+            <label>{t('modal.ecueCodeLabel', 'Code ECUE (Optionnel)')}</label>
             <input
               type="text"
-              placeholder="ex: ECUE1"
+              placeholder={t('modal.ecueCodePlaceholder', 'ex: ECUE1')}
               value={code}
               onChange={(e) => setCode(e.target.value)}
             />
@@ -97,11 +99,11 @@ export const ECUEModal: React.FC<ECUEModalProps> = ({
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
-              Annuler
+              {t('common.cancel', 'Annuler')}
             </button>
             <button type="submit" className="btn-submit" disabled={loading}>
               <Save size={16} />
-              <span>{loading ? 'Enregistrement...' : editECUE ? 'Enregistrer' : 'Créer l\'ECUE'}</span>
+              <span>{loading ? t('common.saving', 'Enregistrement...') : editECUE ? t('common.save', 'Enregistrer') : t('modal.createECUE', 'Créer l\'ECUE')}</span>
             </button>
           </div>
         </form>

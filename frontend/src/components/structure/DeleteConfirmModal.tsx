@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Trash2, X, RefreshCw } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
@@ -22,6 +23,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   message,
   confirmButtonText,
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = React.useState(false);
 
   if (!isOpen) return null;
@@ -55,11 +57,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           ) : (
             <>
               <p>
-                Êtes-vous sûr de vouloir supprimer cet(te) {itemType} :
+                {t('modal.confirmDeleteText', 'Êtes-vous sûr de vouloir supprimer cet(te) {{type}} :', { type: itemType })}
               </p>
               {itemName && <div className="item-highlight">{itemName}</div>}
               <p className="warning-text">
-                ⚠️ Cette action supprimera définitivement cet élément et tous ses sous-éléments rattachés.
+                {t('modal.confirmDeleteWarning', '⚠️ Cette action supprimera définitivement cet élément et tous ses sous-éléments rattachés.')}
               </p>
             </>
           )}
@@ -67,7 +69,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onClose} disabled={loading}>
-            Annuler
+            {t('common.cancel', 'Annuler')}
           </button>
           <button className="btn-delete" onClick={handleConfirm} disabled={loading}>
             {loading ? (
@@ -75,7 +77,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             ) : (
               <Trash2 size={16} />
             )}
-            <span>{loading ? 'Suppression...' : confirmButtonText || 'Supprimer Définitivement'}</span>
+            <span>{loading ? t('common.deleting', 'Suppression...') : confirmButtonText || t('modal.confirmDeleteBtn', 'Supprimer Définitivement')}</span>
           </button>
         </div>
       </div>

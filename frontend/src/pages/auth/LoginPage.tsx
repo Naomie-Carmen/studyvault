@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
 import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Sparkles } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigateForgotPassword,
   onSuccessLogin,
 }) => {
+  const { t } = useTranslation();
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +26,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setError(null);
 
     if (!email.trim() || !password) {
-      setError('Veuillez remplir tous les champs.');
+      setError(t('auth.fillAllFields', 'Veuillez remplir tous les champs.'));
       return;
     }
 
@@ -32,7 +34,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     if (result.success) {
       if (onSuccessLogin) onSuccessLogin();
     } else {
-      setError(result.error || 'Identifiants invalides.');
+      setError(result.error || t('auth.invalidCredentials', 'Identifiants invalides.'));
     }
   };
 
@@ -42,10 +44,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         <div className="auth-header">
           <div className="auth-badge">
             <Sparkles size={14} />
-            <span>Espace Étudiant</span>
+            <span>{t('auth.loginBadge', 'Espace Étudiant')}</span>
           </div>
-          <h2>Connexion à StudyVault</h2>
-          <p>Accédez à votre coffre-fort académique personnel</p>
+          <h2>{t('auth.loginTitle', 'Connexion à StudyVault')}</h2>
+          <p>{t('auth.loginSubtitle', 'Accédez à votre coffre-fort académique personnel')}</p>
         </div>
 
         {error && (
@@ -57,13 +59,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">Adresse Email Universitaire</label>
+            <label htmlFor="email">{t('auth.emailLabel', 'Adresse Email Universitaire')}</label>
             <div className="input-wrapper">
               <Mail className="input-icon" size={18} />
               <input
                 id="email"
                 type="email"
-                placeholder="etudiant@univ.fr"
+                placeholder={t('auth.emailPlaceholder', 'etudiant@univ.fr')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -74,13 +76,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
           <div className="form-group">
             <div className="label-row">
-              <label htmlFor="password">Mot de Passe</label>
+              <label htmlFor="password">{t('auth.passwordLabel', 'Mot de Passe')}</label>
               <button
                 type="button"
                 className="forgot-link"
                 onClick={onNavigateForgotPassword}
               >
-                Mot de passe oublié ?
+                {t('auth.forgotPassword', 'Mot de passe oublié ?')}
               </button>
             </div>
             <div className="input-wrapper">
@@ -107,14 +109,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
           <button type="submit" className="submit-btn" disabled={isLoading}>
             <LogIn size={18} />
-            <span>{isLoading ? 'Connexion en cours...' : 'Se Connecter'}</span>
+            <span>{isLoading ? t('auth.loggingIn', 'Connexion en cours...') : t('auth.loginBtn', 'Se Connecter')}</span>
           </button>
         </form>
 
         <div className="auth-footer">
-          <span>Pas encore de compte ?</span>
+          <span>{t('auth.noAccount', 'Pas encore de compte ?')}</span>
           <button className="switch-auth-btn" onClick={onNavigateRegister}>
-            Créer un compte étudiant
+            {t('auth.createAccountLink', 'Créer un compte étudiant')}
           </button>
         </div>
       </div>

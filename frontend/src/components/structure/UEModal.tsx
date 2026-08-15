@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UE } from '../../types/structure';
 import { FolderTree, X, Save } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export const UEModal: React.FC<UEModalProps> = ({
   semesterId,
   editUE,
 }) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [ects, setEcts] = useState<string>('');
@@ -42,7 +44,7 @@ export const UEModal: React.FC<UEModalProps> = ({
     setError(null);
 
     if (!title.trim()) {
-      setError('L\'intitulé de l\'UE est obligatoire.');
+      setError(t('modal.ueTitleReq', 'L\'intitulé de l\'UE est obligatoire.'));
       return;
     }
 
@@ -56,7 +58,7 @@ export const UEModal: React.FC<UEModalProps> = ({
       });
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement de l\'UE.');
+      setError(err instanceof Error ? err.message : t('modal.ueSaveErr', 'Erreur lors de l\'enregistrement de l\'UE.'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export const UEModal: React.FC<UEModalProps> = ({
         <div className="modal-header">
           <div className="title-group">
             <FolderTree size={20} className="text-indigo" />
-            <h3>{editUE ? 'Modifier l\'Unité d\'Enseignement' : 'Nouvelle Unité d\'Enseignement (UE)'}</h3>
+            <h3>{editUE ? t('modal.editUE', 'Modifier l\'Unité d\'Enseignement') : t('modal.newUE', 'Nouvelle Unité d\'Enseignement (UE)')}</h3>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
@@ -79,10 +81,10 @@ export const UEModal: React.FC<UEModalProps> = ({
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
-            <label>Intitulé de l'UE *</label>
+            <label>{t('modal.ueTitleLabel', 'Intitulé de l\'UE *')}</label>
             <input
               type="text"
-              placeholder="ex: Économie et Mathématiques de Gestion"
+              placeholder={t('modal.ueTitlePlaceholder', 'ex: Économie et Mathématiques de Gestion')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -91,21 +93,21 @@ export const UEModal: React.FC<UEModalProps> = ({
 
           <div className="form-row">
             <div className="form-group">
-              <label>Code UE (Optionnel)</label>
+              <label>{t('modal.ueCodeLabel', 'Code UE (Optionnel)')}</label>
               <input
                 type="text"
-                placeholder="ex: UE1.1"
+                placeholder={t('modal.ueCodePlaceholder', 'ex: UE1.1')}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
               />
             </div>
 
             <div className="form-group">
-              <label>Crédits ECTS (Optionnel)</label>
+              <label>{t('modal.ueEctsLabel', 'Crédits ECTS (Optionnel)')}</label>
               <input
                 type="number"
                 step="0.5"
-                placeholder="ex: 6.0"
+                placeholder={t('modal.ueEctsPlaceholder', 'ex: 6.0')}
                 value={ects}
                 onChange={(e) => setEcts(e.target.value)}
               />
@@ -114,11 +116,11 @@ export const UEModal: React.FC<UEModalProps> = ({
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
-              Annuler
+              {t('common.cancel', 'Annuler')}
             </button>
             <button type="submit" className="btn-submit" disabled={loading}>
               <Save size={16} />
-              <span>{loading ? 'Enregistrement...' : editUE ? 'Enregistrer' : 'Créer l\'UE'}</span>
+              <span>{loading ? t('common.saving', 'Enregistrement...') : editUE ? t('common.save', 'Enregistrer') : t('modal.createUE', 'Créer l\'UE')}</span>
             </button>
           </div>
         </form>

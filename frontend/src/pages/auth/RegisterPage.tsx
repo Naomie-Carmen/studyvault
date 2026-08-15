@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
 import { Mail, Lock, User, GraduationCap, UserPlus, AlertCircle, CheckCircle2, Eye, EyeOff, Ticket } from 'lucide-react';
 import { BetaBadge } from '../../components/common/BetaBadge';
@@ -12,6 +13,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
   onNavigateLogin,
   onSuccessRegister,
 }) => {
+  const { t } = useTranslation();
   const { register, isLoading } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,12 +42,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
     setError(null);
 
     if (!fullName.trim() || !email.trim() || !password) {
-      setError('Veuillez remplir les champs obligatoires.');
+      setError(t('auth.fillRequiredFields', 'Veuillez remplir les champs obligatoires.'));
       return;
     }
 
     if (!isPasswordValid) {
-      setError('Le mot de passe ne respecte pas les critères de sécurité.');
+      setError(t('auth.pwdInvalid', 'Le mot de passe ne respecte pas les critères de sécurité.'));
       return;
     }
 
@@ -60,7 +62,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
     if (result.success) {
       if (onSuccessRegister) onSuccessRegister();
     } else {
-      setError(result.error || 'Erreur lors de l\'inscription.');
+      setError(result.error || t('auth.registerError', 'Erreur lors de l\'inscription.'));
     }
   };
 
@@ -71,8 +73,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           <div className="badge-row">
             <BetaBadge size="md" />
           </div>
-          <h2>Créer un Compte Étudiant</h2>
-          <p>Rejoignez la Bêta Fermée de StudyVault</p>
+          <h2>{t('auth.registerTitle', 'Créer un Compte Étudiant')}</h2>
+          <p>{t('auth.registerSubtitle', 'Rejoignez la Bêta Fermée de StudyVault')}</p>
         </div>
 
         {error && (
@@ -84,7 +86,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="inviteCode">Code d'Invitation Bêta (Optionnel)</label>
+            <label htmlFor="inviteCode">{t('auth.inviteCodeLabel', 'Code d\'Invitation Bêta (Optionnel)')}</label>
             <div className="input-wrapper">
               <Ticket className="input-icon" size={18} />
               <input
@@ -99,13 +101,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="fullName">Nom et Prénom *</label>
+            <label htmlFor="fullName">{t('auth.fullNameLabel', 'Nom et Prénom *')}</label>
             <div className="input-wrapper">
               <User className="input-icon" size={18} />
               <input
                 id="fullName"
                 type="text"
-                placeholder="Léa Bernard"
+                placeholder={t('auth.fullNamePlaceholder', 'Léa Bernard')}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -115,7 +117,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email Universitaire *</label>
+            <label htmlFor="email">{t('auth.emailUnivLabel', 'Email Universitaire *')}</label>
             <div className="input-wrapper">
               <Mail className="input-icon" size={18} />
               <input
@@ -131,7 +133,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="university">Université / École (Optionnel)</label>
+            <label htmlFor="university">{t('auth.universityLabel', 'Université / École (Optionnel)')}</label>
             <div className="input-wrapper">
               <GraduationCap className="input-icon" size={18} />
               <input
@@ -146,7 +148,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Mot de Passe Sécurisé *</label>
+            <label htmlFor="password">{t('auth.securePasswordLabel', 'Mot de Passe Sécurisé *')}</label>
             <div className="input-wrapper">
               <Lock className="input-icon" size={18} />
               <input
@@ -172,29 +174,29 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
             <div className="password-checklist">
               <div className={`check-item ${hasMinLength ? 'valid' : ''}`}>
                 <CheckCircle2 size={13} />
-                <span>Au moins 8 caractères</span>
+                <span>{t('auth.pwdMinLength', 'Au moins 8 caractères')}</span>
               </div>
               <div className={`check-item ${hasLetter ? 'valid' : ''}`}>
                 <CheckCircle2 size={13} />
-                <span>Au moins une lettre</span>
+                <span>{t('auth.pwdLetter', 'Au moins une lettre')}</span>
               </div>
               <div className={`check-item ${hasNumber ? 'valid' : ''}`}>
                 <CheckCircle2 size={13} />
-                <span>Au moins un chiffre</span>
+                <span>{t('auth.pwdNumber', 'Au moins un chiffre')}</span>
               </div>
             </div>
           </div>
 
           <button type="submit" className="submit-btn" disabled={isLoading || !isPasswordValid}>
             <UserPlus size={18} />
-            <span>{isLoading ? 'Inscription en cours...' : 'Créer mon compte'}</span>
+            <span>{isLoading ? t('auth.registering', 'Inscription en cours...') : t('auth.registerBtn', 'Créer mon compte')}</span>
           </button>
         </form>
 
         <div className="auth-footer">
-          <span>Déjà inscrit ?</span>
+          <span>{t('auth.alreadyRegistered', 'Déjà inscrit ?')}</span>
           <button className="switch-auth-btn" onClick={onNavigateLogin}>
-            Se connecter
+            {t('auth.loginLink', 'Se connecter')}
           </button>
         </div>
       </div>

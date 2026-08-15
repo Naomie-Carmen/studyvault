@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { MessageSquarePlus, X, Send, Star, Bug, Lightbulb, Heart, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/useAuth';
 import { API_BASE_URL, getClientAccessToken } from '../services/apiClient';
 
 type FeedbackType = 'bug' | 'suggestion' | 'love' | 'question';
 
 export const FeedbackWidget: React.FC = () => {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState<FeedbackType>('suggestion');
@@ -20,7 +22,7 @@ export const FeedbackWidget: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) {
-      setError('Veuillez saisir votre message.');
+      setError(t('feedback.errorMsg', 'Veuillez saisir votre message.'));
       return;
     }
 
@@ -57,10 +59,10 @@ export const FeedbackWidget: React.FC = () => {
         }, 2000);
       } else {
         const json = await res.json();
-        setError(json?.error?.message || 'Erreur lors de l\'envoi.');
+        setError(json?.error?.message || t('feedback.errorSend', 'Erreur lors de l\'envoi.'));
       }
     } catch {
-      setError('Erreur de connexion lors de l\'envoi du retour.');
+      setError(t('feedback.errorConn', 'Erreur de connexion lors de l\'envoi du retour.'));
     } finally {
       setSubmitting(false);
     }
@@ -73,21 +75,21 @@ export const FeedbackWidget: React.FC = () => {
         <button
           className="feedback-trigger-btn"
           onClick={() => setIsOpen(true)}
-          title="Donner votre avis ou signaler un problème"
+          title={t('feedback.triggerTitle', 'Donner votre avis ou signaler un problème')}
           id="feedback-widget-trigger-btn"
         >
           <MessageSquarePlus size={20} />
-          <span>Feedback Bêta</span>
+          <span>{t('feedback.trigger', 'Feedback Bêta')}</span>
         </button>
       )}
 
       {/* Feedback Panel */}
       {isOpen && (
-        <div className="feedback-panel glass-card" role="dialog" aria-label="Widget de retours Bêta">
+        <div className="feedback-panel glass-card" role="dialog" aria-label={t('feedback.dialogAria', 'Widget de retours Bêta')}>
           <div className="feedback-panel-header">
             <div className="title-row">
               <MessageSquarePlus size={18} className="text-indigo" />
-              <h3>Votre avis compte pour la Bêta</h3>
+              <h3>{t('feedback.title', 'Votre avis compte pour la Bêta')}</h3>
             </div>
             <button className="close-btn" onClick={() => setIsOpen(false)}>
               <X size={16} />
@@ -97,8 +99,8 @@ export const FeedbackWidget: React.FC = () => {
           {submittedSuccess ? (
             <div className="feedback-success-box">
               <CheckCircle2 size={36} className="text-green" />
-              <p><strong>Merci pour votre retour !</strong></p>
-              <small>Votre aide nous permet d'améliorer StudyVault chaque jour.</small>
+              <p><strong>{t('feedback.thanksTitle', 'Merci pour votre retour !')}</strong></p>
+              <small>{t('feedback.thanksSub', 'Votre aide nous permet d\'améliorer StudyVault chaque jour.')}</small>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="feedback-form">
@@ -112,7 +114,7 @@ export const FeedbackWidget: React.FC = () => {
                   onClick={() => setType('bug')}
                 >
                   <Bug size={14} />
-                  <span>Bug</span>
+                  <span>{t('feedback.typeBug', 'Bug')}</span>
                 </button>
 
                 <button
@@ -121,7 +123,7 @@ export const FeedbackWidget: React.FC = () => {
                   onClick={() => setType('suggestion')}
                 >
                   <Lightbulb size={14} />
-                  <span>Idée</span>
+                  <span>{t('feedback.typeIdea', 'Idée')}</span>
                 </button>
 
                 <button
@@ -130,7 +132,7 @@ export const FeedbackWidget: React.FC = () => {
                   onClick={() => setType('love')}
                 >
                   <Heart size={14} />
-                  <span>Avis</span>
+                  <span>{t('feedback.typeRating', 'Avis')}</span>
                 </button>
 
                 <button
@@ -139,13 +141,13 @@ export const FeedbackWidget: React.FC = () => {
                   onClick={() => setType('question')}
                 >
                   <HelpCircle size={14} />
-                  <span>Question</span>
+                  <span>{t('feedback.typeQuestion', 'Question')}</span>
                 </button>
               </div>
 
               {/* Star Rating (Optional) */}
               <div className="rating-row">
-                <span className="rating-label">Satisfaction :</span>
+                <span className="rating-label">{t('feedback.satisfaction', 'Satisfaction :')}</span>
                 <div className="stars">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -163,7 +165,7 @@ export const FeedbackWidget: React.FC = () => {
               {/* Message Input */}
               <textarea
                 className="feedback-textarea"
-                placeholder="Décrivez votre expérience, le problème rencontré ou votre idée d'amélioration..."
+                placeholder={t('feedback.placeholder', 'Décrivez votre expérience, le problème rencontré ou votre idée d\'amélioration...')}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={4}
@@ -171,10 +173,10 @@ export const FeedbackWidget: React.FC = () => {
               />
 
               <div className="panel-footer">
-                <small className="auto-info">Page et infos système capturées automatiquement</small>
+                <small className="auto-info">{t('feedback.autoInfo', 'Page et infos système capturées automatiquement')}</small>
                 <button type="submit" className="btn-send-feedback" disabled={submitting}>
                   <Send size={14} />
-                  <span>{submitting ? 'Envoi...' : 'Envoyer'}</span>
+                  <span>{submitting ? t('feedback.sending', 'Envoi...') : t('feedback.send', 'Envoyer')}</span>
                 </button>
               </div>
             </form>

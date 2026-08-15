@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as timetableService from '../../services/timetableService';
 import * as ocrService from '../../services/ocrService';
 import { processMultiOrientationOCR } from '../../utils/ocrImage';
@@ -20,6 +21,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [importedId, setImportedId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -86,78 +88,51 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     setErrorMsg(null);
 
     try {
-      // 1. Lance l'OCR Tesseract local pour extraire le texte brut
-      setOcrStatus('1/2 Lecture locale de la photo…');
+      setOcrStatus(t('timetableImport.stepOcr', '1/2 Lecture locale de la photo…'));
       const details = await extractTableWithDetails(file);
       const rawOcrText = (details.words || []).map((w: WordItem) => w.text).join(' ').slice(0, 6000);
 
-      // 2. Envoie le texte brut à POST /api/v1/ai/structure
-      setOcrStatus('2/2 Reconstruction par IA…');
+      setOcrStatus(t('timetableImport.stepAi', '2/2 Reconstruction par IA…'));
       const token = localStorage.getItem('studyvault_access_token') || '';
       const response = await fetch(`${API_BASE_URL}/ai/structure`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          text: rawOcrText,
-          kind: 'timetable',
-        }),
+        body: JSON.stringify({ rawText: rawOcrText }),
       });
 
       if (!response.ok) {
-        throw new Error(`Status ${response.status}`);
+        throw new Error(t('timetableImport.aiErrStatus', 'Échec du service IA (status {{status}}).', { status: response.status }));
       }
 
-      const data = await response.json();
-      const sessionsList = Array.isArray(data.data)
-        ? data.data
-        : Array.isArray(data.data?.sessions)
-        ? data.data.sessions
-        : Array.isArray(data.sessions)
-        ? data.sessions
-        : [];
-
-      if (sessionsList.length === 0) {
-        throw new Error('Aucune séance détectée par l\'IA.');
+      const json = await response.json();
+      if (!json.success || !json.data?.rows) {
+        throw new Error(json.error?.message || t('timetableImport.aiErrFormat', 'Données IA non exploitables.'));
       }
 
-      const textLines = sessionsList.map((s: any) => {
-        const jour = s.jour || s.day || '';
-        const start = s.startTime || s.start || '';
-        const end = s.endTime || s.end || '';
-        const type = s.type || '';
-        const mat = s.matiere || s.subject || '';
-        const room = s.salle || s.room || '';
-        const prof = s.enseignant || s.teacher || '';
-        const grp = s.groupe || s.group || '';
-        return `${jour} ${start} ${end} ${type} ${mat} ${room} ${prof} ${grp}`.trim();
-      });
+      const csvContent = json.data.rows.map((row: string[]) => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const csvBlob = new Blob([csvContent], { type: 'text/csv' });
+      const csvFile = new File([csvBlob], 'timetable_ai.csv', { type: 'text/csv' });
 
-      const textContent = textLines.join('\n');
-      const textFile = new File([textContent], file.name.replace(/\.[^/.]+$/, '') + '-ai.txt', { type: 'text/plain' });
-
-      setOcrStatus('Téléversement et analyse des séances IA...');
-      const res = await timetableService.uploadTimetableFile(textFile);
-      if (res.success && res.data) {
-        setImportedId(res.data.id);
-        await ocrService.processImport(res.data.id);
+      setOcrStatus(t('timetableImport.uploadingStatus', 'Téléversement et analyse du planning...'));
+      const uploadRes = await timetableService.uploadTimetableFile(csvFile);
+      if (uploadRes.success && uploadRes.data) {
+        setImportedId(uploadRes.data.id);
+        await ocrService.processImport(uploadRes.data.id);
         setAiLoading(false);
         setOcrStatus(null);
         setIsProcessing(true);
       } else {
-        throw new Error(res.error?.message || 'Erreur lors de la préparation des séances.');
+        throw new Error(uploadRes.error?.message || t('timetableImport.uploadErr', 'Erreur lors du téléversement du CSV IA.'));
       }
-    } catch (_err) {
-      console.warn('[Timetable AI Error] Fallback sur l\'OCR local autonome...');
-      try {
-        await handleUploadAndRunOCR();
-      } catch (_localErr) {
-        setAiFailed(true);
-        setAiError("L'extraction IA est momentanément indisponible. Utilisez l'extraction locale ou réessayez dans 1-2 minutes.");
-        setAiLoading(false);
-      }
+    } catch (err: any) {
+      console.warn('[Extraction IA Planning Error]', err);
+      setAiError(err.message || t('timetableImport.aiErrorDefault', 'Extraction IA indisponible pour cette image. Veuillez utiliser l\'extraction locale.'));
+      setAiFailed(true);
+      setAiLoading(false);
+      setOcrStatus(null);
     }
   };
 
@@ -165,24 +140,29 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
     if (!file) return;
     setUploading(true);
     setErrorMsg(null);
-    setOcrStatus(null);
-    setOcrProgress(0);
+    setOcrStatus(t('timetableImport.preparingFile', 'Préparation du fichier...'));
+    setOcrProgress(10);
 
     try {
       let fileToUpload: File = file;
 
       if (isImage) {
-        setOcrStatus('Préparation et extraction OCR...');
+        setOcrStatus(t('timetableImport.ocrReading', 'Lecture OCR et détection d\'orientation...'));
+        setOcrProgress(30);
         const extractedText = await processMultiOrientationOCR(file, (msg, pct) => {
           setOcrStatus(msg);
-          setOcrProgress(pct);
+          setOcrProgress(30 + Math.round(pct * 0.5));
         });
+
+        if (!extractedText.trim()) {
+            throw new Error(t('timetableImport.ocrNoText', 'Aucun texte n\'a pu être extrait de l\'image. Veuillez vérifier la qualité de la photo.'));
+        }
 
         const textFileName = file.name.replace(/\.[^/.]+$/, '') + '.txt';
         fileToUpload = new File([extractedText], textFileName, { type: 'text/plain' });
       }
 
-      setOcrStatus('Téléversement et analyse du planning...');
+      setOcrStatus(t('timetableImport.uploadingStatus', 'Téléversement et analyse du planning...'));
       const res = await timetableService.uploadTimetableFile(fileToUpload);
       if (res.success && res.data) {
         setImportedId(res.data.id);
@@ -191,12 +171,12 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
         setOcrStatus(null);
         setIsProcessing(true);
       } else {
-        setErrorMsg(res.error?.message || 'Erreur lors du téléversement.');
+        setErrorMsg(res.error?.message || t('timetableImport.uploadErrDefault', 'Erreur lors du téléversement.'));
         setUploading(false);
         setOcrStatus(null);
       }
-    } catch (_err) {
-      setErrorMsg('Échec du traitement du fichier.');
+    } catch (err: any) {
+      setErrorMsg(err.message || t('timetableImport.processErr', 'Échec du traitement du fichier.'));
       setUploading(false);
       setOcrStatus(null);
     }
@@ -212,7 +192,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
       <div className="modal-backdrop">
         <div className="glass-card import-modal-card" ref={modalCardRef} tabIndex={-1}>
           <div className="modal-header">
-            <h3>Importer un Emploi du Temps Officiel</h3>
+            <h3>{t('timetableImport.title', 'Importer un Emploi du Temps Officiel')}</h3>
             <button className="btn-close" onClick={onClose} disabled={uploading || aiLoading}>
               <X size={18} />
             </button>
@@ -224,7 +204,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
             ) : (
               <>
                 <p className="import-info">
-                  Téléversez une photo ou un document PDF de votre emploi du temps pour déclencher l'<strong>extraction automatique par IA ou OCR</strong>.
+                  {t('timetableImport.info', 'Téléversez une photo ou un document PDF de votre emploi du temps pour déclencher l\'extraction automatique par IA ou OCR.')}
                 </p>
 
                 {errorMsg && (
@@ -260,8 +240,8 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                       </div>
                     ) : (
                       <>
-                        <span className="drop-title">Cliquez pour choisir une photo ou un PDF</span>
-                        <span className="drop-sub">Formats autorisés : PDF, PNG, JPG (max 20 Mo)</span>
+                        <span className="drop-title">{t('timetableImport.dropTitle', 'Cliquez pour choisir une photo ou un PDF')}</span>
+                        <span className="drop-sub">{t('timetableImport.dropSub', 'Formats autorisés : PDF, PNG, JPG (max 20 Mo)')}</span>
                       </>
                     )}
                   </label>
@@ -295,7 +275,6 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                     )}
 
                     <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      {/* Gros bouton violet Extraction IA (recommandé) */}
                       <button
                         type="button"
                         className="btn-primary"
@@ -322,17 +301,16 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                         {aiLoading ? (
                           <>
                             <RefreshCw size={18} className="spinning" />
-                            <span>Analyse IA en cours…</span>
+                            <span>{t('timetableImport.aiAnalyzing', 'Analyse IA en cours…')}</span>
                           </>
                         ) : (
                           <>
                             <Sparkles size={18} />
-                            <span>✨ Extraction IA (recommandé)</span>
+                            <span>{t('timetableImport.aiExtractBtn', '✨ Extraction IA (recommandé)')}</span>
                           </>
                         )}
                       </button>
 
-                      {/* Bouton secondaire Extraction locale (sans internet) */}
                       <button
                         type="button"
                         className="btn-secondary"
@@ -358,12 +336,12 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                         {uploading ? (
                           <>
                             <RefreshCw size={18} className="spinning text-indigo" />
-                            <span>OCR local ({ocrProgress}%)…</span>
+                            <span>{t('timetableImport.localOcrRunning', 'OCR local ({{progress}}%)…', { progress: ocrProgress })}</span>
                           </>
                         ) : (
                           <>
                             <Cpu size={18} className="text-indigo" />
-                            <span>Extraction locale (sans internet)</span>
+                            <span>{t('timetableImport.localExtractBtn', 'Extraction locale (sans internet)')}</span>
                           </>
                         )}
                       </button>
@@ -377,7 +355,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
           {!isProcessing && !isImage && (
             <div className="modal-footer">
               <button className="btn-cancel" onClick={onClose}>
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 className="btn-submit"
@@ -385,7 +363,7 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
                 disabled={!file || uploading || aiLoading}
               >
                 <Cpu size={16} />
-                <span>{uploading ? 'Téléversement...' : 'Lancer l\'Extraction'}</span>
+                <span>{uploading ? t('timetableImport.uploading', 'Téléversement...') : t('timetableImport.startExtractBtn', 'Lancer l\'Extraction')}</span>
               </button>
             </div>
           )}

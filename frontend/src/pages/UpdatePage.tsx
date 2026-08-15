@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   RefreshCw, 
   CheckCircle2, 
@@ -25,6 +26,7 @@ interface UpdateManifest {
 }
 
 export const UpdatePage: React.FC = () => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'checking' | 'up-to-date' | 'available' | 'downloading' | 'installed' | 'error'>('checking');
   const [currentVersion, setCurrentVersion] = useState<string>('1.0.3');
   const [updateManifest, setUpdateManifest] = useState<UpdateManifest | null>(null);
@@ -64,7 +66,7 @@ export const UpdatePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Erreur vérification MAJ:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Impossible de contacter le serveur de mises à jour.');
+      setErrorMessage(error instanceof Error ? error.message : t('update.errorContactServer', 'Impossible de contacter le serveur de mises à jour.'));
       setStatus('error');
     }
   };
@@ -87,7 +89,7 @@ export const UpdatePage: React.FC = () => {
       setStatus('installed');
     } catch (error) {
       console.error('Erreur installation MAJ:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Échec du téléchargement ou de l\'installation.');
+      setErrorMessage(error instanceof Error ? error.message : t('update.errorDownloadInstall', 'Échec du téléchargement ou de l\'installation.'));
       setStatus('error');
     }
   };
@@ -110,75 +112,22 @@ export const UpdatePage: React.FC = () => {
           <div className="header-title">
             <RefreshCw size={28} className="header-icon" />
             <div>
-              <h1>Centre de Mises à Jour</h1>
-              <p className="subtitle">Gestion des versions de l'application StudyVault</p>
+              <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
+              <p className="subtitle">{t('update.webSubtitle', 'Gestion des versions de l\'application StudyVault')}</p>
             </div>
           </div>
         </div>
 
         <div className="glass-card web-notice-card">
           <Laptop size={48} className="notice-icon" />
-          <h3>Application Web</h3>
+          <h3>{t('update.webNoticeTitle', 'Application Web')}</h3>
           <p>
-            Les mises à jour automatiques sont disponibles dans l'application <strong>desktop StudyVault</strong>.
+            {t('update.webNoticeText', 'Les mises à jour automatiques sont disponibles dans l\'application desktop StudyVault.')}
           </p>
           <p className="notice-sub">
-            Sur le Web, vous profitez toujours automatiquement de la version serveur la plus récente.
+            {t('update.webNoticeSub', 'Sur le Web, vous profitez toujours automatiquement de la version serveur la plus récente.')}
           </p>
         </div>
-
-        <style>{`
-          .page-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
-          }
-          .page-header {
-            margin-bottom: 2rem;
-          }
-          .header-title {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-          }
-          .header-icon {
-            color: #6366f1;
-          }
-          .subtitle {
-            color: var(--text-muted, #94a3b8);
-            margin-top: 0.25rem;
-            font-size: 0.95rem;
-          }
-          .web-notice-card {
-            padding: 3rem 2rem;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            border-radius: 16px;
-            background: var(--bg-card, rgba(30, 41, 59, 0.7));
-            border: 1px solid rgba(255, 255, 255, 0.1);
-          }
-          .notice-icon {
-            color: #6366f1;
-            margin-bottom: 0.5rem;
-          }
-          .web-notice-card h3 {
-            font-size: 1.4rem;
-            margin: 0;
-          }
-          .web-notice-card p {
-            color: var(--text-secondary, #cbd5e1);
-            max-width: 500px;
-            margin: 0;
-            line-height: 1.6;
-          }
-          .notice-sub {
-            font-size: 0.85rem;
-            color: var(--text-muted, #94a3b8) !important;
-          }
-        `}</style>
       </div>
     );
   }
@@ -189,8 +138,8 @@ export const UpdatePage: React.FC = () => {
         <div className="header-title">
           <RefreshCw size={28} className="header-icon" />
           <div>
-            <h1>Centre de Mises à Jour</h1>
-            <p className="subtitle">Gestion et installation des versions de StudyVault Desktop</p>
+            <h1>{t('update.centerTitle', 'Centre de Mises à Jour')}</h1>
+            <p className="subtitle">{t('update.subtitle', 'Gestion et installation des versions de StudyVault Desktop')}</p>
           </div>
         </div>
       </div>
@@ -200,8 +149,8 @@ export const UpdatePage: React.FC = () => {
         {status === 'checking' && (
           <div className="glass-card status-card checking-card">
             <RefreshCw size={40} className="spin-icon" />
-            <h3>Recherche de mises à jour…</h3>
-            <p>Vérification des nouvelles versions disponibles auprès des serveurs StudyVault.</p>
+            <h3>{t('update.checkingTitle', 'Recherche de mises à jour…')}</h3>
+            <p>{t('update.checkingText', 'Vérification des nouvelles versions disponibles auprès des serveurs StudyVault.')}</p>
           </div>
         )}
 
@@ -209,14 +158,14 @@ export const UpdatePage: React.FC = () => {
         {status === 'up-to-date' && (
           <div className="glass-card status-card uptodate-card">
             <CheckCircle2 size={56} className="success-icon" />
-            <h3>Vous êtes à jour !</h3>
-            <p className="version-badge">Version actuelle : v{currentVersion}</p>
+            <h3>{t('update.uptodateTitle', 'Vous êtes à jour !')}</h3>
+            <p className="version-badge">{t('update.currentVersion', 'Version actuelle : v{{version}}', { version: currentVersion })}</p>
             <p className="uptodate-desc">
-              Aucune nouvelle mise à jour n'est disponible. Votre application bénéficie de toutes les dernières fonctionnalités et correctifs de sécurité.
+              {t('update.uptodateDesc', 'Aucune nouvelle mise à jour n\'est disponible. Votre application bénéficie de toutes les dernières fonctionnalités et correctifs de sécurité.')}
             </p>
             <button className="btn-secondary" onClick={checkForUpdates}>
               <RefreshCw size={16} />
-              Rechercher à nouveau
+              {t('update.checkAgain', 'Rechercher à nouveau')}
             </button>
           </div>
         )}
@@ -226,22 +175,22 @@ export const UpdatePage: React.FC = () => {
           <div className="glass-card update-available-card">
             <div className="card-badge">
               <Sparkles size={16} />
-              <span>Nouvelle version disponible</span>
+              <span>{t('update.availableTitle', 'Nouvelle version disponible')}</span>
             </div>
 
             <div className="update-header">
               <div>
-                <h2>StudyVault v{updateManifest.version || 'Nouvelle version'}</h2>
-                <p className="update-current">Version actuelle installée : v{currentVersion}</p>
+                <h2>StudyVault v{updateManifest.version || '1.0.0'}</h2>
+                <p className="update-current">{t('update.installedVersion', 'Version actuelle installée : v{{version}}', { version: currentVersion })}</p>
                 {updateManifest.date && (
-                  <p className="update-date">Publiée le {new Date(updateManifest.date).toLocaleDateString('fr-FR')}</p>
+                  <p className="update-date">{t('update.publishedDate', 'Publiée le {{date}}', { date: new Date(updateManifest.date).toLocaleDateString() })}</p>
                 )}
               </div>
             </div>
 
             {updateManifest.body && (
               <div className="changelog-box">
-                <h4>Notes de version :</h4>
+                <h4>{t('update.releaseNotes', 'Notes de version :')}</h4>
                 <div className="changelog-text">
                   {updateManifest.body.split('\n').map((line, idx) => (
                     <p key={idx}>{line}</p>
@@ -253,11 +202,11 @@ export const UpdatePage: React.FC = () => {
             <div className="action-row">
               <button className="btn-primary-glow" onClick={handleInstallUpdate}>
                 <Download size={20} />
-                Mettre à jour maintenant
+                {t('update.updateNow', 'Mettre à jour maintenant')}
               </button>
               <button className="btn-secondary" onClick={checkForUpdates}>
                 <RefreshCw size={16} />
-                Revérifier
+                {t('update.recheck', 'Revérifier')}
               </button>
             </div>
           </div>
@@ -267,8 +216,8 @@ export const UpdatePage: React.FC = () => {
         {status === 'downloading' && (
           <div className="glass-card status-card downloading-card">
             <Download size={48} className="pulse-icon" />
-            <h3>Téléchargement et installation…</h3>
-            <p>Veuillez patienter pendant le téléchargement et la préparation de la mise à jour.</p>
+            <h3>{t('update.downloadingTitle', 'Téléchargement et installation…')}</h3>
+            <p>{t('update.downloadingText', 'Veuillez patienter pendant le téléchargement et la préparation de la mise à jour.')}</p>
             <div className="progress-bar-container">
               <div className="progress-bar-indeterminate" />
             </div>
@@ -279,13 +228,13 @@ export const UpdatePage: React.FC = () => {
         {status === 'installed' && (
           <div className="glass-card status-card installed-card">
             <CheckCircle2 size={56} className="success-icon" />
-            <h3>Mise à jour installée avec succès !</h3>
+            <h3>{t('update.installedSuccessTitle', 'Mise à jour installée avec succès !')}</h3>
             <p>
-              La nouvelle version de StudyVault a été préparée. Redémarrez l'application pour appliquer la mise à jour.
+              {t('update.installedSuccessText', 'La nouvelle version de StudyVault a été préparée. Redémarrez l\'application pour appliquer la mise à jour.')}
             </p>
             <button className="btn-primary-glow" onClick={handleRelaunch}>
               <RotateCcw size={20} />
-              Redémarrer l'application
+              {t('update.relaunchApp', 'Redémarrer l\'application')}
             </button>
           </div>
         )}
@@ -294,11 +243,11 @@ export const UpdatePage: React.FC = () => {
         {status === 'error' && (
           <div className="glass-card status-card error-card">
             <AlertCircle size={48} className="error-icon" />
-            <h3>Erreur lors de la mise à jour</h3>
-            <p>{errorMessage || 'Une erreur est survenue pendant la recherche ou l\'installation de la mise à jour.'}</p>
+            <h3>{t('update.errorTitle', 'Erreur lors de la mise à jour')}</h3>
+            <p>{errorMessage || t('update.errorDefault', 'Une erreur est survenue pendant la recherche ou l\'installation de la mise à jour.')}</p>
             <button className="btn-primary" onClick={checkForUpdates}>
               <RefreshCw size={16} />
-              Réessayer
+              {t('update.retry', 'Réessayer')}
             </button>
           </div>
         )}
@@ -307,9 +256,9 @@ export const UpdatePage: React.FC = () => {
         <div className="glass-card info-footer-card">
           <ShieldCheck size={24} className="info-icon" />
           <div>
-            <h4>Sécurité et Mises à jour</h4>
+            <h4>{t('update.securityTitle', 'Sécurité et Mises à jour')}</h4>
             <p>
-              Toutes les mises à jour de StudyVault sont vérifiées par signature cryptographique (Minisign) avant d'être appliquées sur votre ordinateur.
+              {t('update.securityText', 'Toutes les mises à jour de StudyVault sont vérifiées par signature cryptographique (Minisign) avant d\'être appliquées sur votre ordinateur.')}
             </p>
           </div>
         </div>

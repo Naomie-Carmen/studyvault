@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SemesterTree, UE, ECUE, Subject } from '../../types/structure';
 import { getAverages, GradeAveragesResponse } from '../../services/gradeService';
 import { 
@@ -81,14 +82,20 @@ export const TreeView: React.FC<TreeViewProps> = ({
   onDeleteSubject,
   onReorder,
 }) => {
+  const { t } = useTranslation();
   const [collapsedSemesters, setCollapsedSemesters] = useState<Record<string, boolean>>({});
   const [collapsedUEs, setCollapsedUEs] = useState<Record<string, boolean>>({});
   const [averagesData, setAveragesData] = useState<GradeAveragesResponse | null>(null);
 
-  // Drag and Drop States
-  const [draggedItem, setDraggedItem] = useState<{ type: 'ue' | 'ecue'; id: string; parentId: string } | null>(null);
+  // Drag & Drop State
+  const [draggedItem, setDraggedItem] = useState<{
+    type: 'ue' | 'ecue';
+    id: string;
+    parentId: string;
+  } | null>(null);
+
   const [dragOverInfo, setDragOverInfo] = useState<{
-    targetType: 'ue' | 'ecue' | 'semester';
+    targetType: 'semester' | 'ue' | 'ecue';
     targetId: string;
     parentId: string;
     position: 'before' | 'after' | 'inside';
@@ -343,19 +350,20 @@ export const TreeView: React.FC<TreeViewProps> = ({
                   {isSemCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                 </button>
                 <span className="semester-pill">S{sem.number}</span>
+                <span className="semester-pill">S{sem.number}</span>
                 <span className="semester-label">{sem.label}</span>
                 {renderBadge(getSemAvg(sem.number))}
-                {!sem.isActive && <span className="inactive-badge">Inactif</span>}
+                {!sem.isActive && <span className="inactive-badge">{t('structure.inactive', 'Inactif')}</span>}
               </div>
 
               <div className="node-actions" onClick={(e) => e.stopPropagation()}>
                 <button
                   className="add-btn btn-ue"
                   onClick={() => onAddUE(sem.id)}
-                  title="Ajouter une UE"
+                  title={t('structure.addUETitle', 'Ajouter une UE')}
                 >
                   <Plus size={14} />
-                  <span>Ajouter UE</span>
+                  <span>{t('structure.addUE', 'Ajouter UE')}</span>
                 </button>
               </div>
             </div>
@@ -365,9 +373,9 @@ export const TreeView: React.FC<TreeViewProps> = ({
               <div className="semester-children">
                 {filteredUEs.length === 0 ? (
                   <div className="empty-tree-node">
-                    <p>Aucune Unité d'Enseignement (UE) créée dans ce semestre.</p>
+                    <p>{t('structure.emptySem', 'Aucune Unité d\'Enseignement (UE) créée dans ce semestre.')}</p>
                     <button className="btn-link" onClick={() => onAddUE(sem.id)}>
-                      + Créer la première UE
+                      {t('structure.createFirstUE', '+ Créer la première UE')}
                     </button>
                   </div>
                 ) : (
@@ -409,7 +417,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                           onDrop={(e) => handleUEDrop(e, ue, sem)}
                         >
                           <div className="node-title-group">
-                            <span title="Glisser pour réorganiser">
+                            <span title={t('structure.dragToReorder', 'Glisser pour réorganiser')}>
                               <GripVertical size={16} className="drag-handle-icon" />
                             </span>
                             <button className="collapse-toggle">
@@ -432,18 +440,18 @@ export const TreeView: React.FC<TreeViewProps> = ({
                             <button
                               className="add-btn btn-ecue"
                               onClick={() => onAddECUE(ue.id)}
-                              title="Ajouter un ECUE"
+                              title={t('structure.addECUETitle', 'Ajouter un ECUE')}
                             >
                               <Plus size={13} />
-                              <span>ECUE</span>
+                              <span>{t('structure.ecue', 'ECUE')}</span>
                             </button>
                             <button
                               className="add-btn btn-subject"
                               onClick={() => onAddSubject({ ueId: ue.id })}
-                              title="Ajouter une Matière directe"
+                              title={t('structure.addDirectSubjectTitle', 'Ajouter une Matière directe')}
                             >
                               <Plus size={13} />
-                              <span>Matière</span>
+                              <span>{t('structure.subject', 'Matière')}</span>
                             </button>
                             <button className="icon-action-btn" onClick={() => onEditUE(ue)}>
                               <Edit3 size={14} />
@@ -483,7 +491,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                     onDrop={(e) => handleECUEDrop(e, ecue, ue)}
                                   >
                                     <div className="node-title-group">
-                                      <span title="Glisser pour réorganiser">
+                                      <span title={t('structure.dragToReorder', 'Glisser pour réorganiser')}>
                                         <GripVertical size={14} className="drag-handle-icon" />
                                       </span>
                                       <Layers size={16} className="text-purple" />
@@ -504,7 +512,7 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                         onClick={() => onAddSubject({ ecueId: ecue.id })}
                                       >
                                         <Plus size={13} />
-                                        <span>Matière</span>
+                                        <span>{t('structure.subject', 'Matière')}</span>
                                       </button>
                                       <button className="icon-action-btn" onClick={() => onEditECUE(ecue)}>
                                         <Edit3 size={14} />

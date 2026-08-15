@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -64,29 +65,29 @@ interface FieldConfig {
 const FIELD_CONFIGS: FieldConfig[] = [
   {
     key: 'ue_title',
-    label: "Intitulé UE",
+    label: "Intitulé de l'UE",
     required: true,
-    matchers: [/intitul.*ue/i, /titre.*ue/i, /unite.*enseignement/i, /ue/i],
+    matchers: [/intitule.*ue/i, /intitulé.*ue/i, /nom.*ue/i, /libelle.*ue/i, /ue/i],
   },
   {
     key: 'ue_code',
     label: "Code UE",
-    matchers: [/code.*ue/i, /code_ue/i],
+    matchers: [/code.*ue/i, /code_ue/i, /codification/i],
   },
   {
     key: 'ects',
-    label: "ECTS UE",
-    matchers: [/ects/i, /credit/i, /crédit/i],
+    label: "Crédits ECTS / Coefficient",
+    matchers: [/ects/i, /credit/i, /crédit/i, /coef/i, /ch/i],
   },
   {
     key: 'semester',
-    label: "Semestre (ex: 1, 2)",
-    matchers: [/semestre/i, /sem/i],
+    label: "Semestre (Numéro ou Nom)",
+    matchers: [/semestre/i, /sem/i, /s[1-6]/i],
   },
   {
     key: 'ecue_title',
-    label: "Intitulé ECUE",
-    matchers: [/intitul.*ecue/i, /titre.*ecue/i, /element.*constitutif/i, /ecue/i],
+    label: "Intitulé de l'ECUE / Matière",
+    matchers: [/intitule.*ecue/i, /intitulé.*ecue/i, /ecue/i, /élément/i, /element/i],
   },
   {
     key: 'ecue_code',
@@ -110,6 +111,7 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -882,8 +884,8 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
           <div className="modal-title-box">
             <FileSpreadsheet className="modal-icon text-indigo" size={22} />
             <div>
-              <h3>Importation de Maquette Pédagogique</h3>
-              <p className="subtitle">Convertissez votre fichier Excel ou CSV en arborescence de cours</p>
+              <h3>{t('maquetteImport.title', 'Importation de Maquette Pédagogique')}</h3>
+              <p className="subtitle">{t('maquetteImport.subtitle', 'Convertissez votre fichier Excel ou CSV en arborescence de cours')}</p>
             </div>
           </div>
           <button className="close-btn" onClick={onClose} disabled={submitting}>
@@ -894,17 +896,17 @@ export const MaquetteImportModal: React.FC<MaquetteImportModalProps> = ({
         <div className="stepper-header">
           <div className={`step-item ${step === 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
             <span className="step-num">1</span>
-            <span className="step-label">1. Fichier</span>
+            <span className="step-label">{t('maquetteImport.step1', '1. Fichier')}</span>
           </div>
           <div className="step-line" />
           <div className={`step-item ${step === 2 ? 'active' : ''} ${step > 2 ? 'completed' : ''}`}>
             <span className="step-num">2</span>
-            <span className="step-label">2. Colonnes</span>
+            <span className="step-label">{t('maquetteImport.step2', '2. Colonnes')}</span>
           </div>
           <div className="step-line" />
           <div className={`step-item ${step === 3 ? 'active' : ''}`}>
             <span className="step-num">3</span>
-            <span className="step-label">3. Aperçu & Validation</span>
+            <span className="step-label">{t('maquetteImport.step3', '3. Aperçu & Validation')}</span>
           </div>
         </div>
 

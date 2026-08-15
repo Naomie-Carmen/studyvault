@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../services/apiClient';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -17,6 +18,7 @@ async function fetchCurrentVersion(): Promise<string | null> {
 }
 
 export const UpdateBanner: React.FC = () => {
+  const { t } = useTranslation();
   const [newVersion, setNewVersion] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const baselineVersion = useRef<string | null>(null);
@@ -61,13 +63,13 @@ export const UpdateBanner: React.FC = () => {
       <div className="update-banner-content">
         <Sparkles size={16} className="update-icon" />
         <span className="update-text">
-          Une nouvelle version de StudyVault est disponible{newVersion ? ` (v${newVersion})` : ''} !
+          {t('update.bannerAvailable', 'Une nouvelle version de StudyVault est disponible')}{newVersion ? ` (v${newVersion})` : ''} !
         </span>
         <button className="btn-reload" onClick={handleReload} id="update-banner-reload-btn">
           <RefreshCw size={14} />
-          <span>Recharger</span>
+          <span>{t('update.reload', 'Recharger')}</span>
         </button>
-        <button className="btn-dismiss" onClick={handleDismiss} aria-label="Ignorer" id="update-banner-dismiss-btn">
+        <button className="btn-dismiss" onClick={handleDismiss} aria-label={t('update.dismiss', 'Ignorer')} id="update-banner-dismiss-btn">
           <X size={14} />
         </button>
       </div>
