@@ -414,57 +414,72 @@ export const TimetableImportModal: React.FC<TimetableImportModalProps> = ({
           }
 
           .btn-submit, .btn-ai-extract {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            background: #6C63FF !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.6rem !important;
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
             color: #ffffff !important;
-            font-weight: 600 !important;
-            padding: 12px 20px !important;
-            border-radius: 10px !important;
+            font-weight: 700 !important;
+            padding: 12px 24px !important;
+            border-radius: 12px !important;
             border: none !important;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            font-size: 0.95rem !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
+          }
+
+          .btn-submit *, .btn-ai-extract * {
+            color: #ffffff !important;
+            stroke: #ffffff !important;
           }
 
           .btn-submit:hover:not(:disabled), .btn-ai-extract:hover:not(:disabled) {
-            background: #5b52e0 !important;
-            box-shadow: 0 4px 14px rgba(108, 99, 255, 0.4);
+            background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%) !important;
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6) !important;
+            transform: translateY(-1px);
           }
 
           .btn-submit:disabled, .btn-ai-extract:disabled {
-            opacity: 0.5 !important;
+            opacity: 0.55 !important;
             color: #ffffff !important;
             cursor: not-allowed !important;
-            background: #6C63FF !important;
+            background: #4f46e5 !important;
+            box-shadow: none !important;
+            transform: none !important;
           }
 
           .btn-cancel, .btn-local-extract {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            background: rgba(255, 255, 255, 0.08) !important;
-            color: #f1f5f9 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.6rem !important;
+            background: rgba(255, 255, 255, 0.12) !important;
+            color: #ffffff !important;
             font-weight: 600 !important;
-            padding: 12px 20px !important;
-            border-radius: 10px !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            padding: 12px 24px !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            font-size: 0.95rem !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+          }
+
+          .btn-cancel *, .btn-local-extract * {
+            color: #ffffff !important;
+            stroke: #ffffff !important;
           }
 
           .btn-cancel:hover:not(:disabled), .btn-local-extract:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.15) !important;
+            background: rgba(255, 255, 255, 0.22) !important;
+            border-color: rgba(255, 255, 255, 0.4) !important;
             color: #ffffff !important;
           }
 
           .btn-cancel:disabled, .btn-local-extract:disabled {
-            opacity: 0.5 !important;
-            color: #f1f5f9 !important;
+            opacity: 0.45 !important;
+            color: #ffffff !important;
             cursor: not-allowed !important;
           }
 
