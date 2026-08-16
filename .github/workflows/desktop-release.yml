@@ -88,9 +88,28 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: ${{ needs.create-release.outputs.release_id }},
-              draft: false
-            });
+            const release_id = ${{ needs.create-release.outputs.release_id }};
+            let attempts = 0;
+            const maxAttempts = 3;
+            while (attempts < maxAttempts) {
+              try {
+                attempts++;
+                console.log(`Publishing release ${release_id} (Attempt ${attempts}/${maxAttempts})...`);
+                await github.rest.repos.updateRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release_id,
+                  draft: false
+                });
+                console.log(`Release ${release_id} published successfully!`);
+                return;
+              } catch (error) {
+                console.error(`Attempt ${attempts} failed: ${error.message}`);
+                if (attempts < maxAttempts) {
+                  console.log('Waiting 10 seconds before retrying...');
+                  await new Promise((resolve) => setTimeout(resolve, 10000));
+                } else {
+                  throw error;
+                }
+              }
+            }

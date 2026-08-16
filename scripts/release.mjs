@@ -60,13 +60,11 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
+    "Cours liés aux ECUEs : suggestion automatique lors de la création de séances et badges d'emploi du temps sous l'ECUE",
+    "Documents d'ECUE structurés : synchronisation automatique du dossier local Documents/StudyVault/",
+    "Sélection multiple & actions en lot : suppression groupée, changement de catégorie et réattribution de matière",
+    "Emplacement de stockage : choix entre stockage local PC et cloud R2 avec détection automatique du statut",
     "Coefficients ECTS par ECUE : édition en direct et recalcul immédiat des moyennes",
-    "Structure pédagogique flexible : support du mode ECUE = Matière et ECUE multi-matières",
-    "Barre latérale redimensionnable par glisser-déposer (jusqu'à double largeur max)",
-    "Importation de maquette : attribution automatique des coefficients ECUE & sélecteur S1/S2",
-    "Carnet de notes : validation stricte [0-20] et masquage global des flèches natifs d'inputs",
-    "Maquette académique : importation intelligente avec auto-détection",
-    "Recherche globale multi-critères sur tous vos documents et cours",
     "Internationalisation (i18n) complète en anglais et français"
   ];
 
