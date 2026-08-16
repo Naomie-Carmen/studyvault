@@ -3,6 +3,10 @@ import { ApiResponse } from '../types/api';
 import { DocumentItem, PersonalFolderItem, UserQuota } from '../types/document';
 import { DocumentUpdateInput, PersonalFolderInput } from '../types/validators';
 
+export async function getCloudStatus(): Promise<ApiResponse<{ enabled: boolean }>> {
+  return fetchApi<{ enabled: boolean }>('/documents/cloud-status');
+}
+
 export async function uploadFiles(
   formData: FormData
 ): Promise<ApiResponse<DocumentItem[]>> {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SemesterTree, UE, ECUE, Subject } from '../../types/structure';
 import { getAverages, GradeAveragesResponse } from '../../services/gradeService';
 import * as fileOrganizer from '../../services/fileOrganizer';
+import { StorageSelectionModal } from '../documents/StorageSelectionModal';
 import { 
   FolderTree, 
   Layers, 
@@ -68,6 +69,7 @@ const ECUEDocumentsSection: React.FC<{
 }> = ({ semNumber, ueCode, ueTitle, ecueCode, ecueTitle }) => {
   const { t } = useTranslation();
   const [files, setFiles] = useState<fileOrganizer.LocalEcueFile[]>([]);
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
 
   const loadFiles = useCallback(async () => {
     if (!fileOrganizer.isTauri) return;
@@ -88,9 +90,27 @@ const ECUEDocumentsSection: React.FC<{
     );
   }
 
-  const handleAdd = async () => {
+  const triggerAddFlow = async () => {
     const updated = await fileOrganizer.addEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
     setFiles(updated);
+  };
+
+  const handleAddClick = () => {
+    const savedPref = localStorage.getItem('studyvault_doc_storage_pref');
+    if (savedPref === 'local') {
+      triggerAddFlow();
+    } else {
+      setIsStorageModalOpen(true);
+    }
+  };
+
+  const handleConfirmStorage = (storageType: 'local' | 'cloud', remember: boolean) => {
+    if (remember) {
+      localStorage.setItem('studyvault_doc_storage_pref', storageType);
+    }
+    if (storageType === 'local') {
+      triggerAddFlow();
+    }
   };
 
   const handleOpenFolder = async () => {
@@ -117,7 +137,7 @@ const ECUEDocumentsSection: React.FC<{
           <span>Documents ({files.length})</span>
         </div>
         <div className="docs-actions">
-          <button className="doc-action-btn primary" onClick={handleAdd} title="Ajouter des fichiers dans le dossier ECUE">
+          <button className="doc-action-btn primary" onClick={handleAddClick} title="Ajouter des fichiers dans le dossier ECUE">
             <Plus size={11} />
             <span>+ Ajouter</span>
           </button>
@@ -148,6 +168,12 @@ const ECUEDocumentsSection: React.FC<{
           <span>Dossier local vide</span>
         </div>
       )}
+
+      <StorageSelectionModal
+        isOpen={isStorageModalOpen}
+        onClose={() => setIsStorageModalOpen(false)}
+        onConfirm={handleConfirmStorage}
+      />
     </div>
   );
 };

@@ -19,7 +19,8 @@ import {
   acceptClassification,
   modifyClassification,
   rejectClassification,
-  listUnclassified
+  listUnclassified,
+  getCloudStatus
 } from '../controllers/documentController';
 import { requireAuth, requireAuthOrToken } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
@@ -48,6 +49,7 @@ router.post('/upload', (req, res, next) => {
 }, uploadFiles);
 router.get('/', listDocuments);
 router.get('/quota', getQuota);
+router.get('/cloud-status', getCloudStatus);
 router.get('/trash', listTrash);
 router.post('/trash/empty', emptyTrash);
 router.delete('/trash/:id', permanentlyDeleteDocument);

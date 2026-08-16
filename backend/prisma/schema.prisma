@@ -151,6 +151,7 @@ model ECUE {
   noteTypes  NoteType[]
   notes      Note[]
   timetableSessions TimetableSession[]
+  documents  Document[]
 
   @@index([ueId])
 }
@@ -191,10 +192,13 @@ model Document {
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjectId                 String?
   subject                   Subject?                   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  ecueId                    String?
+  ecue                      ECUE?                      @relation(fields: [ecueId], references: [id], onDelete: SetNull)
   personalFolderId          String?
   personalFolder            PersonalFolder?            @relation(fields: [personalFolderId], references: [id], onDelete: SetNull)
   originalName              String
   filePath                  String
+  r2Key                     String?
   mimeType                  String
   fileSize                  Int
   docType                   String                     @default("cours")
@@ -211,6 +215,7 @@ model Document {
 
   @@index([userId])
   @@index([subjectId])
+  @@index([ecueId])
   @@index([personalFolderId])
   @@index([isDeleted])
   @@index([docType])

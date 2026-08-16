@@ -40,4 +40,8 @@ export class ApiError extends Error {
   static unprocessableEntity(message: string = 'Entité non traitable', code: string = 'UNPROCESSABLE_ENTITY'): ApiError {
     return new ApiError(message, 422, code);
   }
+
+  static serviceUnavailable(message: string = 'Stockage cloud non configuré.', code: string = 'SERVICE_UNAVAILABLE'): ApiError {
+    return new ApiError(message, 503, code);
+  }
 }

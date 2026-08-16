@@ -12,9 +12,29 @@ interface DecodedToken {
   userId: string;
 }
 
+export function isR2Configured(): boolean {
+  return Boolean(
+    process.env.R2_ACCOUNT_ID &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET_NAME
+  );
+}
+
+export async function getCloudStatus(_req: Request, res: Response): Promise<void> {
+  const enabled = isR2Configured();
+  sendSuccess(res, { enabled }, 200);
+}
+
 export async function uploadFiles(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (!req.user) throw ApiError.unauthorized();
+
+    const { subjectId, personalFolderId, docType, storageType } = req.body;
+
+    if (storageType === 'cloud' && !isR2Configured()) {
+      throw ApiError.serviceUnavailable('Stockage cloud non configuré.');
+    }
 
     const rawFiles = req.files;
     const files: Express.Multer.File[] = Array.isArray(rawFiles)
@@ -22,8 +42,6 @@ export async function uploadFiles(req: Request, res: Response, next: NextFunctio
       : rawFiles
       ? (Object.values(rawFiles).flat() as Express.Multer.File[])
       : [];
-
-    const { subjectId, personalFolderId, docType } = req.body;
 
     const docs = await docService.uploadDocuments(req.user.id, files, {
       subjectId,
