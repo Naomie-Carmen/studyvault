@@ -150,6 +150,7 @@ model ECUE {
   subjects   Subject[]
   noteTypes  NoteType[]
   notes      Note[]
+  timetableSessions TimetableSession[]
 
   @@index([ueId])
 }
@@ -296,6 +297,8 @@ model TimetableSession {
   user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjectId         String
   subject           Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  ecueId            String?
+  ecue              ECUE?            @relation(fields: [ecueId], references: [id], onDelete: SetNull)
   timetableImportId String?
   timetableImport   TimetableImport? @relation(fields: [timetableImportId], references: [id], onDelete: SetNull)
   dayOfWeek         Int              // 0 = Lundi, 1 = Mardi, ... 6 = Dimanche
@@ -311,6 +314,7 @@ model TimetableSession {
 
   @@index([userId])
   @@index([subjectId])
+  @@index([ecueId])
 }
 
 model TimetableSuggestion {

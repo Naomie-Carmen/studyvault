@@ -27,6 +27,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   tree,
 }) => {
   const [subjectId, setSubjectId] = useState('');
+  const [selectedEcueId, setSelectedEcueId] = useState<string>('');
   const [dayOfWeek, setDayOfWeek] = useState(initialDayOfWeek);
   const [startTime, setStartTime] = useState(initialStartTime);
   const [endTime, setEndTime] = useState('10:00');
@@ -57,6 +58,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
   // Flatten all subjects and ECUEs from structure tree
   const allSubjects: { id: string; name: string }[] = [];
+  const allEcues: { id: string; title: string }[] = [];
   if (tree) {
     tree.semesters.forEach((sem) => {
       sem.ues.forEach((ue) => {
@@ -67,6 +69,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           });
         });
         ue.ecues.forEach((ecue) => {
+          allEcues.push({
+            id: ecue.id,
+            title: `S${sem.number} — ${ecue.code ? '[' + ecue.code + '] ' : ''}${ecue.title}`,
+          });
           if (ecue.subjects && ecue.subjects.length > 0) {
             ecue.subjects.forEach((sub) => {
               allSubjects.push({
@@ -79,6 +85,21 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
       });
     });
   }
+
+  const handleSubjectChange = (newSubId: string) => {
+    setSubjectId(newSubId);
+    if (!tree) return;
+    for (const sem of tree.semesters) {
+      for (const ue of sem.ues) {
+        for (const ecue of ue.ecues) {
+          if (ecue.subjects.some((sub) => sub.id === newSubId) || ecue.id === newSubId) {
+            setSelectedEcueId(ecue.id);
+            return;
+          }
+        }
+      }
+    }
+  };
 
   const handleCreateQuickSubject = async () => {
     if (!newSubjectName.trim() || !selectedUeId) return;
@@ -115,6 +136,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     try {
       const payload: TimetableSessionInput = {
         subjectId,
+        ecueId: selectedEcueId || null,
         dayOfWeek: Number(dayOfWeek),
         startTime,
         endTime,
@@ -205,7 +227,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             ) : (
               <select
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                onChange={(e) => handleSubjectChange(e.target.value)}
                 required
               >
                 <option value="">Sélectionnez une ECUE / matière...</option>
@@ -217,6 +239,24 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               </select>
             )}
           </div>
+
+          {/* ECUE Link Option */}
+          {allEcues.length > 0 && (
+            <div className="form-group">
+              <label>Lier à une ECUE (Suggestion automatique)</label>
+              <select
+                value={selectedEcueId}
+                onChange={(e) => setSelectedEcueId(e.target.value)}
+              >
+                <option value="">Aucune ECUE spécifique</option>
+                {allEcues.map((ecue) => (
+                  <option key={ecue.id} value={ecue.id}>
+                    {ecue.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Day of Week */}
           <div className="form-group">

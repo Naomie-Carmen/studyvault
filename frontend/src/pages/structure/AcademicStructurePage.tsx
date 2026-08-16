@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree, UE, ECUE, Subject } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
+import * as fileOrganizer from '../../services/fileOrganizer';
 import { TreeView, matchSearch } from '../../components/structure/TreeView';
 import { UEModal } from '../../components/structure/UEModal';
 import { ECUEModal } from '../../components/structure/ECUEModal';
@@ -124,6 +125,7 @@ export const AcademicStructurePage: React.FC<AcademicStructurePageProps> = ({
       const res = await structureService.getStructureTree();
       if (res.success && res.data) {
         setTree(res.data);
+        fileOrganizer.syncStructure(res.data).catch(() => {});
       } else {
         setError(res.error?.message || 'Impossible de charger l\'arborescence.');
       }

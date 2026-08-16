@@ -160,10 +160,11 @@
     "emptySem": "No Unit of Study (UE) created in this semester.",
     "createFirstUE": "+ Create first UE",
     "dragToReorder": "Drag to reorder",
-    "addECUETitle": "Add an ECUE",
+    "addECUETitle": "Add ECUE",
     "ecue": "ECUE",
-    "addDirectSubjectTitle": "Add a Direct Subject",
-    "subject": "Subject"
+    "addDirectSubjectTitle": "Add Direct Subject",
+    "subject": "Subject",
+    "desktopNotice": "Document management available in desktop app"
   },
   "maquetteImport": {
     "title": "Import Academic Syllabus",

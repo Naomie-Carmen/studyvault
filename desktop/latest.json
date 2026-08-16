@@ -1,0 +1,11 @@
+{
+  "version": "1.0.1",
+  "notes": "Import de maquette Excel/PDF/Image, bouton admin, universités de Côte d'Ivoire.",
+  "pub_date": "2026-08-14T12:00:00Z",
+  "platforms": {
+    "win64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTVDRnQTZjUXlkVmM4b2hkY2ZBOFJzSmUrdWFUaHg4TzFLS1lac1ZHeGZpejBUMXIwMmVZdWhFQk1oclpjSDBSYS8ySHdjMTR1QUFOUWlpc0ozTUIvN3VzN1JXV0pVQWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2NjY0MzIxCWZpbGU6U3R1ZHlWYXVsdF8xLjAuMV94NjQtc2V0dXAubnNpcy56aXAKR2pCT0gxQzFKOVRxclFCUGQ3S3F5aDFsYUJjU3BCYXlVOUFIYnBaWTg1TWw4UWtiYkYrbjg2VW5PUFBFdVk3RGdIMmtpL09XMUQ1Zzd5Nm5MT1hBRFE9PQo=",
+      "url": "https://github.com/Naomie-Carmen/studyvault/releases/download/v1.0.1/StudyVault_1.0.1_x64-setup.nsis.zip"
+    }
+  }
+}

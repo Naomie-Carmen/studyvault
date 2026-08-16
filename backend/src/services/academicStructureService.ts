@@ -89,6 +89,9 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
                 orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                 include: {
                   subjects: true,
+                  timetableSessions: {
+                    orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+                  },
                 },
               },
               subjects: {
@@ -192,6 +195,15 @@ export async function getFullStructure(userId: string): Promise<AcademicStructur
           title: ecue.title,
           ects: ecue.ects,
           instructor: ecue.instructor,
+          timetableSessions: ((ecue as any).timetableSessions || []).map((s: any) => ({
+            id: s.id,
+            dayOfWeek: s.dayOfWeek,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            sessionType: s.sessionType,
+            room: s.room,
+            notes: s.notes,
+          })),
           subjects: ecue.subjects.map((sub) => ({
             id: sub.id,
             ecueId: sub.ecueId,

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SemesterTree, UE, ECUE, Subject } from '../../types/structure';
 import { getAverages, GradeAveragesResponse } from '../../services/gradeService';
+import * as fileOrganizer from '../../services/fileOrganizer';
 import { 
   FolderTree, 
   Layers, 
@@ -12,7 +13,12 @@ import {
   Edit3, 
   Trash2,
   UserCheck,
-  GripVertical
+  GripVertical,
+  Calendar,
+  Folder,
+  FileText,
+  FileCode,
+  ExternalLink
 } from 'lucide-react';
 
 export function normalizeStr(str: string): string {
@@ -45,11 +51,104 @@ export const HighlightText: React.FC<{ text: string | null | undefined; query?: 
   return (
     <>
       {before}
-      <mark className="search-highlight-mark">
-        {match}
-      </mark>
+      <mark className="search-highlight">{match}</mark>
       {after}
     </>
+  );
+};
+
+const DAYS_OF_WEEK_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+const ECUEDocumentsSection: React.FC<{
+  semNumber: number;
+  ueCode?: string | null;
+  ueTitle: string;
+  ecueCode?: string | null;
+  ecueTitle: string;
+}> = ({ semNumber, ueCode, ueTitle, ecueCode, ecueTitle }) => {
+  const { t } = useTranslation();
+  const [files, setFiles] = useState<fileOrganizer.LocalEcueFile[]>([]);
+
+  const loadFiles = useCallback(async () => {
+    if (!fileOrganizer.isTauri) return;
+    const docs = await fileOrganizer.listEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    setFiles(docs);
+  }, [semNumber, ueCode, ueTitle, ecueCode, ecueTitle]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
+
+  if (!fileOrganizer.isTauri) {
+    return (
+      <div className="ecue-desktop-notice">
+        <Folder size={12} className="text-muted" />
+        <span>{t('structure.desktopNotice', 'Gestion des documents disponible dans l\'application desktop')}</span>
+      </div>
+    );
+  }
+
+  const handleAdd = async () => {
+    const updated = await fileOrganizer.addEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    setFiles(updated);
+  };
+
+  const handleOpenFolder = async () => {
+    await fileOrganizer.openEcueFolder(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+  };
+
+  const handleOpenFile = async (filePath: string) => {
+    await fileOrganizer.openDocumentFile(filePath);
+  };
+
+  const getFileIcon = (ext: string) => {
+    const lower = ext.toLowerCase();
+    if (lower === 'pdf') return <FileText size={13} className="text-indigo" />;
+    if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(lower)) return <BookOpen size={13} className="text-cyan" />;
+    if (['doc', 'docx', 'txt'].includes(lower)) return <FileCode size={13} className="text-purple" />;
+    return <Folder size={13} className="text-muted" />;
+  };
+
+  return (
+    <div className="ecue-docs-section">
+      <div className="ecue-docs-header">
+        <div className="docs-title">
+          <Folder size={13} className="text-indigo" />
+          <span>Documents ({files.length})</span>
+        </div>
+        <div className="docs-actions">
+          <button className="doc-action-btn primary" onClick={handleAdd} title="Ajouter des fichiers dans le dossier ECUE">
+            <Plus size={11} />
+            <span>+ Ajouter</span>
+          </button>
+          <button className="doc-action-btn" onClick={handleOpenFolder} title="Ouvrir le dossier dans l'explorateur">
+            <Folder size={11} />
+            <span>📁 Ouvrir le dossier</span>
+          </button>
+        </div>
+      </div>
+
+      {files.length > 0 ? (
+        <div className="ecue-files-grid">
+          {files.map((file) => (
+            <div
+              key={file.path}
+              className="ecue-file-item"
+              onClick={() => handleOpenFile(file.path)}
+              title={`Cliquer pour ouvrir ${file.name}`}
+            >
+              {getFileIcon(file.extension)}
+              <span className="file-name">{file.name}</span>
+              <ExternalLink size={11} className="open-icon" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ecue-files-empty">
+          <span>Dossier local vide</span>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -545,6 +644,30 @@ export const TreeView: React.FC<TreeViewProps> = ({
                                     </div>
                                   </div>
 
+                                  {/* Linked Timetable Sessions under ECUE */}
+                                  {ecue.timetableSessions && ecue.timetableSessions.length > 0 && (
+                                    <div className="ecue-sessions-container">
+                                      {ecue.timetableSessions.map((session) => (
+                                        <div key={session.id} className="ecue-session-badge" title={session.notes || undefined}>
+                                          <Calendar size={12} className="text-indigo" />
+                                          <span>
+                                            📅 {DAYS_OF_WEEK_SHORT[session.dayOfWeek]} {session.startTime}–{session.endTime} · {session.sessionType}
+                                            {session.room ? ` · ${session.room}` : ''}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Structured Local Documents Folder under ECUE */}
+                                  <ECUEDocumentsSection
+                                    semNumber={sem.number}
+                                    ueCode={ue.code}
+                                    ueTitle={ue.title}
+                                    ecueCode={ecue.code}
+                                    ecueTitle={ecue.title}
+                                  />
+
                                   {/* Subjects under ECUE */}
                                   <div className="subjects-container">
                                     {filteredSubjects.map((sub) => (
@@ -940,6 +1063,119 @@ export const TreeView: React.FC<TreeViewProps> = ({
         .text-indigo { color: var(--primary); }
         .text-purple { color: var(--accent-purple); }
         .text-cyan { color: var(--accent-cyan); }
+
+        .ecue-sessions-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.35rem;
+          margin: 0.35rem 1rem 0.35rem 2rem;
+        }
+
+        .ecue-session-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.2rem 0.5rem;
+          border-radius: 6px;
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          color: #c7d2fe;
+          font-size: 0.75rem;
+          font-weight: 500;
+        }
+
+        .ecue-docs-section {
+          margin: 0.35rem 1rem 0.5rem 2rem;
+          padding: 0.5rem 0.75rem;
+          border-radius: 8px;
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ecue-docs-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.35rem;
+        }
+
+        .docs-title {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.78rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+
+        .docs-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        .doc-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.2rem 0.5rem;
+          border-radius: 4px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-muted);
+          font-size: 0.7rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .doc-action-btn:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.15);
+        }
+        .doc-action-btn.primary {
+          background: rgba(99, 102, 241, 0.2);
+          color: #818cf8;
+          border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .ecue-files-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+        }
+
+        .ecue-file-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 6px;
+          background: rgba(30, 41, 59, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-primary);
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+        .ecue-file-item:hover {
+          background: rgba(99, 102, 241, 0.2);
+          border-color: #6366f1;
+        }
+
+        .ecue-files-empty {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          font-style: italic;
+        }
+
+        .ecue-desktop-notice {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          margin: 0.3rem 1rem 0.4rem 2rem;
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          opacity: 0.8;
+        }
       `}</style>
     </div>
   );

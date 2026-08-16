@@ -125,7 +125,8 @@
     "addECUETitle": "Ajouter un ECUE",
     "ecue": "ECUE",
     "addDirectSubjectTitle": "Ajouter une Matière directe",
-    "subject": "Matière"
+    "subject": "Matière",
+    "desktopNotice": "Gestion des documents disponible dans l'application desktop"
   },
   "maquetteImport": {
     "title": "Importation de Maquette Pédagogique",

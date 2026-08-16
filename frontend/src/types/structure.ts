@@ -7,6 +7,16 @@ export interface Subject {
   color?: string | null;
 }
 
+export interface TimetableSessionSummary {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  sessionType: string;
+  room?: string | null;
+  notes?: string | null;
+}
+
 export interface ECUE {
   id: string;
   ueId: string;
@@ -15,6 +25,7 @@ export interface ECUE {
   ects?: number | null;
   instructor?: string | null;
   subjects: Subject[];
+  timetableSessions?: TimetableSessionSummary[];
 }
 
 export interface UE {

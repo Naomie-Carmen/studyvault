@@ -135,6 +135,7 @@ export const documentUpdateSchema = z.object({
 // Phase 8 - Timetable Schemas
 export const timetableSessionSchema = z.object({
   subjectId: z.string().min(1, { message: 'La matière est obligatoire.' }),
+  ecueId: z.string().trim().optional().nullable(),
   dayOfWeek: z.number().int().min(0).max(6, { message: 'Jour de la semaine invalide (0-6).' }),
   startTime: z.string().regex(/^([01]\d|2[03]):[0-5]\d$/, { message: 'Format d\'heure de début invalide (HH:mm).' }),
   endTime: z.string().regex(/^([01]\d|2[03]):[0-5]\d$/, { message: 'Format d\'heure de fin invalide (HH:mm).' }),
