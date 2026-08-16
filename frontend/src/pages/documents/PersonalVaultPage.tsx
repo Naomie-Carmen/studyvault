@@ -15,7 +15,10 @@ import {
   Sparkles, 
   Search, 
   Folder,
-  Plus
+  Plus,
+  CheckSquare,
+  Trash2,
+  X
 } from 'lucide-react';
 import { PersonalFolderInput } from '../../types/validators';
 
@@ -35,6 +38,9 @@ export const PersonalVaultPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<PersonalFolderInput['categoryType']>('cv');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Batch selection state
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Modals state
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
@@ -87,7 +93,40 @@ export const PersonalVaultPage: React.FC = () => {
 
   useEffect(() => {
     loadVaultData();
+    setSelectedDocIds([]);
   }, [loadVaultData]);
+
+  const toggleSelectDoc = (doc: DocumentItem) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(doc.id) ? prev.filter((id) => id !== doc.id) : [...prev, doc.id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocIds.length === documents.length) {
+      setSelectedDocIds([]);
+    } else {
+      setSelectedDocIds(documents.map((d) => d.id));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedDocIds.length === 0) return;
+    for (const id of selectedDocIds) {
+      await docService.softDeleteDocument(id);
+    }
+    setSelectedDocIds([]);
+    loadVaultData();
+  };
+
+  const handleBatchMoveFolder = async (newFolderId: string) => {
+    if (selectedDocIds.length === 0 || !newFolderId) return;
+    for (const id of selectedDocIds) {
+      await docService.updateDocument(id, { personalFolderId: newFolderId });
+    }
+    setSelectedDocIds([]);
+    loadVaultData();
+  };
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +232,49 @@ export const PersonalVaultPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Batch Action Floating Bar */}
+          {selectedDocIds.length > 0 && (
+            <div className="batch-action-bar glass-card">
+              <div className="batch-info">
+                <CheckSquare size={16} className="text-cyan" />
+                <span>{selectedDocIds.length} document(s) sélectionné(s)</span>
+              </div>
+
+              <div className="batch-actions-group">
+                <button className="batch-btn select-all" onClick={toggleSelectAll}>
+                  {selectedDocIds.length === documents.length ? 'Tout décocher' : 'Tout sélectionner'}
+                </button>
+
+                {folders.length > 0 && (
+                  <select
+                    className="batch-select"
+                    onChange={(e) => {
+                      if (e.target.value) handleBatchMoveFolder(e.target.value);
+                      e.target.value = '';
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>📁 Déplacer vers dossier...</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button className="batch-btn delete" onClick={handleBatchDelete}>
+                  <Trash2 size={14} />
+                  <span>Supprimer</span>
+                </button>
+
+                <button className="batch-btn close" onClick={() => setSelectedDocIds([])} title="Fermer la sélection">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Grid of Documents */}
           {loading ? (
             <div className="glass-card empty-card">
@@ -204,6 +286,8 @@ export const PersonalVaultPage: React.FC = () => {
                 <FileCard
                   key={doc.id}
                   document={doc}
+                  isSelected={selectedDocIds.includes(doc.id)}
+                  onSelectToggle={(d) => toggleSelectDoc(d)}
                   onPreview={(d) => setPreviewDoc(d)}
                   onDelete={(d) => setDeleteTarget(d)}
                 />
@@ -478,6 +562,73 @@ export const PersonalVaultPage: React.FC = () => {
         .btn-submit { padding: 0.5rem 1rem; border-radius: var(--radius-md); background: var(--gradient-primary); color: #ffffff; font-size: 0.825rem; font-weight: 600; }
 
         .text-cyan { color: var(--accent-cyan); }
+
+        .batch-action-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          background: rgba(6, 182, 212, 0.12);
+          border: 1px solid rgba(6, 182, 212, 0.35);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .batch-info {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-weight: 600;
+          font-size: 0.85rem;
+          color: #a5f3fc;
+        }
+
+        .batch-actions-group {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .batch-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary);
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .batch-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .batch-btn.delete {
+          background: rgba(239, 68, 68, 0.2);
+          color: #f87171;
+          border-color: rgba(239, 68, 68, 0.4);
+        }
+        .batch-btn.delete:hover {
+          background: rgba(239, 68, 68, 0.35);
+          color: #ffffff;
+        }
+
+        .batch-select {
+          padding: 0.35rem 0.65rem;
+          border-radius: 6px;
+          background: rgba(30, 41, 59, 0.8);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          font-size: 0.8rem;
+          outline: none;
+        }
       `}</style>
     </div>
   );

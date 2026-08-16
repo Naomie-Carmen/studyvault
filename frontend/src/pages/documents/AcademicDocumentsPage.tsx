@@ -14,7 +14,10 @@ import {
   Sparkles, 
   RefreshCw, 
   BookOpen, 
-  FileCheck
+  FileCheck,
+  CheckSquare,
+  Trash2,
+  X
 } from 'lucide-react';
 
 export const AcademicDocumentsPage: React.FC = () => {
@@ -24,6 +27,9 @@ export const AcademicDocumentsPage: React.FC = () => {
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Batch selection state
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Modals state
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
@@ -52,6 +58,7 @@ export const AcademicDocumentsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    setSelectedDocIds([]);
   }, [loadData]);
 
   const handleSoftDelete = async () => {
@@ -61,6 +68,64 @@ export const AcademicDocumentsPage: React.FC = () => {
       loadData();
     }
   };
+
+  const toggleSelectDoc = (doc: DocumentItem) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(doc.id) ? prev.filter((id) => id !== doc.id) : [...prev, doc.id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocIds.length === documents.length) {
+      setSelectedDocIds([]);
+    } else {
+      setSelectedDocIds(documents.map((d) => d.id));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedDocIds.length === 0) return;
+    for (const id of selectedDocIds) {
+      await docService.softDeleteDocument(id);
+    }
+    setSelectedDocIds([]);
+    loadData();
+  };
+
+  const handleBatchChangeType = async (newType: string) => {
+    if (selectedDocIds.length === 0 || !newType) return;
+    for (const id of selectedDocIds) {
+      await docService.updateDocument(id, { docType: newType as any });
+    }
+    setSelectedDocIds([]);
+    loadData();
+  };
+
+  const handleBatchReassignSubject = async (newSubjectId: string) => {
+    if (selectedDocIds.length === 0 || !newSubjectId) return;
+    for (const id of selectedDocIds) {
+      await docService.updateDocument(id, { subjectId: newSubjectId });
+    }
+    setSelectedDocIds([]);
+    loadData();
+  };
+
+  // Flatten subjects for batch reassign dropdown
+  const allSubjectsList: { id: string; name: string }[] = [];
+  if (tree && Array.isArray(tree.semesters)) {
+    tree.semesters.forEach((sem) => {
+      sem.ues.forEach((ue) => {
+        ue.directSubjects.forEach((sub) => {
+          allSubjectsList.push({ id: sub.id, name: `S${sem.number} — ${sub.name}` });
+        });
+        ue.ecues.forEach((ecue) => {
+          ecue.subjects.forEach((sub) => {
+            allSubjectsList.push({ id: sub.id, name: `S${sem.number} — ${sub.name}` });
+          });
+        });
+      });
+    });
+  }
 
   return (
     <div className="academic-docs-page">
@@ -177,6 +242,65 @@ export const AcademicDocumentsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Batch Action Floating Bar */}
+          {selectedDocIds.length > 0 && (
+            <div className="batch-action-bar glass-card">
+              <div className="batch-info">
+                <CheckSquare size={16} className="text-indigo" />
+                <span>{selectedDocIds.length} document(s) sélectionné(s)</span>
+              </div>
+
+              <div className="batch-actions-group">
+                <button className="batch-btn select-all" onClick={toggleSelectAll}>
+                  {selectedDocIds.length === documents.length ? 'Tout décocher' : 'Tout sélectionner'}
+                </button>
+
+                <select
+                  className="batch-select"
+                  onChange={(e) => {
+                    if (e.target.value) handleBatchChangeType(e.target.value);
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>🏷️ Catégorie...</option>
+                  <option value="cours">COURS</option>
+                  <option value="TD">TD</option>
+                  <option value="TP">TP</option>
+                  <option value="examen">EXAMEN</option>
+                  <option value="autre">AUTRE</option>
+                </select>
+
+                {allSubjectsList.length > 0 && (
+                  <select
+                    className="batch-select"
+                    onChange={(e) => {
+                      if (e.target.value) handleBatchReassignSubject(e.target.value);
+                      e.target.value = '';
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>📁 Matière...</option>
+                    {allSubjectsList.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button className="batch-btn delete" onClick={handleBatchDelete}>
+                  <Trash2 size={14} />
+                  <span>Supprimer</span>
+                </button>
+
+                <button className="batch-btn close" onClick={() => setSelectedDocIds([])} title="Fermer la sélection">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Documents Grid */}
           {loading ? (
             <div className="glass-card empty-card">
@@ -189,6 +313,8 @@ export const AcademicDocumentsPage: React.FC = () => {
                 <FileCard
                   key={doc.id}
                   document={doc}
+                  isSelected={selectedDocIds.includes(doc.id)}
+                  onSelectToggle={(d) => toggleSelectDoc(d)}
                   onPreview={(d) => setPreviewDoc(d)}
                   onDelete={(d) => setDeleteTarget(d)}
                 />
@@ -417,6 +543,73 @@ export const AcademicDocumentsPage: React.FC = () => {
         .spinning { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .text-indigo { color: var(--primary); }
+
+        .batch-action-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.35);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .batch-info {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-weight: 600;
+          font-size: 0.85rem;
+          color: #c7d2fe;
+        }
+
+        .batch-actions-group {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .batch-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary);
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .batch-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .batch-btn.delete {
+          background: rgba(239, 68, 68, 0.2);
+          color: #f87171;
+          border-color: rgba(239, 68, 68, 0.4);
+        }
+        .batch-btn.delete:hover {
+          background: rgba(239, 68, 68, 0.35);
+          color: #ffffff;
+        }
+
+        .batch-select {
+          padding: 0.35rem 0.65rem;
+          border-radius: 6px;
+          background: rgba(30, 41, 59, 0.8);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          font-size: 0.8rem;
+          outline: none;
+        }
       `}</style>
     </div>
   );
