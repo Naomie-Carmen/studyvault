@@ -1,14 +1,24 @@
 {
-  "version": "1.2.14",
+  "version": "1.2.15",
   "releaseDate": "2026-08-17",
   "channel": "stable",
   "notes": [
+    "Amélioration Drag & Drop : compatibilité Windows/WebView2 renforcée avec transfert multi-format et dropEffect='copy'",
+    "Glisser-déposer des ECUEs : correction du transfert de données entre le volet latéral et la grille 24h",
     "Stabilisation intégrale de l'emploi du temps : élimination définitive du clignotement et des re-rendus en boucle",
-    "Optimisation des performances : composants React.memo, défilement et ligne temps réel autonomes",
-    "Nouvelle page Bibliothèque Académique : organisation des cours par ECUE et compartiments (CM, TD, Sujets...)",
-    "Miroir automatique des dossiers : synchronisation directe dans Documents/StudyVault/ sur votre PC"
+    "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments"
   ],
   "history": [
+    {
+      "version": "1.2.14",
+      "releaseDate": "2026-08-17",
+      "highlights": [
+        "Stabilisation intégrale de l'emploi du temps : élimination définitive du clignotement et des re-rendus en boucle",
+        "Optimisation des performances : composants React.memo, défilement et ligne temps réel autonomes",
+        "Nouvelle page Bibliothèque Académique : organisation des cours par ECUE et compartiments (CM, TD, Sujets...)",
+        "Miroir automatique des dossiers : synchronisation directe dans Documents/StudyVault/ sur votre PC"
+      ]
+    },
     {
       "version": "1.2.13",
       "releaseDate": "2026-08-17",
