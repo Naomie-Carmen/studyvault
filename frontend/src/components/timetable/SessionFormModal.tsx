@@ -285,7 +285,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           ) : (
             <div className="form-group">
               <div className="label-row">
-                <label>Cours / ECUE d'enseignement *</label>
+                <label className="field-label">Cours / ECUE d'enseignement *</label>
                 <button
                   type="button"
                   className="btn-quick-create"
@@ -347,8 +347,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           )}
 
           {/* Prominent Session Type Chips Selector (CM, TD, TP, Compo, Révision...) */}
-          <div className="form-group margin-top-sm">
-            <label className="section-label">Type de séance (CM, TD, Compo, Révision...) *</label>
+          <div className="form-group">
+            <label className="field-label">Type de séance *</label>
             <div className="type-chips-container">
               {availableTypes.map((type) => {
                 const isActive = sessionType === type.id;
@@ -374,10 +374,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Row 1: Day & Duration */}
-          <div className="form-grid-2">
+          {/* Row 1: Day & Duration (Clean 2-Column Grid) */}
+          <div className="modal-grid-2">
             <div className="form-group">
-              <label>Jour de la semaine *</label>
+              <label className="field-label">Jour de la semaine *</label>
               <select
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(Number(e.target.value))}
@@ -391,7 +391,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Durée estimée *</label>
+              <label className="field-label">Durée estimée *</label>
               <select
                 value={durationMinutes}
                 onChange={(e) => {
@@ -409,10 +409,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Start Time & End Time */}
-          <div className="form-grid-2">
+          {/* Row 2: Start Time & End Time (Clean 2-Column Grid) */}
+          <div className="modal-grid-2">
             <div className="form-group">
-              <label>Heure de début *</label>
+              <label className="field-label">Heure de début *</label>
               <input
                 type="time"
                 value={startTime}
@@ -425,7 +425,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Heure de fin *</label>
+              <label className="field-label">Heure de fin *</label>
               <input
                 type="time"
                 value={endTime}
@@ -435,10 +435,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Row 3: Room, Instructor, Recurrence */}
-          <div className="form-grid-3">
+          {/* Row 3: Room & Instructor (Clean 2-Column Grid) */}
+          <div className="modal-grid-2">
             <div className="form-group">
-              <label>Salle (optionnel)</label>
+              <label className="field-label">Salle (optionnel)</label>
               <input
                 type="text"
                 placeholder="ex: Amphi A, Salle 102"
@@ -448,7 +448,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Enseignant (optionnel)</label>
+              <label className="field-label">Enseignant (optionnel)</label>
               <input
                 type="text"
                 placeholder="ex: Dr. Dupont"
@@ -456,9 +456,12 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 onChange={(e) => setInstructor(e.target.value)}
               />
             </div>
+          </div>
 
+          {/* Row 4: Recurrence & Notes (Clean 2-Column Grid) */}
+          <div className="modal-grid-2">
             <div className="form-group">
-              <label>Récurrence</label>
+              <label className="field-label">Récurrence</label>
               <select
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value as 'weekly' | 'biweekly' | 'none')}
@@ -468,17 +471,16 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 <option value="none">Une seule fois</option>
               </select>
             </div>
-          </div>
 
-          {/* Row 4: Notes */}
-          <div className="form-group">
-            <label>Notes & remarques (optionnel)</label>
-            <input
-              type="text"
-              placeholder="ex: Chapitres 1 à 3, Apporter calculatrice..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            <div className="form-group">
+              <label className="field-label">Notes & remarques (optionnel)</label>
+              <input
+                type="text"
+                placeholder="ex: Chapitres 1 à 3..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Form Actions */}
@@ -517,7 +519,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           padding: 1.75rem;
           display: flex;
           flex-direction: column;
-          gap: 1.25rem;
+          gap: 16px;
           background: rgba(15, 23, 42, 0.96);
           backdrop-filter: blur(16px);
           border: 1px solid rgba(255, 255, 255, 0.12);
@@ -563,63 +565,32 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
         .session-form {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 16px;
+        }
+
+        .modal-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          align-items: start;
         }
 
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 0.4rem;
+          gap: 6px;
+          margin-bottom: 0;
         }
 
-        .form-group label {
-          font-size: 0.8rem;
-          font-weight: 600;
-          color: #94a3b8;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .session-form input[type="text"],
-        .session-form input[type="time"],
-        .session-form select {
-          width: 100%;
-          padding: 0.55rem 0.85rem;
-          border-radius: 8px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(30, 41, 59, 0.7);
-          color: #ffffff;
-          font-size: 0.85rem;
-          font-weight: 500;
-          outline: none;
-          transition: all 0.2s ease;
-          box-sizing: border-box;
-        }
-
-        .session-form input[type="text"]:focus,
-        .session-form input[type="time"]:focus,
-        .session-form select:focus {
-          border-color: #6366f1;
-          background: rgba(30, 41, 59, 0.95);
-          box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .session-form select option {
-          background: #0f172a;
-          color: #ffffff;
-        }
-
-        .form-grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.85rem;
-        }
-
-        .form-grid-3 {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 0.85rem;
+        .field-label {
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          color: #94a3b8 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          margin-bottom: 0 !important;
+          line-height: 1.2 !important;
         }
 
         .selected-course-banner {
@@ -672,14 +643,6 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           color: #ffffff;
           background: rgba(255, 255, 255, 0.18);
           border-color: rgba(255, 255, 255, 0.4);
-        }
-
-        .section-label {
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #94a3b8;
-          margin-bottom: 0.4rem;
-          display: block;
         }
 
         .type-chips-container {

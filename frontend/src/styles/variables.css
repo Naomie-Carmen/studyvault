@@ -1,4 +1,6 @@
 :root {
+  color-scheme: dark;
+
   /* Color Palette - HSL Tailored Theme */
   --bg-primary: #0b0f19;
   --bg-secondary: #131b2e;
