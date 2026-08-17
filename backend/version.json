@@ -1,14 +1,24 @@
 {
-  "version": "1.2.12",
+  "version": "1.2.13",
   "releaseDate": "2026-08-17",
   "channel": "stable",
   "notes": [
+    "Correctif Emploi du Temps : élimination de la boucle de re-rendu infinie (clignotement)",
+    "Gestion réseau stabilisée : messages d'erreur réseau clairs et prévention de la saturation des sockets API",
     "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments",
-    "Refonte Emploi du Temps 24h : défilement 00h-24h, indicateur temps réel, drag & drop des cours et archivage hebdomadaire",
-    "Compartiments & miroir OS : sous-dossiers locaux automatiques dans Documents/StudyVault/{Semestre}/{UE}/{ECUE}/{compartiment}",
-    "Gestion des types de séance : personnalisation des types (CM, TD, Compo...) et des couleurs dans les Paramètres"
+    "Compartiments & miroir OS : sous-dossiers locaux automatiques dans Documents/StudyVault/{Semestre}/{UE}/{ECUE}/{compartiment}"
   ],
   "history": [
+    {
+      "version": "1.2.12",
+      "releaseDate": "2026-08-17",
+      "highlights": [
+        "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments",
+        "Refonte Emploi du Temps 24h : défilement 00h-24h, indicateur temps réel, drag & drop des cours et archivage hebdomadaire",
+        "Compartiments & miroir OS : sous-dossiers locaux automatiques dans Documents/StudyVault/{Semestre}/{UE}/{ECUE}/{compartiment}",
+        "Gestion des types de séance : personnalisation des types (CM, TD, Compo...) et des couleurs dans les Paramètres"
+      ]
+    },
     {
       "version": "1.2.11",
       "releaseDate": "2026-08-16",
