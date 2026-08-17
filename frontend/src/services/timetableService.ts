@@ -1,6 +1,6 @@
 import { fetchApi, API_BASE_URL, getClientAccessToken } from './apiClient';
 import { ApiResponse } from '../types/api';
-import { TimetableSession, TimetableImport, TimetableStats } from '../types/timetable';
+import { TimetableSession, TimetableImport, TimetableStats, WeekArchive } from '../types/timetable';
 import { TimetableSessionInput } from '../types/validators';
 
 export async function createSession(
@@ -59,6 +59,25 @@ export async function updateSession(
 export async function deleteSession(id: string): Promise<ApiResponse<{ message: string }>> {
   return fetchApi<{ message: string }>(`/timetable/sessions/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export async function getWeekArchives(): Promise<ApiResponse<WeekArchive[]>> {
+  return fetchApi<WeekArchive[]>('/timetable/archives', {
+    method: 'GET',
+  });
+}
+
+export async function getWeekArchive(weekStart: string): Promise<ApiResponse<WeekArchive>> {
+  return fetchApi<WeekArchive>(`/timetable/archives/${weekStart}`, {
+    method: 'GET',
+  });
+}
+
+export async function syncPastWeekArchives(currentWeekStart: string): Promise<ApiResponse<WeekArchive[]>> {
+  return fetchApi<WeekArchive[]>('/timetable/archives/sync', {
+    method: 'POST',
+    body: JSON.stringify({ currentWeekStart }),
   });
 }
 

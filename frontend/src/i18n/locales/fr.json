@@ -74,6 +74,14 @@
       "ecueIsSubjectDesc": "Chaque ECUE agit directement comme matière de cours.",
       "ecueHasSubjects": "ECUE multi-matières",
       "ecueHasSubjectsDesc": "Chaque ECUE contient plusieurs sous-matières de cours."
+    },
+    "sessionTypes": {
+      "title": "Types de Séance & Couleurs",
+      "desc": "Personnalisez les types de cours (CM, TD, Compo...) et leurs couleurs dans l'emploi du temps",
+      "alreadyExists": "Ce type de séance existe déjà.",
+      "reset": "Réinitialiser les types par défaut",
+      "resetBtn": "Réinitialiser",
+      "addBtn": "Ajouter un type de séance (ex: Compo, Kholle...)"
     }
   },
   "timetable": {

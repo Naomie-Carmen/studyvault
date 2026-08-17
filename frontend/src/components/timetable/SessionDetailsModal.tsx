@@ -1,13 +1,14 @@
-import React from 'react';
 import { TimetableSession } from '../../types/timetable';
+import * as timetableService from '../../services/timetableService';
 import { X, Clock, MapPin, AlertTriangle, FileText, Trash2 } from 'lucide-react';
 
 interface SessionDetailsModalProps {
   session: TimetableSession | null;
   isOpen: boolean;
   onClose: () => void;
-  onDelete: (id: string) => void;
-  onNavigateToDocuments: (subjectId: string) => void;
+  onDelete?: (id: string) => void;
+  onDeleteSuccess?: () => void;
+  onNavigateToDocuments?: (subjectId: string) => void;
 }
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -17,6 +18,7 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
   isOpen,
   onClose,
   onDelete,
+  onDeleteSuccess,
   onNavigateToDocuments,
 }) => {
   if (!isOpen || !session) return null;
@@ -62,17 +64,30 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
           )}
 
           {/* Quick Action: Access Documents for this Subject */}
-          <div className="quick-documents-cta" onClick={() => onNavigateToDocuments(session.subjectId)}>
-            <FileText size={20} className="text-indigo" />
-            <div className="cta-text">
-              <h4>Consulter les cours & TD de la matière</h4>
-              <p>Accédez directement aux documents académiques enregistrés sous cette matière.</p>
+          {onNavigateToDocuments && (
+            <div className="quick-documents-cta" onClick={() => onNavigateToDocuments(session.subjectId)}>
+              <FileText size={20} className="text-indigo" />
+              <div className="cta-text">
+                <h4>Consulter les cours & TD de la matière</h4>
+                <p>Accédez directement aux documents académiques enregistrés sous cette matière.</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="details-footer">
-          <button className="btn-delete" onClick={() => onDelete(session.id)}>
+          <button
+            className="btn-delete"
+            onClick={async () => {
+              if (onDelete) {
+                onDelete(session.id);
+              } else {
+                await timetableService.deleteSession(session.id);
+                if (onDeleteSuccess) onDeleteSuccess();
+                onClose();
+              }
+            }}
+          >
             <Trash2 size={16} />
             <span>Supprimer la séance</span>
           </button>

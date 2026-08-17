@@ -5,17 +5,32 @@ import * as timetableService from '../../services/timetableService';
 import { TimetableSessionInput } from '../../types/validators';
 import { X, Plus, AlertCircle, Calendar } from 'lucide-react';
 
+import { getSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
+
 interface SessionFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   initialDayOfWeek?: number;
   initialStartTime?: string;
+  initialEcueId?: string;
+  initialSubjectId?: string;
+  initialDurationMinutes?: number;
   tree: AcademicStructureTree | null;
 }
 
 const DAYS_OF_WEEK = [
   'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
+];
+
+const DURATION_OPTIONS = [
+  { value: 30, label: '30 min' },
+  { value: 60, label: '1 h' },
+  { value: 90, label: '1 h 30 (défaut)' },
+  { value: 120, label: '2 h' },
+  { value: 150, label: '2 h 30' },
+  { value: 180, label: '3 h' },
+  { value: 240, label: '4 h' },
 ];
 
 export const SessionFormModal: React.FC<SessionFormModalProps> = ({
@@ -24,17 +39,23 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   onSuccess,
   initialDayOfWeek = 0,
   initialStartTime = '08:00',
+  initialEcueId = '',
+  initialSubjectId = '',
+  initialDurationMinutes = 90,
   tree,
 }) => {
-  const [subjectId, setSubjectId] = useState('');
-  const [selectedEcueId, setSelectedEcueId] = useState<string>('');
+  const [subjectId, setSubjectId] = useState(initialSubjectId);
+  const [selectedEcueId, setSelectedEcueId] = useState<string>(initialEcueId);
   const [dayOfWeek, setDayOfWeek] = useState(initialDayOfWeek);
   const [startTime, setStartTime] = useState(initialStartTime);
-  const [endTime, setEndTime] = useState('10:00');
+  const [durationMinutes, setDurationMinutes] = useState(initialDurationMinutes);
+  const [endTime, setEndTime] = useState('09:30');
   const [room, setRoom] = useState('');
-  const [sessionType, setSessionType] = useState<'CM' | 'TD' | 'TP' | 'EXAM' | 'OTHER'>('CM');
+  const [instructor, setInstructor] = useState('');
+  const [sessionType, setSessionType] = useState<string>('CM');
   const [recurrence, setRecurrence] = useState<'weekly' | 'biweekly' | 'none'>('weekly');
   const [notes, setNotes] = useState('');
+  const [availableTypes, setAvailableTypes] = useState<SessionTypeConfig[]>([]);
 
   // Inline Quick Subject Creation Subform
   const [showQuickSubject, setShowQuickSubject] = useState(false);
@@ -45,14 +66,51 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    setAvailableTypes(getSessionTypes());
+  }, [isOpen]);
+
+  // Recalculate end time whenever startTime or durationMinutes changes
+  const updateEndTime = (startStr: string, durationMins: number) => {
+    const [h, m] = startStr.split(':').map(Number);
+    const totalStartMins = h * 60 + m;
+    const totalEndMins = Math.min(24 * 60, totalStartMins + durationMins);
+    const endH = String(Math.floor(totalEndMins / 60)).padStart(2, '0');
+    const endM = String(totalEndMins % 60).padStart(2, '0');
+    setEndTime(`${endH}:${endM}`);
+  };
+
+  useEffect(() => {
     setDayOfWeek(initialDayOfWeek);
     setStartTime(initialStartTime);
+    setDurationMinutes(initialDurationMinutes);
+    if (initialEcueId) setSelectedEcueId(initialEcueId);
+    if (initialSubjectId) setSubjectId(initialSubjectId);
 
-    // Calculate default end time = startTime + 2 hours
-    const [h, m] = initialStartTime.split(':').map(Number);
-    const endH = String(Math.min(21, h + 2)).padStart(2, '0');
-    setEndTime(`${endH}:${String(m).padStart(2, '0')}`);
-  }, [initialDayOfWeek, initialStartTime]);
+    updateEndTime(initialStartTime, initialDurationMinutes);
+  }, [initialDayOfWeek, initialStartTime, initialEcueId, initialSubjectId, initialDurationMinutes, isOpen]);
+
+  // Pre-fill instructor and subject if initialEcueId is provided
+  useEffect(() => {
+    if (tree && selectedEcueId) {
+      for (const sem of tree.semesters) {
+        for (const ue of sem.ues) {
+          for (const ecue of ue.ecues) {
+            if (ecue.id === selectedEcueId) {
+              if (ecue.instructor) setInstructor(ecue.instructor);
+              if (!subjectId) {
+                if (ecue.subjects && ecue.subjects.length > 0) {
+                  setSubjectId(ecue.subjects[0].id);
+                } else {
+                  setSubjectId(ecue.id);
+                }
+              }
+              return;
+            }
+          }
+        }
+      }
+    }
+  }, [tree, selectedEcueId, subjectId]);
 
   if (!isOpen) return null;
 
@@ -134,6 +192,11 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
     setSubmitting(true);
     try {
+      const combinedNotes = [
+        instructor.trim() ? `Enseignant: ${instructor.trim()}` : '',
+        notes.trim(),
+      ].filter(Boolean).join('\n');
+
       const payload: TimetableSessionInput = {
         subjectId,
         ecueId: selectedEcueId || null,
@@ -141,9 +204,9 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
         startTime,
         endTime,
         room: room.trim() || null,
-        sessionType,
+        sessionType: sessionType as any,
         recurrence,
-        notes: notes.trim() || null,
+        notes: combinedNotes || null,
       };
 
       const res = await timetableService.createSession(payload);
@@ -273,16 +336,37 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </select>
           </div>
 
-          {/* Times Row */}
+          {/* Times & Duration Row */}
           <div className="form-row">
             <div className="form-group flex-1">
               <label>Heure de début *</label>
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  updateEndTime(e.target.value, durationMinutes);
+                }}
                 required
               />
+            </div>
+
+            <div className="form-group flex-1">
+              <label>Durée estimée *</label>
+              <select
+                value={durationMinutes}
+                onChange={(e) => {
+                  const mins = Number(e.target.value);
+                  setDurationMinutes(mins);
+                  updateEndTime(startTime, mins);
+                }}
+              >
+                {DURATION_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group flex-1">
@@ -296,23 +380,43 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Session Type Radios */}
+          {/* Session Type Radios (Dynamic) */}
           <div className="form-group">
             <label>Type de séance *</label>
             <div className="session-type-radios">
-              {(['CM', 'TD', 'TP', 'EXAM', 'OTHER'] as const).map((t) => (
-                <label key={t} className={`type-radio-label ${sessionType === t ? 'active' : ''}`}>
+              {availableTypes.map((t) => (
+                <label
+                  key={t.id}
+                  className={`type-radio-label ${sessionType === t.id ? 'active' : ''}`}
+                  style={{
+                    borderColor: sessionType === t.id ? t.color : undefined,
+                    backgroundColor: sessionType === t.id ? `${t.color}25` : undefined,
+                  }}
+                >
                   <input
                     type="radio"
                     name="sessionType"
-                    value={t}
-                    checked={sessionType === t}
-                    onChange={() => setSessionType(t)}
+                    value={t.id}
+                    checked={sessionType === t.id}
+                    onChange={() => setSessionType(t.id)}
                   />
-                  <span>{t}</span>
+                  <span style={{ color: sessionType === t.id ? t.color : undefined }}>
+                    {t.id} ({t.label})
+                  </span>
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* Enseignant Field */}
+          <div className="form-group">
+            <label>Enseignant / Intervenant (optionnel)</label>
+            <input
+              type="text"
+              placeholder="ex: Dr. Dupont / Prof. Martin"
+              value={instructor}
+              onChange={(e) => setInstructor(e.target.value)}
+            />
           </div>
 
           {/* Room & Recurrence */}

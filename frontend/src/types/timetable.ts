@@ -7,12 +7,19 @@ export interface TimetableSession {
     name: string;
     color?: string | null;
   };
+  ecueId?: string | null;
+  ecue?: {
+    id: string;
+    title: string;
+    code?: string | null;
+    instructor?: string | null;
+  };
   timetableImportId?: string | null;
   dayOfWeek: number; // 0 = Lundi, 1 = Mardi, ... 6 = Dimanche
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   room?: string | null;
-  sessionType: 'CM' | 'TD' | 'TP' | 'EXAM' | 'OTHER';
+  sessionType: string; // CM, TD, TP, EXAM, COMPO, OTHER
   recurrence: 'weekly' | 'biweekly' | 'none';
   color?: string | null;
   notes?: string | null;
@@ -33,12 +40,14 @@ export interface TimetableImport {
 
 export interface TimetableStats {
   totalHoursPerWeek: number;
-  hoursByType: {
-    CM: number;
-    TD: number;
-    TP: number;
-    EXAM: number;
-    OTHER: number;
-  };
+  hoursByType: Record<string, number>;
   busiestDay: { dayOfWeek: number; dayName: string; totalHours: number } | null;
+}
+
+export interface WeekArchive {
+  id: string;
+  userId: string;
+  weekStart: string; // YYYY-MM-DD
+  data: TimetableSession[];
+  createdAt: string;
 }

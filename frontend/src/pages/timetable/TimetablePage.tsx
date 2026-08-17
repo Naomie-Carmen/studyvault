@@ -1,101 +1,157 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { AcademicStructureTree } from '../../types/structure';
-
-type TimetableWeekData = Record<number, TimetableSession[]>;
 import * as timetableService from '../../services/timetableService';
 import * as structureService from '../../services/academicStructureService';
 import { SessionFormModal } from '../../components/timetable/SessionFormModal';
 import { SessionDetailsModal } from '../../components/timetable/SessionDetailsModal';
 import { TimetableImportModal } from '../../components/timetable/TimetableImportModal';
-import { useTranslation } from 'react-i18next';
+import { CoursesSidebarDrawer } from '../../components/timetable/CoursesSidebarDrawer';
+import { TimetableGrid } from '../../components/timetable/TimetableGrid';
 import { PrintWeeklySheet } from '../../components/timetable/PrintWeeklySheet';
+
 import { 
   Calendar as CalendarIcon, 
   Plus, 
   UploadCloud, 
-  Grid, 
-  List, 
-  Clock, 
-  MapPin, 
-  AlertTriangle,
-  Printer
+  Printer,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Clock
 } from 'lucide-react';
+
+type TimetableWeekData = Record<number, TimetableSession[]>;
 
 interface TimetablePageProps {
   onNavigateToDocuments?: (subjectId: string) => void;
 }
 
-const TIME_SLOTS = [
-  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
-];
+const getMondayOfDate = (d: Date): Date => {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(date.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
+
+const formatDateToYYYYMMDD = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const formatWeekSpanLabel = (mondayDate: Date): string => {
+  const sundayDate = new Date(mondayDate);
+  sundayDate.setDate(mondayDate.getDate() + 6);
+
+  const startStr = mondayDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+  const endStr = sundayDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  return `Semaine du ${startStr} au ${endStr}`;
+};
 
 export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocuments }) => {
   const { t } = useTranslation();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const currentMonday = getMondayOfDate(new Date());
+
+  const [selectedWeekMonday, setSelectedWeekMonday] = useState<Date>(currentMonday);
   const [weekData, setWeekData] = useState<TimetableWeekData | null>(null);
   const [tree, setTree] = useState<AcademicStructureTree | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [modalCreateParams, setModalCreateParams] = useState<{
+    dayOfWeek?: number;
+    startTime?: string;
+    ecueId?: string;
+    subjectId?: string;
+  }>({});
+
   const [selectedSession, setSelectedSession] = useState<TimetableSession | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const loadData = async () => {
+  const isCurrentWeek =
+    selectedWeekMonday.getFullYear() === currentMonday.getFullYear() &&
+    selectedWeekMonday.getMonth() === currentMonday.getMonth() &&
+    selectedWeekMonday.getDate() === currentMonday.getDate();
+
+  const isPastWeek = selectedWeekMonday < currentMonday;
+  const weekStartStr = formatDateToYYYYMMDD(selectedWeekMonday);
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [weekRes, treeRes] = await Promise.all([
-        timetableService.getWeekSessions(),
+      // Lazy auto-archive past weeks on load
+      timetableService.syncPastWeekArchives(formatDateToYYYYMMDD(currentMonday)).catch(() => {});
+
+      const [treeRes, liveWeekRes, archiveRes] = await Promise.all([
         structureService.getStructureTree(),
+        timetableService.getWeekSessions(),
+        isPastWeek ? timetableService.getWeekArchive(weekStartStr) : Promise.resolve(null),
       ]);
-      if (weekRes.success && weekRes.data && typeof weekRes.data === 'object') {
-        const normalized: TimetableWeekData = {};
-        for (const [k, v] of Object.entries(weekRes.data)) {
-          const key = parseInt(k, 10);
-          if (!Number.isNaN(key) && Array.isArray(v)) normalized[key] = v as TimetableSession[];
-        }
-        setWeekData(normalized);
-      } else {
-        setWeekData(null);
-      }
+
       if (treeRes.success && treeRes.data) setTree(treeRes.data);
+
+      let rawSessionsList: TimetableSession[] = [];
+
+      if (isPastWeek && archiveRes && archiveRes.success && archiveRes.data && archiveRes.data.data) {
+        rawSessionsList = archiveRes.data.data as TimetableSession[];
+      } else if (liveWeekRes.success && liveWeekRes.data) {
+        if (Array.isArray(liveWeekRes.data)) {
+          rawSessionsList = liveWeekRes.data;
+        } else if (typeof liveWeekRes.data === 'object') {
+          rawSessionsList = Object.values(liveWeekRes.data).flat() as TimetableSession[];
+        }
+      }
+
+      const grouped: TimetableWeekData = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+      rawSessionsList.forEach((sess) => {
+        if (sess.dayOfWeek >= 0 && sess.dayOfWeek <= 6) {
+          grouped[sess.dayOfWeek].push(sess);
+        }
+      });
+
+      setWeekData(grouped);
     } catch (_e) {
       /* ignore */
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedWeekMonday, isPastWeek, weekStartStr, currentMonday]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const DAYS = [
-    { key: 0, label: t('timetable.days.mon', 'Lundi') },
-    { key: 1, label: t('timetable.days.tue', 'Mardi') },
-    { key: 2, label: t('timetable.days.wed', 'Mercredi') },
-    { key: 3, label: t('timetable.days.thu', 'Jeudi') },
-    { key: 4, label: t('timetable.days.fri', 'Vendredi') },
-    { key: 5, label: t('timetable.days.sat', 'Samedi') },
-    { key: 6, label: t('timetable.days.sun', 'Dimanche') },
-  ];
-
-  const hasAnySession =
-    !!weekData && DAYS.some((day) => Array.isArray(weekData[day.key]) && weekData[day.key].length > 0);
+  const handleNavigateWeek = (offsetWeeks: number) => {
+    const next = new Date(selectedWeekMonday);
+    next.setDate(selectedWeekMonday.getDate() + offsetWeeks * 7);
+    setSelectedWeekMonday(next);
+  };
 
   const handleOpenDetails = (session: TimetableSession) => {
     setSelectedSession(session);
     setIsDetailsOpen(true);
   };
 
+  const handleOpenCreateModal = (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => {
+    if (isPastWeek) return;
+    setModalCreateParams(params);
+    setIsFormOpen(true);
+  };
+
   return (
     <div className="timetable-page">
       {/* Top Action Header */}
-      <div className="page-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="page-header glass-card">
+        <div className="header-info-group">
           <div className="page-header-icon">
             <CalendarIcon size={24} />
           </div>
@@ -105,26 +161,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
           </div>
         </div>
 
-        <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div className="view-toggle glass-card">
-            <button
-              className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
-              title={t('timetable.viewGridTitle', 'Vue Grille Hebdomadaire')}
-            >
-              <Grid size={16} />
-              <span>{t('timetable.viewGrid', 'Grille')}</span>
-            </button>
-            <button
-              className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-              title={t('timetable.viewListTitle', 'Vue Liste Chronologique')}
-            >
-              <List size={16} />
-              <span>{t('timetable.viewList', 'Liste')}</span>
-            </button>
-          </div>
-
+        <div className="header-actions">
           <button className="btn-print-week" onClick={() => window.print()} title={t('timetable.printWeek', 'Imprimer ma semaine')}>
             <Printer size={16} />
             <span>{t('timetable.printWeek', 'Imprimer ma semaine')}</span>
@@ -135,204 +172,312 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
             <span>{t('timetable.importBtn', 'Importer PDF/Image (OCR)')}</span>
           </button>
 
-          <button className="btn-add-session" onClick={() => setIsFormOpen(true)}>
-            <Plus size={16} />
-            <span>{t('timetable.addSessionBtn', 'Ajouter une séance')}</span>
-          </button>
+          {!isPastWeek && (
+            <button className="btn-add-session" onClick={() => handleOpenCreateModal({ dayOfWeek: 0, startTime: '08:00' })}>
+              <Plus size={16} />
+              <span>{t('timetable.addSessionBtn', 'Ajouter une séance')}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Content Area */}
-      {loading ? (
-        <div className="timetable-loading glass-card">
-          <Clock size={24} className="animate-spin text-indigo" />
-          <span>{t('timetable.loadingText', 'Chargement du planning hebdomadaire...')}</span>
+      {/* Week Selector Bar */}
+      <div className="week-selector-bar glass-card">
+        <button className="week-nav-btn" onClick={() => handleNavigateWeek(-1)} title="Semaine précédente">
+          <ChevronLeft size={18} />
+        </button>
+
+        <div className="week-range-label">
+          <CalendarIcon size={16} className="text-indigo" />
+          <span className="week-span-text">{formatWeekSpanLabel(selectedWeekMonday)}</span>
+
+          {isPastWeek && <span className="archive-pill">🔒 Archivée (Lecture seule)</span>}
+          {isCurrentWeek && <span className="current-pill">✨ Cette semaine</span>}
         </div>
-      ) : !hasAnySession ? (
-        <div className="empty-state">
-          <div className="empty-icon-circle">
-            <CalendarIcon size={32} />
-          </div>
-          <h3>{t('timetable.emptyTitle', 'Aucune séance programmée')}</h3>
-          <p>{t('timetable.emptySub', 'Ajoutez vos cours et révisions manuellement, ou importez votre emploi du temps via l\'OCR.')}</p>
-        </div>
-      ) : viewMode === 'grid' ? (
-        /* Grid View */
-        <div className="grid-container glass-card">
-          <div className="grid-header-row">
-            <div className="time-col-header">{t('timetable.hoursCol', 'Heures')}</div>
-            {DAYS.map((d) => (
-              <div key={d.key} className="day-col-header">
-                {d.label}
-              </div>
-            ))}
-          </div>
 
-          <div className="grid-body">
-            {TIME_SLOTS.map((time) => (
-              <div key={time} className="time-row">
-                <div className="time-label">{time}</div>
+        <button className="week-nav-btn" onClick={() => handleNavigateWeek(1)} title="Semaine suivante">
+          <ChevronRight size={18} />
+        </button>
 
-                {DAYS.map((day) => {
-                  const daySessions = Array.isArray(weekData?.[day.key]) ? (weekData as TimetableWeekData)[day.key] : [];
-                  const activeSessions = daySessions.filter((s: TimetableSession) => {
-                    const startHour = parseInt(s.startTime.split(':')[0], 10);
-                    const slotHour = parseInt(time.split(':')[0], 10);
-                    return startHour === slotHour;
-                  });
+        {!isCurrentWeek && (
+          <button className="btn-today-reset" onClick={() => setSelectedWeekMonday(currentMonday)}>
+            Aujourd'hui
+          </button>
+        )}
+      </div>
 
-                  return (
-                    <div key={day.key} className="slot-cell">
-                      {activeSessions.map((sess: TimetableSession) => (
-                        <div
-                          key={sess.id}
-                          className={`session-block ${sess.hasConflict ? 'conflict' : ''}`}
-                          style={{ borderColor: sess.color || 'var(--primary)' }}
-                          onClick={() => handleOpenDetails(sess)}
-                        >
-                          <div className="block-top">
-                            <span className="type-badge">{sess.sessionType}</span>
-                            {sess.hasConflict && (
-                              <AlertTriangle size={12} className="text-amber" />
-                            )}
-                          </div>
-                          <span className="subject-title">{sess.subject?.name || 'Matière'}</span>
-                          <span className="time-span">{sess.startTime} - {sess.endTime}</span>
-                          {sess.room && <span className="room-span">{sess.room}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* List View */
-        <div className="list-container">
-          {DAYS.map((day) => {
-            const daySessions = Array.isArray(weekData?.[day.key]) ? (weekData as TimetableWeekData)[day.key] : [];
-            if (daySessions.length === 0) return null;
-
-            return (
-              <div key={day.key} className="day-list-card glass-card">
-                <h3>{day.label}</h3>
-                <div className="day-sessions-list">
-                  {daySessions.map((sess: TimetableSession) => (
-                    <div
-                      key={sess.id}
-                      className="list-session-item"
-                      onClick={() => handleOpenDetails(sess)}
-                    >
-                      <span className="list-type">{sess.sessionType}</span>
-                      <div className="list-main">
-                        <span className="list-subject">{sess.subject?.name || 'Matière'}</span>
-                        <div className="list-meta">
-                          <span><Clock size={12} /> {sess.startTime} - {sess.endTime}</span>
-                          {sess.room && <span><MapPin size={12} /> {sess.room}</span>}
-                        </div>
-                      </div>
-                      {sess.hasConflict && (
-                        <span className="badge-conflict"><AlertTriangle size={12} /> Conflit</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {/* Past Week Read-Only Banner */}
+      {isPastWeek && (
+        <div className="past-week-banner glass-card">
+          <Lock size={16} className="text-amber" />
+          <span>Cette semaine est archivée en lecture seule. Vous pouvez consulter et imprimer l'emploi du temps passé.</span>
         </div>
       )}
 
-      {/* Session Form Modal */}
+      {/* Main Content Layout (Sidebar + 24H Grid) */}
+      <div className="timetable-main-layout">
+        <CoursesSidebarDrawer
+          tree={tree}
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          isPastWeek={isPastWeek}
+        />
+
+        <div className="timetable-grid-column">
+          {loading ? (
+            <div className="timetable-loading glass-card">
+              <Clock size={24} className="spinning text-indigo" />
+              <span>Chargement du planning...</span>
+            </div>
+          ) : (
+            <TimetableGrid
+              weekData={weekData}
+              selectedWeekMonday={selectedWeekMonday}
+              isPastWeek={isPastWeek}
+              onOpenSessionDetails={handleOpenDetails}
+              onOpenCreateModal={handleOpenCreateModal}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Create Session Modal */}
       <SessionFormModal
         isOpen={isFormOpen}
-        tree={tree}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setModalCreateParams({});
+        }}
         onSuccess={loadData}
+        initialDayOfWeek={modalCreateParams.dayOfWeek ?? 0}
+        initialStartTime={modalCreateParams.startTime ?? '08:00'}
+        initialEcueId={modalCreateParams.ecueId}
+        initialSubjectId={modalCreateParams.subjectId}
+        initialDurationMinutes={90}
+        tree={tree}
       />
 
       {/* Session Details Modal */}
       <SessionDetailsModal
-        session={selectedSession}
         isOpen={isDetailsOpen}
-        onClose={() => setIsDetailsOpen(false)}
-        onDelete={loadData}
-        onNavigateToDocuments={onNavigateToDocuments ? (subjectId) => onNavigateToDocuments(subjectId) : () => {}}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        onDeleteSuccess={loadData}
+        onNavigateToDocuments={onNavigateToDocuments}
       />
 
-      {/* Timetable Import Modal */}
+      {/* Import OCR Modal */}
       <TimetableImportModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onSuccess={loadData}
       />
 
-      {/* Printable Weekly Sheet (hidden on screen, visible on print) */}
-      <PrintWeeklySheet weekData={weekData} />
+      {/* Print Sheet Hidden Container */}
+      <PrintWeeklySheet weekData={weekData} selectedWeekMonday={selectedWeekMonday} />
 
       <style>{`
-        .timetable-page { display: flex; flex-direction: column; gap: 1.25rem; }
-        .timetable-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-        .title-group { display: flex; align-items: center; gap: 0.75rem; }
-        .title-group h2 { font-size: 1.35rem; font-weight: 800; }
-        .sub-title { font-size: 0.8rem; color: var(--text-muted); }
-
-        .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-        .view-toggle { display: flex; padding: 0.2rem; gap: 0.2rem; }
-        .toggle-btn { display: flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.775rem; font-weight: 600; color: var(--text-muted); }
-        .toggle-btn.active { background: var(--gradient-primary); color: #ffffff; }
-
-        .btn-print-week { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 0.95rem; border-radius: var(--radius-md); background: rgba(232, 201, 192, 0.18); color: #e8c9c0; font-size: 0.825rem; font-weight: 600; border: 1px solid rgba(232, 201, 192, 0.35); cursor: pointer; transition: all 0.2s ease; }
-        .btn-print-week:hover { background: rgba(232, 201, 192, 0.28); transform: translateY(-1px); }
-
-        .btn-import-file { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 0.95rem; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.15); color: var(--primary); font-size: 0.825rem; font-weight: 600; border: 1px solid rgba(99, 102, 241, 0.3); }
-        .btn-add-session { display: flex; align-items: center; gap: 0.35rem; padding: 0.55rem 1.15rem; border-radius: var(--radius-md); background: var(--gradient-primary); color: #ffffff; font-size: 0.825rem; font-weight: 700; box-shadow: var(--shadow-glow); }
-
-        .timetable-loading { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 3rem; font-size: 0.9rem; color: var(--text-muted); }
-
-        .empty-card { padding: 3rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
-        .empty-card h3 { font-size: 1.1rem; font-weight: 700; }
-        .empty-card p { font-size: 0.85rem; color: var(--text-muted); }
-
-        /* Grid Layout */
-        .grid-container { display: flex; flex-direction: column; overflow-x: auto; padding: 1rem; }
-        .grid-header-row { display: grid; grid-template-columns: 70px repeat(7, minmax(130px, 1fr)); border-bottom: 1px solid var(--border-color); pb: 0.5rem; text-align: center; font-weight: 700; font-size: 0.85rem; color: var(--text-primary); }
-        .time-col-header { color: var(--text-muted); font-size: 0.775rem; }
-
-        .grid-body { display: flex; flex-direction: column; }
-        .time-row { display: grid; grid-template-columns: 70px repeat(7, minmax(130px, 1fr)); border-bottom: 1px dashed rgba(255, 255, 255, 0.05); min-height: 70px; }
-        .time-label { font-size: 0.75rem; color: var(--text-muted); pt: 0.5rem; font-weight: 600; }
-
-        .slot-cell { padding: 0.25rem; display: flex; flex-direction: column; gap: 0.25rem; border-left: 1px solid rgba(255, 255, 255, 0.03); }
-
-        .session-block {
-          padding: 0.45rem; border-radius: var(--radius-sm); background: rgba(99, 102, 241, 0.12);
-          border-left: 3px solid var(--primary); cursor: pointer; display: flex; flex-direction: column; gap: 0.15rem; transition: transform 0.2s ease;
+        .timetable-page {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
         }
-        .session-block:hover { transform: translateY(-2px); }
-        .session-block.conflict { border-color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
 
-        .block-top { display: flex; align-items: center; justify-content: space-between; }
-        .type-badge { font-size: 0.625rem; font-weight: 800; uppercase; color: var(--primary); }
-        .subject-title { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .time-span { font-size: 0.7rem; color: var(--text-muted); }
-        .room-span { font-size: 0.675rem; color: var(--accent-cyan); font-weight: 600; }
+        .page-header {
+          padding: 1.25rem 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
 
-        /* List Layout */
-        .list-container { display: flex; flex-direction: column; gap: 1rem; }
-        .day-list-card { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-        .day-list-card h3 { font-size: 1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); pb: 0.35rem; }
+        .header-info-group {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
 
-        .day-sessions-list { display: flex; flex-direction: column; gap: 0.5rem; }
-        .list-session-item { display: flex; align-items: center; gap: 0.85rem; padding: 0.65rem 0.85rem; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); cursor: pointer; }
-        .list-type { font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); background: rgba(99, 102, 241, 0.2); color: var(--primary); }
-        .list-main { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
-        .list-subject { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); }
-        .list-meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; color: var(--text-muted); }
-        .badge-conflict { display: flex; align-items: center; gap: 0.25rem; font-size: 0.725rem; color: #f59e0b; font-weight: 700; }
+        .page-header-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
+        .header-title-box h1 {
+          font-size: 1.35rem;
+          font-weight: 700;
+        }
+
+        .header-title-box .subtitle {
+          font-size: 0.825rem;
+          color: var(--text-muted);
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .btn-print-week, .btn-import-file, .btn-add-session {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 0.85rem;
+          border-radius: 8px;
+          font-size: 0.825rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-print-week {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+        }
+        .btn-print-week:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-import-file {
+          background: rgba(6, 182, 212, 0.15);
+          border: 1px solid rgba(6, 182, 212, 0.3);
+          color: #38bdf8;
+        }
+        .btn-import-file:hover {
+          background: rgba(6, 182, 212, 0.25);
+        }
+
+        .btn-add-session {
+          background: var(--gradient-primary);
+          border: none;
+          color: #ffffff;
+        }
+        .btn-add-session:hover {
+          opacity: 0.9;
+        }
+
+        .week-selector-bar {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 1rem;
+          padding: 0.65rem 1.25rem;
+          border-radius: 12px;
+        }
+
+        .week-nav-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .week-nav-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .week-range-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .week-span-text {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .archive-pill {
+          font-size: 0.72rem;
+          font-weight: 700;
+          padding: 0.15rem 0.5rem;
+          border-radius: 12px;
+          background: rgba(245, 158, 11, 0.2);
+          color: #fbbf24;
+          border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .current-pill {
+          font-size: 0.72rem;
+          font-weight: 700;
+          padding: 0.15rem 0.5rem;
+          border-radius: 12px;
+          background: rgba(99, 102, 241, 0.2);
+          color: #818cf8;
+          border: 1px solid rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-today-reset {
+          padding: 0.25rem 0.65rem;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          font-size: 0.78rem;
+          cursor: pointer;
+        }
+        .btn-today-reset:hover {
+          background: rgba(255, 255, 255, 0.2);
+          color: var(--text-primary);
+        }
+
+        .past-week-banner {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.65rem 1rem;
+          border-radius: 10px;
+          background: rgba(245, 158, 11, 0.12);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          color: #fde68a;
+          font-size: 0.85rem;
+        }
+
+        .timetable-main-layout {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
+        }
+
+        .timetable-grid-column {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          min-width: 0;
+        }
+
+        .timetable-loading {
+          padding: 3rem;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          font-size: 0.85rem;
+          color: var(--text-muted);
+        }
+
+        .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
         .text-indigo { color: var(--primary); }
         .text-amber { color: #f59e0b; }
       `}</style>

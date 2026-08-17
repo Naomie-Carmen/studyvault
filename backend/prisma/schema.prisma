@@ -47,6 +47,7 @@ model User {
   feedbacks                 Feedback[]
   noteTypes                 NoteType[]
   notes                     Note[]
+  weekArchives              WeekArchive[]
 
   @@index([email])
 }
@@ -449,3 +450,16 @@ model Note {
   @@index([userId])
   @@index([ecueId])
 }
+
+model WeekArchive {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart String   // YYYY-MM-DD (Monday date)
+  data      Json     // Array of session snapshots for that week
+  createdAt DateTime @default(now())
+
+  @@unique([userId, weekStart])
+  @@index([userId])
+}
+

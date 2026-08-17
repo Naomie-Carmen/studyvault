@@ -68,12 +68,20 @@
       "simpleModeLabel": "Simple average (all grades weigh equally)"
     },
     "structure": {
-      "title": "Course Structure Mode",
-      "desc": "Define how ECUEs relate to course subjects",
+      "title": "Academic Structure Mode",
+      "desc": "Define relationship between ECUEs and subjects",
       "ecueIsSubject": "ECUE = Subject (Recommended)",
-      "ecueIsSubjectDesc": "Each ECUE directly acts as a course subject.",
+      "ecueIsSubjectDesc": "Each ECUE acts directly as a course subject.",
       "ecueHasSubjects": "Multi-subject ECUE",
-      "ecueHasSubjectsDesc": "Each ECUE contains multiple sub-subjects (Lectures/Tutorials)."
+      "ecueHasSubjectsDesc": "Each ECUE contains multiple sub-subjects."
+    },
+    "sessionTypes": {
+      "title": "Session Types & Colors",
+      "desc": "Customize course session types (Lecture, Tutorial, Exam...) and colors in timetable",
+      "alreadyExists": "This session type already exists.",
+      "reset": "Reset default session types",
+      "resetBtn": "Reset",
+      "addBtn": "Add a session type (e.g. Exam, Quiz...)"
     }
   },
   "timetable": {

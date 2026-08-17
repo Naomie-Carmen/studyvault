@@ -8,11 +8,12 @@ type TimetableWeekData = Record<number, TimetableSession[]>;
 
 interface PrintWeeklySheetProps {
   weekData: TimetableWeekData | null;
+  selectedWeekMonday?: Date;
 }
 
-function getWeekRange(): { mondayStr: string; sundayStr: string } {
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
+function getWeekRange(refDate?: Date): { mondayStr: string; sundayStr: string } {
+  const now = refDate ? new Date(refDate) : new Date();
+  const dayOfWeek = now.getDay();
   const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
 
   const monday = new Date(now);
@@ -34,12 +35,12 @@ function getWeekRange(): { mondayStr: string; sundayStr: string } {
   };
 }
 
-export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({ weekData }) => {
+export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({ weekData, selectedWeekMonday }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { profile } = useAcademic();
 
-  const { mondayStr, sundayStr } = getWeekRange();
+  const { mondayStr, sundayStr } = getWeekRange(selectedWeekMonday);
   const todayFormatted = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',

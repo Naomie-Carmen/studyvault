@@ -18,6 +18,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { GradeConfigSection } from '../components/settings/GradeConfigSection';
+import { SessionTypeConfigSection } from '../components/settings/SessionTypeConfigSection';
 
 interface SettingsPageProps {
   onNavigate?: (tab: string) => void;
@@ -215,6 +216,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
         {/* Section 3.5: Barème de notation */}
         <GradeConfigSection />
+
+        {/* Section 3.55: Types de Séance */}
+        <SessionTypeConfigSection />
 
         {/* Section 3.6: Structure Pédagogique */}
         <div className="glass-card settings-card">

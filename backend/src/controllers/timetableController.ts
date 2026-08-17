@@ -169,3 +169,37 @@ export async function rejectSuggestions(req: Request, res: Response, next: NextF
     next(err);
   }
 }
+
+export async function listArchives(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const archives = await timetableService.getWeekArchives(req.user.id);
+    sendSuccess(res, archives);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getArchive(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const archive = await timetableService.getWeekArchive(req.user.id, req.params.weekStart);
+    sendSuccess(res, archive);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function syncArchives(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { currentWeekStart } = req.body;
+    if (!currentWeekStart) {
+      throw ApiError.badRequest('La date de début de semaine est obligatoire.');
+    }
+    const archives = await timetableService.syncPastWeekArchives(req.user.id, currentWeekStart);
+    sendSuccess(res, archives);
+  } catch (err) {
+    next(err);
+  }
+}

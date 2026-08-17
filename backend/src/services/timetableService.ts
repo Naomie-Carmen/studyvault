@@ -77,6 +77,7 @@ export async function getSessions(
     where,
     include: {
       subject: { select: { id: true, name: true, color: true } },
+      ecue: { select: { id: true, title: true, code: true, instructor: true } },
     },
     orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
   });
@@ -237,4 +238,63 @@ export async function getTimetableImports(userId: string): Promise<TimetableImpo
     where: { userId },
     orderBy: { createdAt: 'desc' },
   });
+}
+
+export async function getWeekArchives(userId: string) {
+  return prisma.weekArchive.findMany({
+    where: { userId },
+    orderBy: { weekStart: 'desc' },
+  });
+}
+
+export async function getWeekArchive(userId: string, weekStart: string) {
+  return prisma.weekArchive.findUnique({
+    where: {
+      userId_weekStart: { userId, weekStart },
+    },
+  });
+}
+
+export async function saveWeekArchive(userId: string, weekStart: string, data: any) {
+  return prisma.weekArchive.upsert({
+    where: {
+      userId_weekStart: { userId, weekStart },
+    },
+    create: {
+      userId,
+      weekStart,
+      data,
+    },
+    update: {
+      data,
+    },
+  });
+}
+
+export async function syncPastWeekArchives(userId: string, currentWeekStart: string) {
+  const existingArchives = await prisma.weekArchive.findMany({
+    where: { userId },
+    select: { weekStart: true },
+  });
+  const existingDates = new Set(existingArchives.map((a) => a.weekStart));
+
+  const allSessions = await getSessions(userId);
+  const currentMonday = new Date(currentWeekStart);
+
+  for (let i = 1; i <= 12; i++) {
+    const pastMondayDate = new Date(currentMonday.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    const pastWeekStart = pastMondayDate.toISOString().split('T')[0];
+
+    if (!existingDates.has(pastWeekStart)) {
+      await prisma.weekArchive.create({
+        data: {
+          userId,
+          weekStart: pastWeekStart,
+          data: allSessions as any,
+        },
+      });
+    }
+  }
+
+  return getWeekArchives(userId);
 }

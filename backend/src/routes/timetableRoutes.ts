@@ -13,7 +13,10 @@ import {
   processImport,
   getSuggestions,
   validateSuggestions,
-  rejectSuggestions
+  rejectSuggestions,
+  listArchives,
+  getArchive,
+  syncArchives
 } from '../controllers/timetableController';
 import { requireAuth } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
@@ -27,6 +30,10 @@ router.get('/week', getWeek);
 router.get('/today', getToday);
 router.get('/upcoming', getUpcoming);
 router.get('/stats', getStats);
+
+router.get('/archives', listArchives);
+router.get('/archives/:weekStart', getArchive);
+router.post('/archives/sync', syncArchives);
 
 router.patch('/sessions/:id', updateSession);
 router.delete('/sessions/:id', deleteSession);
