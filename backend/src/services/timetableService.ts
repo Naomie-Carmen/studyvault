@@ -15,12 +15,47 @@ export async function createSession(
   userId: string,
   input: TimetableSessionInput
 ): Promise<TimetableSessionDTO> {
-  const subject = await prisma.subject.findUnique({
-    where: { id: input.subjectId },
+  let targetSubjectId = input.subjectId;
+  let targetEcueId = input.ecueId || null;
+
+  // 1. Try finding Subject directly
+  let subject = await prisma.subject.findUnique({
+    where: { id: targetSubjectId },
   });
 
+  // 2. If subject not found, targetSubjectId or input.ecueId might be an ECUE id!
   if (!subject) {
-    throw ApiError.notFound('Matière introuvable.');
+    const searchEcueId = input.ecueId || input.subjectId;
+    if (searchEcueId) {
+      const ecue = await prisma.eCUE.findUnique({
+        where: { id: searchEcueId },
+        include: { subjects: true },
+      });
+
+      if (ecue) {
+        targetEcueId = ecue.id;
+
+        if (ecue.subjects && ecue.subjects.length > 0) {
+          subject = ecue.subjects[0];
+          targetSubjectId = subject.id;
+        } else {
+          // Create a mirror Subject for this ECUE automatically
+          subject = await prisma.subject.create({
+            data: {
+              name: ecue.title,
+              ecueId: ecue.id,
+              instructor: ecue.instructor,
+              color: '#6366f1',
+            },
+          });
+          targetSubjectId = subject.id;
+        }
+      }
+    }
+  }
+
+  if (!subject) {
+    throw ApiError.notFound('Matière ou ECUE introuvable.');
   }
 
   // Check for conflict (overlapping session on same day)
@@ -36,7 +71,8 @@ export async function createSession(
   const session = await prisma.timetableSession.create({
     data: {
       userId,
-      subjectId: input.subjectId,
+      subjectId: targetSubjectId,
+      ecueId: targetEcueId,
       dayOfWeek: input.dayOfWeek,
       startTime: input.startTime,
       endTime: input.endTime,
@@ -48,6 +84,7 @@ export async function createSession(
     },
     include: {
       subject: { select: { id: true, name: true, color: true } },
+      ecue: { select: { id: true, title: true, code: true, instructor: true } },
     },
   });
 
