@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AcademicStructureTree } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
 import * as timetableService from '../../services/timetableService';
 import { TimetableSessionInput } from '../../types/validators';
-import { X, Plus, AlertCircle, Calendar } from 'lucide-react';
-
+import { X, Plus, AlertCircle, Calendar, BookOpen, Check } from 'lucide-react';
 import { getSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
 
 interface SessionFormModalProps {
@@ -44,18 +43,21 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   initialDurationMinutes = 90,
   tree,
 }) => {
-  const [subjectId, setSubjectId] = useState(initialSubjectId);
+  const [subjectId, setSubjectId] = useState<string>(initialSubjectId);
   const [selectedEcueId, setSelectedEcueId] = useState<string>(initialEcueId);
-  const [dayOfWeek, setDayOfWeek] = useState(initialDayOfWeek);
-  const [startTime, setStartTime] = useState(initialStartTime);
-  const [durationMinutes, setDurationMinutes] = useState(initialDurationMinutes);
-  const [endTime, setEndTime] = useState('09:30');
-  const [room, setRoom] = useState('');
-  const [instructor, setInstructor] = useState('');
+  const [dayOfWeek, setDayOfWeek] = useState<number>(initialDayOfWeek);
+  const [startTime, setStartTime] = useState<string>(initialStartTime);
+  const [durationMinutes, setDurationMinutes] = useState<number>(initialDurationMinutes);
+  const [endTime, setEndTime] = useState<string>('09:30');
+  const [room, setRoom] = useState<string>('');
+  const [instructor, setInstructor] = useState<string>('');
   const [sessionType, setSessionType] = useState<string>('CM');
   const [recurrence, setRecurrence] = useState<'weekly' | 'biweekly' | 'none'>('weekly');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState<string>('');
   const [availableTypes, setAvailableTypes] = useState<SessionTypeConfig[]>([]);
+
+  // Manual course picker toggle
+  const [showManualCoursePicker, setShowManualCoursePicker] = useState<boolean>(false);
 
   // Inline Quick Subject Creation Subform
   const [showQuickSubject, setShowQuickSubject] = useState(false);
@@ -83,80 +85,89 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     setDayOfWeek(initialDayOfWeek);
     setStartTime(initialStartTime);
     setDurationMinutes(initialDurationMinutes);
-    if (initialEcueId) setSelectedEcueId(initialEcueId);
-    if (initialSubjectId) setSubjectId(initialSubjectId);
+
+    const effectiveEcue = initialEcueId || '';
+    const effectiveSub = initialSubjectId || initialEcueId || '';
+
+    setSelectedEcueId(effectiveEcue);
+    setSubjectId(effectiveSub);
+    setShowManualCoursePicker(!effectiveEcue && !effectiveSub);
 
     updateEndTime(initialStartTime, initialDurationMinutes);
   }, [initialDayOfWeek, initialStartTime, initialEcueId, initialSubjectId, initialDurationMinutes, isOpen]);
 
-  // Pre-fill instructor and subject if initialEcueId is provided
-  useEffect(() => {
-    if (tree && selectedEcueId) {
-      for (const sem of tree.semesters) {
-        for (const ue of sem.ues) {
-          for (const ecue of ue.ecues) {
-            if (ecue.id === selectedEcueId) {
-              if (ecue.instructor) setInstructor(ecue.instructor);
-              if (!subjectId) {
-                if (ecue.subjects && ecue.subjects.length > 0) {
-                  setSubjectId(ecue.subjects[0].id);
-                } else {
-                  setSubjectId(ecue.id);
-                }
-              }
-              return;
-            }
-          }
-        }
-      }
-    }
-  }, [tree, selectedEcueId, subjectId]);
+  // Build full course options list (all ECUEs and Subjects)
+  const allCourseOptions = useMemo(() => {
+    const options: { id: string; name: string; ecueId?: string; instructor?: string | null }[] = [];
+    if (!tree) return options;
 
-  if (!isOpen) return null;
-
-  // Flatten all subjects and ECUEs from structure tree
-  const allSubjects: { id: string; name: string }[] = [];
-  const allEcues: { id: string; title: string }[] = [];
-  if (tree) {
     tree.semesters.forEach((sem) => {
       sem.ues.forEach((ue) => {
-        ue.directSubjects.forEach((sub) => {
-          allSubjects.push({
-            id: sub.id,
-            name: `S${sem.number} — ${ue.code ? ue.code + ' : ' : ''}${sub.name}`,
-          });
-        });
         ue.ecues.forEach((ecue) => {
-          allEcues.push({
+          options.push({
             id: ecue.id,
-            title: `S${sem.number} — ${ecue.code ? '[' + ecue.code + '] ' : ''}${ecue.title}`,
+            name: `S${sem.number} — ${ecue.code ? '[' + ecue.code + '] ' : ''}${ecue.title}`,
+            ecueId: ecue.id,
+            instructor: ecue.instructor,
           });
-          if (ecue.subjects && ecue.subjects.length > 0) {
-            ecue.subjects.forEach((sub) => {
-              allSubjects.push({
+
+          ecue.subjects?.forEach((sub) => {
+            if (sub.id !== ecue.id) {
+              options.push({
                 id: sub.id,
                 name: `S${sem.number} — ${ecue.code ? '[' + ecue.code + '] ' : ''}${sub.name}`,
+                ecueId: ecue.id,
+                instructor: sub.instructor || ecue.instructor,
               });
-            });
-          }
+            }
+          });
+        });
+
+        ue.directSubjects?.forEach((sub) => {
+          options.push({
+            id: sub.id,
+            name: `S${sem.number} — ${ue.code ? '[' + ue.code + '] ' : ''}${sub.name}`,
+            instructor: sub.instructor,
+          });
         });
       });
     });
-  }
 
-  const handleSubjectChange = (newSubId: string) => {
-    setSubjectId(newSubId);
-    if (!tree) return;
-    for (const sem of tree.semesters) {
-      for (const ue of sem.ues) {
-        for (const ecue of ue.ecues) {
-          if (ecue.subjects.some((sub) => sub.id === newSubId) || ecue.id === newSubId) {
-            setSelectedEcueId(ecue.id);
-            return;
-          }
-        }
+    return options;
+  }, [tree]);
+
+  // Find title of pre-selected course
+  const selectedCourseLabel = useMemo(() => {
+    const activeId = subjectId || selectedEcueId;
+    if (!activeId) return null;
+    const match = allCourseOptions.find((o) => o.id === activeId || o.ecueId === activeId);
+    return match ? match.name : null;
+  }, [allCourseOptions, subjectId, selectedEcueId]);
+
+  // Pre-fill instructor when course changes
+  useEffect(() => {
+    const activeId = subjectId || selectedEcueId;
+    if (activeId && allCourseOptions.length > 0) {
+      const match = allCourseOptions.find((o) => o.id === activeId || o.ecueId === activeId);
+      if (match && match.instructor) {
+        setInstructor(match.instructor);
       }
     }
+  }, [subjectId, selectedEcueId, allCourseOptions]);
+
+  if (!isOpen) return null;
+
+  const handleSelectCourse = (chosenId: string) => {
+    const match = allCourseOptions.find((o) => o.id === chosenId);
+    if (match) {
+      setSubjectId(match.id);
+      if (match.ecueId) setSelectedEcueId(match.ecueId);
+      else setSelectedEcueId(match.id);
+      if (match.instructor) setInstructor(match.instructor);
+    } else {
+      setSubjectId(chosenId);
+    }
+    setShowManualCoursePicker(false);
   };
 
   const handleCreateQuickSubject = async () => {
@@ -166,9 +177,12 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
         title: newSubjectName.trim(),
         ueId: selectedUeId,
       });
-      if (res.success) {
+      if (res.success && res.data) {
         setShowQuickSubject(false);
         setNewSubjectName('');
+        setSelectedEcueId(res.data.id);
+        setSubjectId(res.data.id);
+        setShowManualCoursePicker(false);
         onSuccess();
       }
     } catch (_e) {
@@ -180,8 +194,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!subjectId) {
-      setErrorMsg('Veuillez sélectionner une matière d\'enseignement.');
+    const finalSubId = subjectId || selectedEcueId;
+
+    if (!finalSubId) {
+      setErrorMsg('Veuillez sélectionner un cours ou une ECUE.');
       return;
     }
 
@@ -198,7 +214,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
       ].filter(Boolean).join('\n');
 
       const payload: TimetableSessionInput = {
-        subjectId,
+        subjectId: finalSubId,
         ecueId: selectedEcueId || null,
         dayOfWeek: Number(dayOfWeek),
         startTime,
@@ -226,10 +242,11 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   return (
     <div className="modal-backdrop">
       <div className="glass-card session-modal-card">
+        {/* Header */}
         <div className="modal-header">
           <div className="title-group">
-            <Calendar size={18} className="text-indigo" />
-            <h3>Nouvelle Séance de Cours</h3>
+            <Calendar size={20} className="text-indigo" />
+            <h3>Ajouter une Séance de Cours</h3>
           </div>
           <button className="btn-close" onClick={onClose}>
             <X size={18} />
@@ -244,102 +261,130 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           )}
 
-          {/* Subject / ECUE Picker with Quick Create Trigger */}
-          <div className="form-group">
-            <div className="label-row">
-              <label>ECUE / Matière d'enseignement *</label>
+          {/* Locked Selected Course Banner OR Dropdown Switcher */}
+          {!showManualCoursePicker && selectedCourseLabel ? (
+            <div className="selected-course-banner glass-card">
+              <div className="banner-left">
+                <BookOpen size={18} className="text-indigo" />
+                <div className="banner-text">
+                  <span className="banner-sub">Cours sélectionné :</span>
+                  <span className="banner-main-title">{selectedCourseLabel}</span>
+                </div>
+              </div>
               <button
                 type="button"
-                className="btn-quick-create"
-                onClick={() => setShowQuickSubject(!showQuickSubject)}
+                className="btn-switch-course"
+                onClick={() => setShowManualCoursePicker(true)}
               >
-                <Plus size={12} />
-                <span>Créer une ECUE</span>
+                Changer
               </button>
             </div>
-
-            {showQuickSubject ? (
-              <div className="quick-subject-subform glass-card">
-                <input
-                  type="text"
-                  placeholder="Intitulé de l'ECUE (ex: Microéconomie II)"
-                  value={newSubjectName}
-                  onChange={(e) => setNewSubjectName(e.target.value)}
-                />
-                <select
-                  value={selectedUeId}
-                  onChange={(e) => setSelectedUeId(e.target.value)}
-                >
-                  <option value="">Sélectionnez l'UE parente *</option>
-                  {tree?.semesters.flatMap((sem) =>
-                    sem.ues.map((ue) => (
-                      <option key={ue.id} value={ue.id}>
-                        S{sem.number} — {ue.title}
-                      </option>
-                    ))
-                  )}
-                </select>
+          ) : (
+            <div className="form-group">
+              <div className="label-row">
+                <label>ECUE / Matière d'enseignement *</label>
                 <button
                   type="button"
-                  className="btn-save-sub"
-                  onClick={handleCreateQuickSubject}
+                  className="btn-quick-create"
+                  onClick={() => setShowQuickSubject(!showQuickSubject)}
                 >
-                  Valider la création
+                  <Plus size={12} />
+                  <span>Nouveau cours</span>
                 </button>
               </div>
-            ) : (
-              <select
-                value={subjectId}
-                onChange={(e) => handleSubjectChange(e.target.value)}
-                required
-              >
-                <option value="">Sélectionnez une ECUE / matière...</option>
-                {allSubjects.map((sub) => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
 
-          {/* ECUE Link Option */}
-          {allEcues.length > 0 && (
-            <div className="form-group">
-              <label>Lier à une ECUE (Suggestion automatique)</label>
-              <select
-                value={selectedEcueId}
-                onChange={(e) => setSelectedEcueId(e.target.value)}
-              >
-                <option value="">Aucune ECUE spécifique</option>
-                {allEcues.map((ecue) => (
-                  <option key={ecue.id} value={ecue.id}>
-                    {ecue.title}
-                  </option>
-                ))}
-              </select>
+              {showQuickSubject ? (
+                <div className="quick-subject-subform glass-card">
+                  <input
+                    type="text"
+                    placeholder="Intitulé du cours (ex: Microéconomie II)"
+                    value={newSubjectName}
+                    onChange={(e) => setNewSubjectName(e.target.value)}
+                  />
+                  <select
+                    value={selectedUeId}
+                    onChange={(e) => setSelectedUeId(e.target.value)}
+                  >
+                    <option value="">Sélectionnez l'UE parente *</option>
+                    {tree?.semesters.flatMap((sem) =>
+                      sem.ues.map((ue) => (
+                        <option key={ue.id} value={ue.id}>
+                          S{sem.number} — {ue.title}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn-save-sub"
+                    onClick={handleCreateQuickSubject}
+                  >
+                    Créer et sélectionner
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={subjectId || selectedEcueId}
+                  onChange={(e) => handleSelectCourse(e.target.value)}
+                  required
+                >
+                  <option value="">-- Sélectionnez une ECUE / matière --</option>
+                  {allCourseOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
-          {/* Day of Week */}
-          <div className="form-group">
-            <label>Jour de la semaine *</label>
-            <select
-              value={dayOfWeek}
-              onChange={(e) => setDayOfWeek(Number(e.target.value))}
-            >
-              {DAYS_OF_WEEK.map((day, idx) => (
-                <option key={idx} value={idx}>
-                  {day}
-                </option>
-              ))}
-            </select>
+          {/* Prominent Session Type Chips Selector (CM, TD, TP, Compo, Révision...) */}
+          <div className="form-group margin-top-sm">
+            <label className="section-label">Type de séance (CM, TD, Compo, Révision...) *</label>
+            <div className="type-chips-container">
+              {availableTypes.map((type) => {
+                const isActive = sessionType === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    className={`type-chip-btn ${isActive ? 'active' : ''}`}
+                    style={{
+                      borderColor: isActive ? type.color : 'rgba(255,255,255,0.15)',
+                      backgroundColor: isActive ? `${type.color}30` : 'rgba(15, 23, 42, 0.5)',
+                      color: isActive ? '#ffffff' : 'var(--text-primary)',
+                      boxShadow: isActive ? `0 0 12px ${type.color}40` : 'none',
+                    }}
+                    onClick={() => setSessionType(type.id)}
+                  >
+                    <span className="chip-color-dot" style={{ backgroundColor: type.color }} />
+                    <span className="chip-label">{type.id}</span>
+                    {isActive && <Check size={12} className="check-icon" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Times & Duration Row */}
+          {/* Day & Times Row */}
           <div className="form-row">
             <div className="form-group flex-1">
-              <label>Heure de début *</label>
+              <label>Jour *</label>
+              <select
+                value={dayOfWeek}
+                onChange={(e) => setDayOfWeek(Number(e.target.value))}
+              >
+                {DAYS_OF_WEEK.map((day, idx) => (
+                  <option key={idx} value={idx}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group flex-1">
+              <label>Début *</label>
               <input
                 type="time"
                 value={startTime}
@@ -352,7 +397,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
 
             <div className="form-group flex-1">
-              <label>Durée estimée *</label>
+              <label>Durée *</label>
               <select
                 value={durationMinutes}
                 onChange={(e) => {
@@ -370,7 +415,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
 
             <div className="form-group flex-1">
-              <label>Heure de fin *</label>
+              <label>Fin *</label>
               <input
                 type="time"
                 value={endTime}
@@ -380,54 +425,25 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Session Type Radios (Dynamic) */}
-          <div className="form-group">
-            <label>Type de séance *</label>
-            <div className="session-type-radios">
-              {availableTypes.map((t) => (
-                <label
-                  key={t.id}
-                  className={`type-radio-label ${sessionType === t.id ? 'active' : ''}`}
-                  style={{
-                    borderColor: sessionType === t.id ? t.color : undefined,
-                    backgroundColor: sessionType === t.id ? `${t.color}25` : undefined,
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="sessionType"
-                    value={t.id}
-                    checked={sessionType === t.id}
-                    onChange={() => setSessionType(t.id)}
-                  />
-                  <span style={{ color: sessionType === t.id ? t.color : undefined }}>
-                    {t.id} ({t.label})
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Enseignant Field */}
-          <div className="form-group">
-            <label>Enseignant / Intervenant (optionnel)</label>
-            <input
-              type="text"
-              placeholder="ex: Dr. Dupont / Prof. Martin"
-              value={instructor}
-              onChange={(e) => setInstructor(e.target.value)}
-            />
-          </div>
-
-          {/* Room & Recurrence */}
+          {/* Enseignant & Salle */}
           <div className="form-row">
             <div className="form-group flex-1">
               <label>Salle (optionnel)</label>
               <input
                 type="text"
-                placeholder="ex: Amphi B / Salle 204"
+                placeholder="ex: Amphi A, Salle 102"
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group flex-1">
+              <label>Enseignant (optionnel)</label>
+              <input
+                type="text"
+                placeholder="ex: Dr. Dupont"
+                value={instructor}
+                onChange={(e) => setInstructor(e.target.value)}
               />
             </div>
 
@@ -437,8 +453,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value as 'weekly' | 'biweekly' | 'none')}
               >
-                <option value="weekly">Chaque semaine</option>
-                <option value="biweekly">Une semaine sur deux</option>
+                <option value="weekly">Hebdomadaire</option>
+                <option value="biweekly">1 sem. sur 2</option>
                 <option value="none">Une seule fois</option>
               </select>
             </div>
@@ -446,90 +462,166 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
           {/* Notes */}
           <div className="form-group">
-            <label>Notes & consignes (optionnel)</label>
-            <textarea
-              placeholder="Consignes particulières, matériel à apporter..."
+            <label>Notes & remarques (optionnel)</label>
+            <input
+              type="text"
+              placeholder="ex: Chapitres 1 à 3, Apporter calculatrice..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
             />
           </div>
 
+          {/* Form Actions */}
           <div className="modal-actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onClose}
+              disabled={submitting}
+            >
               Annuler
             </button>
-            <button type="submit" className="btn-submit" disabled={submitting}>
-              {submitting ? 'Enregistrement...' : 'Enregistrer la séance'}
+
+            <button
+              type="submit"
+              className="btn-primary btn-submit-large"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <span>Enregistrement...</span>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <span>Ajouter la séance ({sessionType})</span>
+                </>
+              )}
             </button>
           </div>
         </form>
       </div>
 
       <style>{`
-        .modal-backdrop {
-          position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
-          display: flex; align-items: center; justify-content: center; z-index: 110; padding: 1rem;
-        }
-
         .session-modal-card {
-          width: 100%; max-width: 500px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+          width: 520px;
+          max-width: 95vw;
+          padding: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
         }
 
-        .modal-header {
-          display: flex; align-items: center; justify-content: space-between;
+        .selected-course-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.4);
         }
 
-        .title-group { display: flex; align-items: center; gap: 0.5rem; }
-        .title-group h3 { font-size: 1.1rem; font-weight: 700; }
-
-        .session-form { display: flex; flex-direction: column; gap: 0.85rem; }
-
-        .label-row { display: flex; align-items: center; justify-content: space-between; }
-
-        .btn-quick-create {
-          display: flex; align-items: center; gap: 0.25rem; font-size: 0.725rem; color: var(--primary); font-weight: 600;
+        .banner-left {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
         }
 
-        .quick-subject-subform {
-          padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25);
+        .banner-text {
+          display: flex;
+          flex-direction: column;
         }
 
-        .btn-save-sub {
-          padding: 0.4rem; border-radius: var(--radius-sm); background: var(--gradient-primary); color: #ffffff; font-size: 0.75rem; font-weight: 600;
+        .banner-sub {
+          font-size: 0.7rem;
+          color: #818cf8;
+          font-weight: 600;
+          text-transform: uppercase;
         }
 
-        .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
-        .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
-
-        .form-group input, .form-group select, .form-group textarea {
-          width: 100%; padding: 0.55rem; background: rgba(0, 0, 0, 0.25);
-          border: 1px solid var(--border-color); border-radius: var(--radius-md);
-          color: var(--text-primary); font-size: 0.85rem; outline: none;
+        .banner-main-title {
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #ffffff;
         }
 
-        .form-row { display: flex; gap: 0.75rem; }
-        .flex-1 { flex: 1; }
-
-        .session-type-radios { display: flex; gap: 0.4rem; }
-
-        .type-radio-label {
-          flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.25rem;
-          padding: 0.4rem; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.04);
-          border: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 700; cursor: pointer;
+        .btn-switch-course {
+          background: none;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: var(--text-secondary);
+          padding: 0.25rem 0.6rem;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+        .btn-switch-course:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.1);
         }
 
-        .type-radio-label input { display: none; }
-        .type-radio-label.active { background: var(--gradient-primary); color: #ffffff; border-color: transparent; }
-
-        .modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
-        .btn-cancel { padding: 0.5rem 0.85rem; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); font-size: 0.825rem; }
-        .btn-submit { padding: 0.5rem 1.15rem; border-radius: var(--radius-md); background: var(--gradient-primary); color: #ffffff; font-size: 0.825rem; font-weight: 600; }
-
-        .alert-error {
-          display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem; border-radius: var(--radius-md); background: var(--status-error-bg); color: var(--status-error); font-size: 0.8rem;
+        .section-label {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: var(--text-secondary);
+          margin-bottom: 0.4rem;
+          display: block;
         }
-        .text-indigo { color: var(--primary); }
+
+        .type-chips-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .type-chip-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 0.85rem;
+          border-radius: 20px;
+          border: 1px solid;
+          font-size: 0.825rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .type-chip-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .chip-color-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+
+        .btn-submit-large {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.6rem 1.25rem;
+          font-weight: 700;
+        }
+
+        .form-row {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .flex-1 {
+          flex: 1;
+        }
+
+        .margin-top-sm {
+          margin-top: 0.5rem;
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.75rem;
+          margin-top: 1rem;
+        }
       `}</style>
     </div>
   );
