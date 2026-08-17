@@ -6,7 +6,8 @@
     "academicSpace": "ACADEMIC SPACE",
     "academicProfile": "Academic Profile",
     "academicStructure": "Course Structure (UE / ECUE / Subjects)",
-    "academicDocuments": "Course Library",
+    "academicDocuments": "Academic Documents",
+    "library": "Library (Compartments)",
     "timetable": "Timetable (OCR)",
     "grades": "Grades & Averages",
     "confidentialSpace": "CONFIDENTIAL SPACE",
@@ -82,6 +83,15 @@
       "reset": "Reset default session types",
       "resetBtn": "Reset",
       "addBtn": "Add a session type (e.g. Exam, Quiz...)"
+    },
+    "defaultCategories": {
+      "title": "Default Compartments (Library)",
+      "desc": "Define default subfolders created for each new ECUE (e.g. CM, TD, Sujets...)",
+      "alreadyExists": "This compartment already exists.",
+      "atLeastOne": "There must be at least one default compartment.",
+      "resetBtn": "Reset",
+      "inputPlaceholder": "Compartment name (e.g. Exams, Projects...)",
+      "addBtn": "Add"
     }
   },
   "timetable": {

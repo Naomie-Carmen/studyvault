@@ -31,38 +31,14 @@ export async function getUserQuota(userId: string): Promise<UserQuotaDTO> {
 export async function uploadDocuments(
   userId: string,
   files: Express.Multer.File[],
-  params: { subjectId?: string; personalFolderId?: string; docType?: string }
+  params: { subjectId?: string; ecueId?: string; categoryId?: string; personalFolderId?: string; docType?: string }
 ): Promise<DocumentDTO[]> {
   if (!files || files.length === 0) {
     throw ApiError.badRequest('Aucun fichier transmis.');
   }
 
-  // A document must belong to EITHER subjectId OR personalFolderId
   if (params.subjectId && params.personalFolderId) {
     throw ApiError.badRequest('Un document ne peut pas appartenir simultanément à une matière et un coffre-fort.');
-  }
-
-  if (params.subjectId) {
-    const subject = await prisma.subject.findUnique({
-      where: { id: params.subjectId },
-      include: {
-        ue: { include: { semester: { include: { academicYear: true } } } },
-        ecue: { include: { ue: { include: { semester: { include: { academicYear: true } } } } } },
-      },
-    });
-    const ownerId = subject?.ue?.semester.academicYear.userId || subject?.ecue?.ue.semester.academicYear.userId;
-    if (!subject || ownerId !== userId) {
-      throw ApiError.notFound('Matière introuvable ou accès refusé.');
-    }
-  }
-
-  if (params.personalFolderId) {
-    const folder = await prisma.personalFolder.findUnique({
-      where: { id: params.personalFolderId },
-    });
-    if (!folder || folder.userId !== userId) {
-      throw ApiError.notFound('Dossier personnel introuvable ou accès refusé.');
-    }
   }
 
   // Calculate quota
@@ -72,7 +48,7 @@ export async function uploadDocuments(
     throw ApiError.badRequest('Quota de stockage dépassé (limite de 2 Go). Veuillez libérer de l\'espace.');
   }
 
-  const createdDocs: DocumentDTO[] = [];
+  const createdDocs: any[] = [];
 
   for (const file of files) {
     try {
@@ -82,6 +58,8 @@ export async function uploadDocuments(
         data: {
           userId,
           subjectId: params.subjectId || null,
+          ecueId: params.ecueId || null,
+          categoryId: params.categoryId || null,
           personalFolderId: params.personalFolderId || null,
           originalName: file.originalname,
           filePath: stored.finalPath,
@@ -90,6 +68,11 @@ export async function uploadDocuments(
           docType: params.docType || 'cours',
           status: 'ready',
           isDeleted: false,
+        },
+        include: {
+          category: true,
+          ecue: true,
+          subject: true,
         },
       });
 
@@ -106,6 +89,8 @@ export async function getDocuments(
   userId: string,
   filters: {
     subjectId?: string;
+    ecueId?: string;
+    categoryId?: string | null;
     personalFolderId?: string;
     docType?: string;
     search?: string;
@@ -119,6 +104,14 @@ export async function getDocuments(
 
   if (filters.subjectId) {
     where.subjectId = filters.subjectId;
+  }
+
+  if (filters.ecueId) {
+    where.ecueId = filters.ecueId;
+  }
+
+  if (filters.categoryId !== undefined) {
+    where.categoryId = filters.categoryId;
   }
 
   if (filters.personalFolderId) {
@@ -139,8 +132,13 @@ export async function getDocuments(
 
   return prisma.document.findMany({
     where,
+    include: {
+      category: true,
+      ecue: true,
+      subject: true,
+    },
     orderBy: { createdAt: 'desc' },
-  });
+  }) as any;
 }
 
 export async function getDocumentById(userId: string, documentId: string): Promise<DocumentDTO> {
@@ -290,5 +288,119 @@ export async function deletePersonalFolder(userId: string, folderId: string): Pr
 
   await prisma.personalFolder.delete({
     where: { id: folderId },
+  });
+}
+
+// Document Categories (Compartiments par ECUE)
+export async function getCategoriesForEcue(userId: string, ecueId: string) {
+  const ecue = await prisma.eCUE.findUnique({
+    where: { id: ecueId },
+  });
+  if (!ecue) {
+    throw ApiError.notFound('ECUE introuvable.');
+  }
+
+  let categories = await prisma.documentCategory.findMany({
+    where: { userId, ecueId },
+    orderBy: { order: 'asc' },
+  });
+
+  // First time opening ECUE: auto-create default categories (CM, TD, Sujets) if empty
+  if (categories.length === 0) {
+    const defaultNames = ['CM', 'TD', 'Sujets'];
+    const created = [];
+    for (let i = 0; i < defaultNames.length; i++) {
+      const cat = await prisma.documentCategory.create({
+        data: {
+          userId,
+          ecueId,
+          name: defaultNames[i],
+          order: i,
+        },
+      });
+      created.push(cat);
+    }
+    categories = created;
+  }
+
+  return categories;
+}
+
+export async function createCategory(userId: string, ecueId: string, name: string, order?: number) {
+  const existing = await prisma.documentCategory.findFirst({
+    where: { userId, ecueId, name: name.trim() },
+  });
+  if (existing) {
+    return existing;
+  }
+
+  return prisma.documentCategory.create({
+    data: {
+      userId,
+      ecueId,
+      name: name.trim(),
+      order: order ?? 0,
+    },
+  });
+}
+
+export async function updateCategory(userId: string, categoryId: string, name: string) {
+  const cat = await prisma.documentCategory.findFirst({
+    where: { id: categoryId, userId },
+  });
+  if (!cat) {
+    throw ApiError.notFound('Compartiment introuvable.');
+  }
+
+  return prisma.documentCategory.update({
+    where: { id: categoryId },
+    data: { name: name.trim() },
+  });
+}
+
+export async function deleteCategory(userId: string, categoryId: string) {
+  const cat = await prisma.documentCategory.findFirst({
+    where: { id: categoryId, userId },
+  });
+  if (!cat) {
+    throw ApiError.notFound('Compartiment introuvable.');
+  }
+
+  // Decouple documents into "Non classé" (categoryId = null), NEVER delete files!
+  await prisma.document.updateMany({
+    where: { categoryId },
+    data: { categoryId: null },
+  });
+
+  return prisma.documentCategory.delete({
+    where: { id: categoryId },
+  });
+}
+
+export async function moveDocumentCategory(userId: string, documentId: string, categoryId: string | null) {
+  const doc = await prisma.document.findFirst({
+    where: { id: documentId, userId },
+  });
+  if (!doc) {
+    throw ApiError.notFound('Document introuvable.');
+  }
+
+  if (categoryId) {
+    const cat = await prisma.documentCategory.findFirst({
+      where: { id: categoryId, userId },
+    });
+    if (!cat) {
+      throw ApiError.notFound('Compartiment cible introuvable.');
+    }
+  }
+
+  return prisma.document.update({
+    where: { id: documentId },
+    data: { categoryId },
+    include: {
+      category: true,
+      ecue: true,
+      subject: true,
+    },
   });
 }

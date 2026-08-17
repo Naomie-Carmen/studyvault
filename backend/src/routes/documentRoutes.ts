@@ -20,7 +20,12 @@ import {
   modifyClassification,
   rejectClassification,
   listUnclassified,
-  getCloudStatus
+  getCloudStatus,
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  moveDocumentCategory
 } from '../controllers/documentController';
 import { requireAuth, requireAuthOrToken } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
@@ -55,6 +60,12 @@ router.post('/trash/empty', emptyTrash);
 router.delete('/trash/:id', permanentlyDeleteDocument);
 router.get('/recently-viewed', getRecentlyViewed);
 router.get('/unclassified', listUnclassified);
+
+router.get('/categories', listCategories);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
+router.patch('/:id/category', moveDocumentCategory);
 
 router.get('/:id', getDocument);
 router.get('/:id/metadata', getMetadata);

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { GradeConfigSection } from '../components/settings/GradeConfigSection';
 import { SessionTypeConfigSection } from '../components/settings/SessionTypeConfigSection';
+import { DefaultCategoriesConfigSection } from '../components/settings/DefaultCategoriesConfigSection';
 
 interface SettingsPageProps {
   onNavigate?: (tab: string) => void;
@@ -219,6 +220,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
         {/* Section 3.55: Types de Séance */}
         <SessionTypeConfigSection />
+
+        {/* Section 3.56: Compartiments par Défaut */}
+        <DefaultCategoriesConfigSection />
 
         {/* Section 3.6: Structure Pédagogique */}
         <div className="glass-card settings-card">

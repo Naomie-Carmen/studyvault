@@ -48,6 +48,7 @@ model User {
   noteTypes                 NoteType[]
   notes                     Note[]
   weekArchives              WeekArchive[]
+  documentCategories        DocumentCategory[]
 
   @@index([email])
 }
@@ -153,6 +154,7 @@ model ECUE {
   notes      Note[]
   timetableSessions TimetableSession[]
   documents  Document[]
+  documentCategories DocumentCategory[]
 
   @@index([ueId])
 }
@@ -197,6 +199,8 @@ model Document {
   ecue                      ECUE?                      @relation(fields: [ecueId], references: [id], onDelete: SetNull)
   personalFolderId          String?
   personalFolder            PersonalFolder?            @relation(fields: [personalFolderId], references: [id], onDelete: SetNull)
+  categoryId                String?
+  category                  DocumentCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   originalName              String
   filePath                  String
   r2Key                     String?
@@ -218,6 +222,7 @@ model Document {
   @@index([subjectId])
   @@index([ecueId])
   @@index([personalFolderId])
+  @@index([categoryId])
   @@index([isDeleted])
   @@index([docType])
 }
@@ -461,5 +466,22 @@ model WeekArchive {
 
   @@unique([userId, weekStart])
   @@index([userId])
+}
+
+model DocumentCategory {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ecueId    String
+  ecue      ECUE       @relation(fields: [ecueId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  documents Document[]
+
+  @@unique([userId, ecueId, name])
+  @@index([userId])
+  @@index([ecueId])
 }
 

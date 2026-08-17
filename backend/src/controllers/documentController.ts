@@ -30,7 +30,7 @@ export async function uploadFiles(req: Request, res: Response, next: NextFunctio
   try {
     if (!req.user) throw ApiError.unauthorized();
 
-    const { subjectId, personalFolderId, docType, storageType } = req.body;
+    const { subjectId, ecueId, categoryId, personalFolderId, docType, storageType } = req.body;
 
     if (storageType === 'cloud' && !isR2Configured()) {
       throw ApiError.serviceUnavailable('Stockage cloud non configuré.');
@@ -45,6 +45,8 @@ export async function uploadFiles(req: Request, res: Response, next: NextFunctio
 
     const docs = await docService.uploadDocuments(req.user.id, files, {
       subjectId,
+      ecueId,
+      categoryId,
       personalFolderId,
       docType,
     });
@@ -66,10 +68,12 @@ export async function listDocuments(req: Request, res: Response, next: NextFunct
   try {
     if (!req.user) throw ApiError.unauthorized();
 
-    const { subjectId, personalFolderId, docType, search, isPersonalVault } = req.query;
+    const { subjectId, ecueId, categoryId, personalFolderId, docType, search, isPersonalVault } = req.query;
 
     const docs = await docService.getDocuments(req.user.id, {
       subjectId: subjectId as string,
+      ecueId: ecueId as string,
+      categoryId: categoryId === 'null' ? null : (categoryId as string),
       personalFolderId: personalFolderId as string,
       docType: docType as string,
       search: search as string,
@@ -388,6 +392,64 @@ export async function listUnclassified(req: Request, res: Response, next: NextFu
     if (!req.user) throw ApiError.unauthorized();
     const docs = await classificationService.getUnclassifiedDocuments(req.user.id);
     sendSuccess(res, docs);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Category Controllers (Compartiments par ECUE)
+export async function listCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const ecueId = req.query.ecueId as string;
+    if (!ecueId) throw ApiError.badRequest('L\'identifiant ECUE est obligatoire.');
+    const categories = await docService.getCategoriesForEcue(req.user.id, ecueId);
+    sendSuccess(res, categories);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { ecueId, name, order } = req.body;
+    if (!ecueId || !name) throw ApiError.badRequest('ecueId et name sont obligatoires.');
+    const cat = await docService.createCategory(req.user.id, ecueId, name, order);
+    sendSuccess(res, cat, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { name } = req.body;
+    if (!name) throw ApiError.badRequest('Le nom est obligatoire.');
+    const cat = await docService.updateCategory(req.user.id, req.params.id, name);
+    sendSuccess(res, cat);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    await docService.deleteCategory(req.user.id, req.params.id);
+    sendSuccess(res, { message: 'Compartiment supprimé, documents conservés.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function moveDocumentCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { categoryId } = req.body;
+    const doc = await docService.moveDocumentCategory(req.user.id, req.params.id, categoryId ?? null);
+    sendSuccess(res, doc);
   } catch (err) {
     next(err);
   }

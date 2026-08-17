@@ -4,7 +4,6 @@ import {
   LayoutDashboard, 
   GraduationCap, 
   Layers, 
-  FileText, 
   Search,
   Calendar,
   ShieldCheck, 
@@ -22,7 +21,8 @@ import {
   RotateCcw,
   RefreshCw,
   Settings,
-  Calculator
+  Calculator,
+  Library
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
@@ -255,13 +255,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button
-              className={`nav-item ${selectedTab === 'academic-documents' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
-              onClick={() => hasConfiguredProfile && handleNav('academic-documents')}
+              className={`nav-item ${selectedTab === 'library' || selectedTab === 'academic-documents' ? 'active' : ''} ${!hasConfiguredProfile ? 'disabled' : ''}`}
+              onClick={() => hasConfiguredProfile && handleNav('library')}
               disabled={!hasConfiguredProfile}
               title={!hasConfiguredProfile ? t('nav.profileRequired', 'Veuillez configurer votre profil d\'abord') : ''}
             >
-              <FileText size={18} />
-              <span>{t('nav.academicDocuments', 'Bibliothèque de Cours')}</span>
+              <Library size={18} />
+              <span>{t('nav.library', 'Bibliothèque (Compartiments)')}</span>
             </button>
 
             <button

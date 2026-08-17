@@ -6,7 +6,8 @@
     "academicSpace": "ESPACE ACADÉMIQUE",
     "academicProfile": "Profil Universitaire",
     "academicStructure": "Arborescence (UE / ECUE / Matières)",
-    "academicDocuments": "Bibliothèque de Cours",
+    "academicDocuments": "Documents Académiques",
+    "library": "Bibliothèque (Compartiments)",
     "timetable": "Emploi du Temps (OCR)",
     "grades": "Notes & Moyennes",
     "confidentialSpace": "ESPACE CONFIDENTIEL",
@@ -82,12 +83,28 @@
       "reset": "Réinitialiser les types par défaut",
       "resetBtn": "Réinitialiser",
       "addBtn": "Ajouter un type de séance (ex: Compo, Kholle...)"
+    },
+    "defaultCategories": {
+      "title": "Compartiments par Défaut (Bibliothèque)",
+      "desc": "Définissez les sous-dossiers automatiques créés pour chaque nouvelle ECUE (ex: CM, TD, Sujets...)",
+      "alreadyExists": "Ce compartiment existe déjà.",
+      "atLeastOne": "Il doit y avoir au moins un compartiment par défaut.",
+      "resetBtn": "Réinitialiser",
+      "inputPlaceholder": "Nom du compartiment (ex: Annales, Projets...)",
+      "addBtn": "Ajouter"
     }
   },
   "timetable": {
     "title": "Planning & Emploi du Temps",
     "subtitle": "Gérez vos séances hebdomadaires et vos révisions.",
     "printWeek": "Imprimer ma semaine"
+  },
+  "library": {
+    "title": "Bibliothèque Académique",
+    "subtitle": "Rangement structuré des cours, TD et sujets par ECUE et compartiments.",
+    "openFolderBtn": "📁 Ouvrir le dossier",
+    "addCategoryBtn": "+ Compartiment",
+    "searchPlaceholder": "Rechercher une ECUE..."
   },
   "grades": {
     "title": "Notes & Moyennes",

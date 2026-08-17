@@ -1,6 +1,6 @@
 import { fetchApi, API_BASE_URL, getClientAccessToken } from './apiClient';
 import { ApiResponse } from '../types/api';
-import { DocumentItem, PersonalFolderItem, UserQuota } from '../types/document';
+import { DocumentItem, PersonalFolderItem, UserQuota, DocumentCategoryItem } from '../types/document';
 import { DocumentUpdateInput, PersonalFolderInput } from '../types/validators';
 
 export async function getCloudStatus(): Promise<ApiResponse<{ enabled: boolean }>> {
@@ -18,6 +18,8 @@ export async function uploadFiles(
 
 export async function getDocuments(filters?: {
   subjectId?: string;
+  ecueId?: string;
+  categoryId?: string | null;
   personalFolderId?: string;
   docType?: string;
   search?: string;
@@ -25,6 +27,8 @@ export async function getDocuments(filters?: {
 }): Promise<ApiResponse<DocumentItem[]>> {
   const params = new URLSearchParams();
   if (filters?.subjectId) params.append('subjectId', filters.subjectId);
+  if (filters?.ecueId) params.append('ecueId', filters.ecueId);
+  if (filters?.categoryId !== undefined) params.append('categoryId', filters.categoryId === null ? 'null' : filters.categoryId);
   if (filters?.personalFolderId) params.append('personalFolderId', filters.personalFolderId);
   if (filters?.docType) params.append('docType', filters.docType);
   if (filters?.search) params.append('search', filters.search);
@@ -105,5 +109,39 @@ export async function createPersonalFolder(
 export async function deletePersonalFolder(id: string): Promise<ApiResponse<{ message: string }>> {
   return fetchApi<{ message: string }>(`/personal-folders/${id}`, {
     method: 'DELETE',
+  });
+}
+
+// Category API Methods
+export async function getCategories(ecueId: string): Promise<ApiResponse<DocumentCategoryItem[]>> {
+  return fetchApi<DocumentCategoryItem[]>(`/documents/categories?ecueId=${encodeURIComponent(ecueId)}`, {
+    method: 'GET',
+  });
+}
+
+export async function createCategory(ecueId: string, name: string): Promise<ApiResponse<DocumentCategoryItem>> {
+  return fetchApi<DocumentCategoryItem>('/documents/categories', {
+    method: 'POST',
+    body: JSON.stringify({ ecueId, name }),
+  });
+}
+
+export async function updateCategory(id: string, name: string): Promise<ApiResponse<DocumentCategoryItem>> {
+  return fetchApi<DocumentCategoryItem>(`/documents/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteCategory(id: string): Promise<ApiResponse<{ message: string }>> {
+  return fetchApi<{ message: string }>(`/documents/categories/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function moveDocumentCategory(id: string, categoryId: string | null): Promise<ApiResponse<DocumentItem>> {
+  return fetchApi<DocumentItem>(`/documents/${id}/category`, {
+    method: 'PATCH',
+    body: JSON.stringify({ categoryId }),
   });
 }

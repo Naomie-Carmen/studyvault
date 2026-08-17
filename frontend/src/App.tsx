@@ -13,6 +13,7 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AcademicProfilePage } from './pages/academic/AcademicProfilePage';
 import { AcademicStructurePage } from './pages/structure/AcademicStructurePage';
 import { AcademicDocumentsPage } from './pages/documents/AcademicDocumentsPage';
+import { LibraryPage } from './pages/documents/LibraryPage';
 import { PersonalVaultPage } from './pages/documents/PersonalVaultPage';
 import { SearchPage } from './pages/search/SearchPage';
 import { TimetablePage } from './pages/timetable/TimetablePage';
@@ -280,6 +281,9 @@ export const App: React.FC = () => {
 
       case 'academic-documents':
         return <AcademicDocumentsPage />;
+
+      case 'library':
+        return <LibraryPage />;
 
       case 'timetable':
         return (

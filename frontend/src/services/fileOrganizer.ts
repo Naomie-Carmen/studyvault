@@ -219,7 +219,8 @@ export async function openEcueFolder(
   ueCode?: string | null,
   ueTitle?: string,
   ecueCode?: string | null,
-  ecueTitle?: string
+  ecueTitle?: string,
+  categoryName?: string
 ): Promise<boolean> {
   if (!isTauri) return false;
 
@@ -229,7 +230,12 @@ export async function openEcueFolder(
     const { createDir, exists } = await import('@tauri-apps/api/fs');
 
     const docDir = await documentDir();
-    const folderPath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    let folderPath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+
+    if (categoryName) {
+      const sep = folderPath.includes('\\') ? '\\' : '/';
+      folderPath = `${folderPath}${sep}${sanitizeName(categoryName)}`;
+    }
 
     if (!(await exists(folderPath))) {
       await createDir(folderPath, { recursive: true });
@@ -239,6 +245,165 @@ export async function openEcueFolder(
     return true;
   } catch (err) {
     console.error('FileOrganizer openEcueFolder error:', err);
+    return false;
+  }
+}
+
+/**
+ * Assure la présence du dossier de compartiment dans l'arborescence locale.
+ */
+export async function ensureCategoryFolder(
+  semNumber: number,
+  ueCode: string | null | undefined,
+  ueTitle: string | undefined,
+  ecueCode: string | null | undefined,
+  ecueTitle: string | undefined,
+  categoryName: string
+): Promise<string | null> {
+  if (!isTauri) return null;
+
+  try {
+    const { documentDir } = await import('@tauri-apps/api/path');
+    const { createDir, exists } = await import('@tauri-apps/api/fs');
+
+    const docDir = await documentDir();
+    const ecuePath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    const sep = ecuePath.includes('\\') ? '\\' : '/';
+    const catPath = `${ecuePath}${sep}${sanitizeName(categoryName)}`;
+
+    if (!(await exists(catPath))) {
+      await createDir(catPath, { recursive: true });
+    }
+
+    return catPath;
+  } catch (err) {
+    console.error('FileOrganizer ensureCategoryFolder error:', err);
+    return null;
+  }
+}
+
+/**
+ * Renomme un dossier de compartiment sur le disque.
+ */
+export async function renameCategoryFolder(
+  semNumber: number,
+  ueCode: string | null | undefined,
+  ueTitle: string | undefined,
+  ecueCode: string | null | undefined,
+  ecueTitle: string | undefined,
+  oldName: string,
+  newName: string
+): Promise<boolean> {
+  if (!isTauri) return false;
+
+  try {
+    const { documentDir } = await import('@tauri-apps/api/path');
+    const { renameFile, exists } = await import('@tauri-apps/api/fs');
+
+    const docDir = await documentDir();
+    const ecuePath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    const sep = ecuePath.includes('\\') ? '\\' : '/';
+
+    const oldPath = `${ecuePath}${sep}${sanitizeName(oldName)}`;
+    const newPath = `${ecuePath}${sep}${sanitizeName(newName)}`;
+
+    if (await exists(oldPath)) {
+      await renameFile(oldPath, newPath);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('FileOrganizer renameCategoryFolder error:', err);
+    return false;
+  }
+}
+
+/**
+ * Copie un ou plusieurs fichiers externes vers le dossier du compartiment.
+ */
+export async function copyFilesToCategoryFolder(
+  sourcePaths: string[],
+  semNumber: number,
+  ueCode: string | null | undefined,
+  ueTitle: string | undefined,
+  ecueCode: string | null | undefined,
+  ecueTitle: string | undefined,
+  categoryName?: string
+): Promise<{ fileName: string; destPath: string }[]> {
+  if (!isTauri || sourcePaths.length === 0) return [];
+
+  try {
+    const { documentDir } = await import('@tauri-apps/api/path');
+    const { copyFile, createDir, exists } = await import('@tauri-apps/api/fs');
+
+    const docDir = await documentDir();
+    let folderPath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    const sep = folderPath.includes('\\') ? '\\' : '/';
+
+    if (categoryName) {
+      folderPath = `${folderPath}${sep}${sanitizeName(categoryName)}`;
+    }
+
+    if (!(await exists(folderPath))) {
+      await createDir(folderPath, { recursive: true });
+    }
+
+    const copied: { fileName: string; destPath: string }[] = [];
+
+    for (const src of sourcePaths) {
+      const fileName = src.split(/[/\\]/).pop() || 'file';
+      const destPath = `${folderPath}${sep}${fileName}`;
+      await copyFile(src, destPath);
+      copied.push({ fileName, destPath });
+    }
+
+    return copied;
+  } catch (err) {
+    console.error('FileOrganizer copyFilesToCategoryFolder error:', err);
+    return [];
+  }
+}
+
+/**
+ * Déplace un fichier local d'un compartiment à un autre sur le disque.
+ */
+export async function moveFileBetweenCategories(
+  fileName: string,
+  semNumber: number,
+  ueCode: string | null | undefined,
+  ueTitle: string | undefined,
+  ecueCode: string | null | undefined,
+  ecueTitle: string | undefined,
+  oldCategoryName?: string,
+  newCategoryName?: string
+): Promise<boolean> {
+  if (!isTauri) return false;
+
+  try {
+    const { documentDir } = await import('@tauri-apps/api/path');
+    const { renameFile, createDir, exists } = await import('@tauri-apps/api/fs');
+
+    const docDir = await documentDir();
+    const ecuePath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    const sep = ecuePath.includes('\\') ? '\\' : '/';
+
+    const sourceDir = oldCategoryName ? `${ecuePath}${sep}${sanitizeName(oldCategoryName)}` : ecuePath;
+    const targetDir = newCategoryName ? `${ecuePath}${sep}${sanitizeName(newCategoryName)}` : ecuePath;
+
+    if (!(await exists(targetDir))) {
+      await createDir(targetDir, { recursive: true });
+    }
+
+    const sourceFilePath = `${sourceDir}${sep}${fileName}`;
+    const targetFilePath = `${targetDir}${sep}${fileName}`;
+
+    if (await exists(sourceFilePath)) {
+      await renameFile(sourceFilePath, targetFilePath);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('FileOrganizer moveFileBetweenCategories error:', err);
     return false;
   }
 }
