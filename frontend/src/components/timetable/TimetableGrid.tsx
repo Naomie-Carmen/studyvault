@@ -10,6 +10,7 @@ interface TimetableGridProps {
   isPastWeek: boolean;
   onOpenSessionDetails: (session: TimetableSession) => void;
   onOpenCreateModal: (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => void;
+  onMoveSession: (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => void;
 }
 
 const HOURS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
@@ -43,11 +44,13 @@ NowIndicatorLine.displayName = 'NowIndicatorLine';
  */
 interface SessionCardOverlayProps {
   session: TimetableSession;
+  isPastWeek?: boolean;
   onOpenSessionDetails: (session: TimetableSession) => void;
 }
 
 const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
   session,
+  isPastWeek = false,
   onOpenSessionDetails,
 }) => {
   const style = useMemo(() => {
@@ -73,10 +76,30 @@ const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
 
   const typeColor = useMemo(() => getSessionTypeColor(session.sessionType), [session.sessionType]);
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (isPastWeek) return;
+    e.dataTransfer.effectAllowed = 'move';
+    const payload = {
+      type: 'move-existing-session',
+      sessionId: session.id,
+      startTime: session.startTime,
+      endTime: session.endTime,
+    };
+    const jsonStr = JSON.stringify(payload);
+    try {
+      e.dataTransfer.setData('application/json', jsonStr);
+      e.dataTransfer.setData('text/plain', jsonStr);
+    } catch (_e) {
+      /* ignore */
+    }
+  };
+
   return (
     <div
       className={`session-card-overlay ${session.hasConflict ? 'conflict' : ''}`}
       style={style}
+      draggable={!isPastWeek}
+      onDragStart={handleDragStart}
       onClick={(e) => {
         e.stopPropagation();
         onOpenSessionDetails(session);
@@ -122,6 +145,7 @@ interface DayColumnProps {
   isPastWeek: boolean;
   onOpenSessionDetails: (session: TimetableSession) => void;
   onOpenCreateModal: (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => void;
+  onMoveSession: (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => void;
 }
 
 const DayColumn: React.FC<DayColumnProps> = React.memo(({
@@ -131,6 +155,7 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
   isPastWeek,
   onOpenSessionDetails,
   onOpenCreateModal,
+  onMoveSession,
 }) => {
   const handleCellDrop = (e: React.DragEvent, hourStr: string) => {
     e.preventDefault();
@@ -143,6 +168,26 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
       }
       if (rawData) {
         const parsed = JSON.parse(rawData);
+
+        // Case 1: Dragging an existing session to move it
+        if (parsed.type === 'move-existing-session' && parsed.sessionId) {
+          const [sh, sm] = parsed.startTime.split(':').map(Number);
+          const [eh, em] = parsed.endTime.split(':').map(Number);
+          const durationMins = Math.max(30, (eh * 60 + em) - (sh * 60 + sm));
+
+          const [newH, newM] = hourStr.split(':').map(Number);
+          const newStartMins = newH * 60 + newM;
+          const newEndMins = Math.min(24 * 60, newStartMins + durationMins);
+
+          const newEndH = String(Math.floor(newEndMins / 60)).padStart(2, '0');
+          const newEndM = String(newEndMins % 60).padStart(2, '0');
+          const newEndTimeStr = `${newEndH}:${newEndM}`;
+
+          onMoveSession(parsed.sessionId, dayKey, hourStr, newEndTimeStr);
+          return;
+        }
+
+        // Case 2: Dragging a course from sidebar to create session
         if (parsed && (parsed.ecueId || parsed.subjectId)) {
           onOpenCreateModal({
             dayOfWeek: dayKey,
@@ -185,6 +230,7 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
         <SessionCardOverlay
           key={session.id}
           session={session}
+          isPastWeek={isPastWeek}
           onOpenSessionDetails={onOpenSessionDetails}
         />
       ))}
@@ -203,6 +249,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
   isPastWeek,
   onOpenSessionDetails,
   onOpenCreateModal,
+  onMoveSession,
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -299,6 +346,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
                   isPastWeek={isPastWeek}
                   onOpenSessionDetails={onOpenSessionDetails}
                   onOpenCreateModal={onOpenCreateModal}
+                  onMoveSession={onMoveSession}
                 />
               );
             })}
@@ -426,13 +474,13 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
           border-radius: 6px;
           padding: 0.35rem 0.5rem;
           z-index: 10;
-          cursor: pointer;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+          cursor: grab;
           transition: transform 0.15s ease, box-shadow 0.15s ease;
           overflow: hidden;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        .session-card-overlay:active {
+          cursor: grabbing;
         }
         .session-card-overlay:hover {
           transform: scale(1.02);

@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Création de matière à la volée : création automatique des enregistrements manquants pour éliminer toute erreur backend",
-    "Validation Zod assouplie : prise en charge complète des types de séances personnalisés (COMPO, REVISION...)",
-    "Correctif d'heures 24h : validation correcte des heures de fin de soirée (21h00, 22h00, 23h00)",
-    "Création de séance garantie à 100% en 1 seul clic"
+    "Déplacement interactif des séances : glissez-déposez n'importe quelle séance déjà placée vers un nouveau jour ou un autre créneau horaire",
+    "Mise à jour instantanée en arrière-plan sans ouvrir la modale lors d'un déplacement de séance",
+    "Curseur visuel adaptatif (grab/grabbing) lors du survol et déplacement des cartes de cours",
+    "Glisser-déposer bivalent : création de séance depuis le volet latéral ET déplacement direct sur la grille 24h"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

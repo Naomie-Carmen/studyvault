@@ -161,6 +161,21 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     setSelectedWeekMonday(currentMonday);
   }, [currentMonday]);
 
+  const handleMoveSession = useCallback(async (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => {
+    try {
+      const res = await timetableService.updateSession(sessionId, {
+        dayOfWeek: newDayOfWeek,
+        startTime: newStartTime,
+        endTime: newEndTime,
+      });
+      if (res.success) {
+        loadData();
+      }
+    } catch (_e) {
+      /* ignore */
+    }
+  }, [loadData]);
+
   return (
     <div className="timetable-page">
       {/* Top Action Header */}
@@ -250,6 +265,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
               isPastWeek={isPastWeek}
               onOpenSessionDetails={handleOpenDetails}
               onOpenCreateModal={handleOpenCreateModal}
+              onMoveSession={handleMoveSession}
             />
           )}
         </div>
