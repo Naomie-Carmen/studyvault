@@ -137,19 +137,29 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
     if (isPastWeek) return;
 
     try {
-      const rawData = e.dataTransfer.getData('application/json');
+      let rawData = e.dataTransfer.getData('application/json');
+      if (!rawData) {
+        rawData = e.dataTransfer.getData('text/plain');
+      }
       if (rawData) {
         const parsed = JSON.parse(rawData);
-        onOpenCreateModal({
-          dayOfWeek: dayKey,
-          startTime: hourStr,
-          ecueId: parsed.ecueId,
-          subjectId: parsed.subjectId,
-        });
+        if (parsed && (parsed.ecueId || parsed.subjectId)) {
+          onOpenCreateModal({
+            dayOfWeek: dayKey,
+            startTime: hourStr,
+            ecueId: parsed.ecueId,
+            subjectId: parsed.subjectId,
+          });
+        }
       }
     } catch (_err) {
-      /* ignore */
+      /* ignore non-JSON plain text */
     }
+  };
+
+  const handleCellDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
   };
 
   return (
@@ -159,7 +169,7 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
         <div
           key={hourStr}
           className="hour-cell"
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={handleCellDragOver}
           onDrop={(e) => handleCellDrop(e, hourStr)}
           onClick={() => {
             if (!isPastWeek) {

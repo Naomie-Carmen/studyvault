@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Correctif Emploi du Temps : élimination de la boucle de re-rendu infinie (clignotement)",
-    "Gestion réseau stabilisée : messages d'erreur réseau clairs et prévention de la saturation des sockets API",
-    "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments",
-    "Compartiments & miroir OS : sous-dossiers locaux automatiques dans Documents/StudyVault/{Semestre}/{UE}/{ECUE}/{compartiment}"
+    "Amélioration Drag & Drop : compatibilité Windows/WebView2 renforcée avec transfert multi-format et dropEffect='copy'",
+    "Glisser-déposer des ECUEs : correction du transfert de données entre le volet latéral et la grille 24h",
+    "Stabilisation intégrale de l'emploi du temps : élimination définitive du clignotement et des re-rendus en boucle",
+    "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

@@ -35,8 +35,18 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
       code: item.code,
       instructor: item.instructor,
     };
-    e.dataTransfer.setData('application/json', JSON.stringify(payload));
-    e.dataTransfer.setData('text/plain', item.title);
+    const jsonStr = JSON.stringify(payload);
+    e.dataTransfer.effectAllowed = 'copy';
+    try {
+      e.dataTransfer.setData('application/json', jsonStr);
+    } catch (_e) {
+      /* ignore */
+    }
+    try {
+      e.dataTransfer.setData('text/plain', jsonStr);
+    } catch (_e) {
+      /* ignore */
+    }
   };
 
   if (!isOpen) {
