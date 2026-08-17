@@ -128,11 +128,16 @@ export async function fetchApi<T>(
     const data = (await parseJson(response)) as ApiResponse<T>;
     return data;
   } catch (error) {
+    const rawMsg = error instanceof Error ? error.message : '';
+    const userFriendlyMessage = (rawMsg === 'Failed to fetch' || rawMsg.includes('NetworkError'))
+      ? 'Impossible de contacter le serveur backend. Veuillez vérifier votre connexion au serveur.'
+      : (rawMsg || 'Impossible de contacter l\'API backend.');
+
     return {
       success: false,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Impossible de contacter l\'API backend.',
+        message: userFriendlyMessage,
         statusCode: 503,
       },
     };

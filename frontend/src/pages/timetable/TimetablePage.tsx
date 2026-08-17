@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { AcademicStructureTree } from '../../types/structure';
@@ -56,7 +56,7 @@ const formatWeekSpanLabel = (mondayDate: Date): string => {
 
 export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocuments }) => {
   const { t } = useTranslation();
-  const currentMonday = getMondayOfDate(new Date());
+  const currentMonday = useMemo(() => getMondayOfDate(new Date()), []);
 
   const [selectedWeekMonday, setSelectedWeekMonday] = useState<Date>(currentMonday);
   const [weekData, setWeekData] = useState<TimetableWeekData | null>(null);
@@ -86,9 +86,8 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   const weekStartStr = formatDateToYYYYMMDD(selectedWeekMonday);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
     try {
-      // Lazy auto-archive past weeks on load
+      // Lazy auto-archive past weeks on load (fire-and-forget)
       timetableService.syncPastWeekArchives(formatDateToYYYYMMDD(currentMonday)).catch(() => {});
 
       const [treeRes, liveWeekRes, archiveRes] = await Promise.all([
