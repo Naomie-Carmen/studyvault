@@ -153,6 +153,14 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     setIsFormOpen(true);
   }, [isPastWeek]);
 
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  const handleResetToday = useCallback(() => {
+    setSelectedWeekMonday(currentMonday);
+  }, [currentMonday]);
+
   return (
     <div className="timetable-page">
       {/* Top Action Header */}
@@ -206,7 +214,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         </button>
 
         {!isCurrentWeek && (
-          <button className="btn-today-reset" onClick={() => setSelectedWeekMonday(currentMonday)}>
+          <button className="btn-today-reset" onClick={handleResetToday}>
             Aujourd'hui
           </button>
         )}
@@ -225,7 +233,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         <CoursesSidebarDrawer
           tree={tree}
           isOpen={isSidebarOpen}
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          onToggle={handleToggleSidebar}
           isPastWeek={isPastWeek}
         />
 
