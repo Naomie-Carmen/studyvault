@@ -1,16 +1,26 @@
 {
-  "version": "1.2.11",
-  "releaseDate": "2026-08-16",
+  "version": "1.2.12",
+  "releaseDate": "2026-08-17",
   "channel": "stable",
   "notes": [
-    "Cours liés aux ECUEs : suggestion automatique lors de la création de séances et badges d'emploi du temps sous l'ECUE",
-    "Documents d'ECUE structurés : synchronisation automatique du dossier local Documents/StudyVault/",
-    "Sélection multiple & actions en lot : suppression groupée, changement de catégorie et réattribution de matière",
-    "Emplacement de stockage : choix entre stockage local PC et cloud R2 avec détection automatique du statut",
-    "Coefficients ECTS par ECUE : édition en direct et recalcul immédiat des moyennes",
-    "Internationalisation (i18n) complète en anglais et français"
+    "Bibliothèque Académique : classement structuré des cours, TD et sujets par ECUE et compartiments",
+    "Refonte Emploi du Temps 24h : défilement 00h-24h, indicateur temps réel, drag & drop des cours et archivage hebdomadaire",
+    "Compartiments & miroir OS : sous-dossiers locaux automatiques dans Documents/StudyVault/{Semestre}/{UE}/{ECUE}/{compartiment}",
+    "Gestion des types de séance : personnalisation des types (CM, TD, Compo...) et des couleurs dans les Paramètres"
   ],
   "history": [
+    {
+      "version": "1.2.11",
+      "releaseDate": "2026-08-16",
+      "highlights": [
+        "Cours liés aux ECUEs : suggestion automatique lors de la création de séances et badges d'emploi du temps sous l'ECUE",
+        "Documents d'ECUE structurés : synchronisation automatique du dossier local Documents/StudyVault/",
+        "Sélection multiple & actions en lot : suppression groupée, changement de catégorie et réattribution de matière",
+        "Emplacement de stockage : choix entre stockage local PC et cloud R2 avec détection automatique du statut",
+        "Coefficients ECTS par ECUE : édition en direct et recalcul immédiat des moyennes",
+        "Internationalisation (i18n) complète en anglais et français"
+      ]
+    },
     {
       "version": "1.2.10",
       "releaseDate": "2026-08-16",
