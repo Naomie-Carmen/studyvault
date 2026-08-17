@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { getSessionTypeColor } from '../../utils/sessionTypesConfig';
@@ -14,86 +14,43 @@ interface TimetableGridProps {
 
 const HOURS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
 
-export const TimetableGrid: React.FC<TimetableGridProps> = ({
-  weekData,
-  selectedWeekMonday,
-  isPastWeek,
-  onOpenSessionDetails,
-  onOpenCreateModal,
-}) => {
-  const { t } = useTranslation();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [nowTime, setNowTime] = useState<Date>(new Date());
+/**
+ * Isolated Now Indicator Line Component
+ * Updates its own timer every 60s without re-rendering parent grid.
+ */
+const NowIndicatorLine: React.FC = React.memo(() => {
+  const [nowTime, setNowTime] = useState<Date>(() => new Date());
 
-  // Auto-scroll to 07:00 AM on mount
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = 7 * 56;
-    }
-  }, []);
-
-  // Update current time line every 60s
   useEffect(() => {
     const timer = setInterval(() => setNowTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const DAYS = [
-    { key: 0, label: t('timetable.days.mon', 'Lundi') },
-    { key: 1, label: t('timetable.days.tue', 'Mardi') },
-    { key: 2, label: t('timetable.days.wed', 'Mercredi') },
-    { key: 3, label: t('timetable.days.thu', 'Jeudi') },
-    { key: 4, label: t('timetable.days.fri', 'Vendredi') },
-    { key: 5, label: t('timetable.days.sat', 'Samedi') },
-    { key: 6, label: t('timetable.days.sun', 'Dimanche') },
-  ];
-
-  // Calculate dates for week header columns
-  const getDayDateLabel = (dayIndex: number) => {
-    const d = new Date(selectedWeekMonday);
-    d.setDate(selectedWeekMonday.getDate() + dayIndex);
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-  };
-
-  // Check if selected week is current week
-  const today = new Date();
-  const currentMondayDate = new Date(today);
-  const jsDay = today.getDay();
-  const diffToMon = today.getDate() - jsDay + (jsDay === 0 ? -6 : 1);
-  currentMondayDate.setDate(diffToMon);
-  currentMondayDate.setHours(0, 0, 0, 0);
-
-  const isCurrentWeek =
-    selectedWeekMonday.getFullYear() === currentMondayDate.getFullYear() &&
-    selectedWeekMonday.getMonth() === currentMondayDate.getMonth() &&
-    selectedWeekMonday.getDate() === currentMondayDate.getDate();
-
-  const currentDayOfWeekIndex = today.getDay() === 0 ? 6 : today.getDay() - 1;
   const nowTotalMinutes = nowTime.getHours() * 60 + nowTime.getMinutes();
   const nowLineTopPx = (nowTotalMinutes / 60) * 56;
 
-  const handleCellDrop = (e: React.DragEvent, dayIndex: number, hourStr: string) => {
-    e.preventDefault();
-    if (isPastWeek) return;
+  return (
+    <div className="line-now" style={{ top: `${nowLineTopPx}px` }}>
+      <div className="line-now-dot" />
+    </div>
+  );
+});
 
-    try {
-      const rawData = e.dataTransfer.getData('application/json');
-      if (rawData) {
-        const parsed = JSON.parse(rawData);
-        onOpenCreateModal({
-          dayOfWeek: dayIndex,
-          startTime: hourStr,
-          ecueId: parsed.ecueId,
-          subjectId: parsed.subjectId,
-        });
-      }
-    } catch (_err) {
-      /* ignore */
-    }
-  };
+NowIndicatorLine.displayName = 'NowIndicatorLine';
 
-  // Calculate session card absolute layout position
-  const getSessionStyle = (session: TimetableSession) => {
+/**
+ * Memoized Session Card Overlay Component
+ */
+interface SessionCardOverlayProps {
+  session: TimetableSession;
+  onOpenSessionDetails: (session: TimetableSession) => void;
+}
+
+const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
+  session,
+  onOpenSessionDetails,
+}) => {
+  const style = useMemo(() => {
     const [sh, sm] = session.startTime.split(':').map(Number);
     const [eh, em] = session.endTime.split(':').map(Number);
 
@@ -112,7 +69,180 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       borderLeft: `4px solid ${sessionColor}`,
       backgroundColor: `${sessionColor}22`,
     };
+  }, [session.startTime, session.endTime, session.color, session.sessionType]);
+
+  const typeColor = useMemo(() => getSessionTypeColor(session.sessionType), [session.sessionType]);
+
+  return (
+    <div
+      className={`session-card-overlay ${session.hasConflict ? 'conflict' : ''}`}
+      style={style}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpenSessionDetails(session);
+      }}
+      title={`${session.subject?.name || session.ecue?.title || 'Séance'} (${session.startTime}–${session.endTime})`}
+    >
+      <div className="session-card-header">
+        <span className="session-type-badge" style={{ backgroundColor: typeColor }}>
+          {session.sessionType}
+        </span>
+        {session.hasConflict && <AlertTriangle size={12} className="conflict-icon" />}
+      </div>
+
+      <div className="session-card-title">
+        {session.ecue?.code && <span className="ecue-code">[{session.ecue.code}] </span>}
+        {session.subject?.name || session.ecue?.title || 'Séance'}
+      </div>
+
+      <div className="session-card-footer">
+        <span className="time-span">
+          {session.startTime}–{session.endTime}
+        </span>
+        {session.room && (
+          <span className="room-span">
+            <MapPin size={10} />
+            {session.room}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+SessionCardOverlay.displayName = 'SessionCardOverlay';
+
+/**
+ * Memoized Day Column Component
+ */
+interface DayColumnProps {
+  dayKey: number;
+  daySessions: TimetableSession[];
+  isTodayColumn: boolean;
+  isPastWeek: boolean;
+  onOpenSessionDetails: (session: TimetableSession) => void;
+  onOpenCreateModal: (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => void;
+}
+
+const DayColumn: React.FC<DayColumnProps> = React.memo(({
+  dayKey,
+  daySessions,
+  isTodayColumn,
+  isPastWeek,
+  onOpenSessionDetails,
+  onOpenCreateModal,
+}) => {
+  const handleCellDrop = (e: React.DragEvent, hourStr: string) => {
+    e.preventDefault();
+    if (isPastWeek) return;
+
+    try {
+      const rawData = e.dataTransfer.getData('application/json');
+      if (rawData) {
+        const parsed = JSON.parse(rawData);
+        onOpenCreateModal({
+          dayOfWeek: dayKey,
+          startTime: hourStr,
+          ecueId: parsed.ecueId,
+          subjectId: parsed.subjectId,
+        });
+      }
+    } catch (_err) {
+      /* ignore */
+    }
   };
+
+  return (
+    <div className={`day-column ${isTodayColumn ? 'today-column' : ''}`}>
+      {/* 24 Hour Drop Cell Grid */}
+      {HOURS_24.map((hourStr) => (
+        <div
+          key={hourStr}
+          className="hour-cell"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleCellDrop(e, hourStr)}
+          onClick={() => {
+            if (!isPastWeek) {
+              onOpenCreateModal({ dayOfWeek: dayKey, startTime: hourStr });
+            }
+          }}
+          title={!isPastWeek ? `Cliquer pour ajouter une séance à ${hourStr}` : undefined}
+        />
+      ))}
+
+      {/* Sessions Overlays */}
+      {daySessions.map((session) => (
+        <SessionCardOverlay
+          key={session.id}
+          session={session}
+          onOpenSessionDetails={onOpenSessionDetails}
+        />
+      ))}
+
+      {/* Isolated Now Line */}
+      {isTodayColumn && <NowIndicatorLine />}
+    </div>
+  );
+});
+
+DayColumn.displayName = 'DayColumn';
+
+export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
+  weekData,
+  selectedWeekMonday,
+  isPastWeek,
+  onOpenSessionDetails,
+  onOpenCreateModal,
+}) => {
+  const { t } = useTranslation();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrolledRef = useRef<boolean>(false);
+
+  // Auto-scroll to 07:00 AM ONCE on mount
+  useEffect(() => {
+    if (!scrolledRef.current && containerRef.current) {
+      scrolledRef.current = true;
+      containerRef.current.scrollTop = 7 * 56;
+    }
+  }, []);
+
+  const DAYS = useMemo(() => [
+    { key: 0, label: t('timetable.days.mon', 'Lundi') },
+    { key: 1, label: t('timetable.days.tue', 'Mardi') },
+    { key: 2, label: t('timetable.days.wed', 'Mercredi') },
+    { key: 3, label: t('timetable.days.thu', 'Jeudi') },
+    { key: 4, label: t('timetable.days.fri', 'Vendredi') },
+    { key: 5, label: t('timetable.days.sat', 'Samedi') },
+    { key: 6, label: t('timetable.days.sun', 'Dimanche') },
+  ], [t]);
+
+  // Calculate dates for week header columns
+  const dayDateLabels = useMemo(() => {
+    return [0, 1, 2, 3, 4, 5, 6].map((dayIndex) => {
+      const d = new Date(selectedWeekMonday);
+      d.setDate(selectedWeekMonday.getDate() + dayIndex);
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    });
+  }, [selectedWeekMonday]);
+
+  // Check if selected week is current week
+  const { isCurrentWeek, currentDayOfWeekIndex } = useMemo(() => {
+    const today = new Date();
+    const currentMondayDate = new Date(today);
+    const jsDay = today.getDay();
+    const diffToMon = today.getDate() - jsDay + (jsDay === 0 ? -6 : 1);
+    currentMondayDate.setDate(diffToMon);
+    currentMondayDate.setHours(0, 0, 0, 0);
+
+    const isCurrent =
+      selectedWeekMonday.getFullYear() === currentMondayDate.getFullYear() &&
+      selectedWeekMonday.getMonth() === currentMondayDate.getMonth() &&
+      selectedWeekMonday.getDate() === currentMondayDate.getDate();
+
+    const currentDayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
+
+    return { isCurrentWeek: isCurrent, currentDayOfWeekIndex: currentDayIdx };
+  }, [selectedWeekMonday]);
 
   return (
     <div className="timetable-24h-grid-wrapper glass-card">
@@ -128,7 +258,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               return (
                 <div key={day.key} className={`day-header-cell ${isTodayColumn ? 'today-col' : ''}`}>
                   <span className="day-name">{day.label}</span>
-                  <span className="day-date">{getDayDateLabel(day.key)}</span>
+                  <span className="day-date">{dayDateLabels[day.key]}</span>
                 </div>
               );
             })}
@@ -151,68 +281,15 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               const isTodayColumn = isCurrentWeek && day.key === currentDayOfWeekIndex;
 
               return (
-                <div key={day.key} className={`day-column ${isTodayColumn ? 'today-column' : ''}`}>
-                  {/* 24 Hour Drop Cell Grid */}
-                  {HOURS_24.map((hourStr) => (
-                    <div
-                      key={hourStr}
-                      className="hour-cell"
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => handleCellDrop(e, day.key, hourStr)}
-                      onClick={() => {
-                        if (!isPastWeek) {
-                          onOpenCreateModal({ dayOfWeek: day.key, startTime: hourStr });
-                        }
-                      }}
-                      title={!isPastWeek ? `Cliquer pour ajouter une séance à ${hourStr}` : undefined}
-                    />
-                  ))}
-
-                  {/* Sessions Overlays */}
-                  {daySessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className={`session-card-overlay ${session.hasConflict ? 'conflict' : ''}`}
-                      style={getSessionStyle(session)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenSessionDetails(session);
-                      }}
-                      title={`${session.subject?.name || session.ecue?.title || 'Séance'} (${session.startTime}–${session.endTime})`}
-                    >
-                      <div className="session-card-header">
-                        <span className="session-type-badge" style={{ backgroundColor: getSessionTypeColor(session.sessionType) }}>
-                          {session.sessionType}
-                        </span>
-                        {session.hasConflict && <AlertTriangle size={12} className="conflict-icon" />}
-                      </div>
-
-                      <div className="session-card-title">
-                        {session.ecue?.code && <span className="ecue-code">[{session.ecue.code}] </span>}
-                        {session.subject?.name || session.ecue?.title || 'Séance'}
-                      </div>
-
-                      <div className="session-card-footer">
-                        <span className="time-span">
-                          {session.startTime}–{session.endTime}
-                        </span>
-                        {session.room && (
-                          <span className="room-span">
-                            <MapPin size={10} />
-                            {session.room}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Now Indicator Line */}
-                  {isTodayColumn && (
-                    <div className="line-now" style={{ top: `${nowLineTopPx}px` }}>
-                      <div className="line-now-dot" />
-                    </div>
-                  )}
-                </div>
+                <DayColumn
+                  key={day.key}
+                  dayKey={day.key}
+                  daySessions={daySessions}
+                  isTodayColumn={isTodayColumn}
+                  isPastWeek={isPastWeek}
+                  onOpenSessionDetails={onOpenSessionDetails}
+                  onOpenCreateModal={onOpenCreateModal}
+                />
               );
             })}
           </div>
@@ -431,4 +508,6 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       `}</style>
     </div>
   );
-};
+});
+
+TimetableGrid.displayName = 'TimetableGrid';

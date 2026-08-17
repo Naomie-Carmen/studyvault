@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { AcademicStructureTree } from '../../types/structure';
@@ -57,6 +57,7 @@ const formatWeekSpanLabel = (mondayDate: Date): string => {
 export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocuments }) => {
   const { t } = useTranslation();
   const currentMonday = useMemo(() => getMondayOfDate(new Date()), []);
+  const hasSyncedArchivesRef = useRef<boolean>(false);
 
   const [selectedWeekMonday, setSelectedWeekMonday] = useState<Date>(currentMonday);
   const [weekData, setWeekData] = useState<TimetableWeekData | null>(null);
@@ -77,18 +78,22 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const isCurrentWeek =
+  const isCurrentWeek = useMemo(() =>
     selectedWeekMonday.getFullYear() === currentMonday.getFullYear() &&
     selectedWeekMonday.getMonth() === currentMonday.getMonth() &&
-    selectedWeekMonday.getDate() === currentMonday.getDate();
+    selectedWeekMonday.getDate() === currentMonday.getDate(),
+  [selectedWeekMonday, currentMonday]);
 
-  const isPastWeek = selectedWeekMonday < currentMonday;
-  const weekStartStr = formatDateToYYYYMMDD(selectedWeekMonday);
+  const isPastWeek = useMemo(() => selectedWeekMonday < currentMonday, [selectedWeekMonday, currentMonday]);
+  const weekStartStr = useMemo(() => formatDateToYYYYMMDD(selectedWeekMonday), [selectedWeekMonday]);
 
   const loadData = useCallback(async () => {
     try {
-      // Lazy auto-archive past weeks on load (fire-and-forget)
-      timetableService.syncPastWeekArchives(formatDateToYYYYMMDD(currentMonday)).catch(() => {});
+      // Lazy auto-archive past weeks ONCE per session/mount
+      if (!hasSyncedArchivesRef.current) {
+        hasSyncedArchivesRef.current = true;
+        timetableService.syncPastWeekArchives(formatDateToYYYYMMDD(currentMonday)).catch(() => {});
+      }
 
       const [treeRes, liveWeekRes, archiveRes] = await Promise.all([
         structureService.getStructureTree(),
@@ -129,22 +134,24 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     loadData();
   }, [loadData]);
 
-  const handleNavigateWeek = (offsetWeeks: number) => {
-    const next = new Date(selectedWeekMonday);
-    next.setDate(selectedWeekMonday.getDate() + offsetWeeks * 7);
-    setSelectedWeekMonday(next);
-  };
+  const handleNavigateWeek = useCallback((offsetWeeks: number) => {
+    setSelectedWeekMonday((prev) => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() + offsetWeeks * 7);
+      return next;
+    });
+  }, []);
 
-  const handleOpenDetails = (session: TimetableSession) => {
+  const handleOpenDetails = useCallback((session: TimetableSession) => {
     setSelectedSession(session);
     setIsDetailsOpen(true);
-  };
+  }, []);
 
-  const handleOpenCreateModal = (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => {
+  const handleOpenCreateModal = useCallback((params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => {
     if (isPastWeek) return;
     setModalCreateParams(params);
     setIsFormOpen(true);
-  };
+  }, [isPastWeek]);
 
   return (
     <div className="timetable-page">

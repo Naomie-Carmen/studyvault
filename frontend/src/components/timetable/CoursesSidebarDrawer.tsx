@@ -10,7 +10,7 @@ interface CoursesSidebarDrawerProps {
   isPastWeek?: boolean;
 }
 
-export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = ({
+export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.memo(({
   tree,
   isOpen,
   onToggle,
@@ -349,4 +349,6 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = ({
       `}</style>
     </div>
   );
-};
+});
+
+CoursesSidebarDrawer.displayName = 'CoursesSidebarDrawer';
