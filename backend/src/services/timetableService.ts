@@ -55,7 +55,22 @@ export async function createSession(
   }
 
   if (!subject) {
-    throw ApiError.notFound('Matière ou ECUE introuvable.');
+    // 3. Fallback: Find or create a Subject by name on the fly
+    const existingByName = await prisma.subject.findFirst({
+      where: { name: input.subjectId },
+    });
+    if (existingByName) {
+      subject = existingByName;
+      targetSubjectId = subject.id;
+    } else {
+      subject = await prisma.subject.create({
+        data: {
+          name: input.subjectId,
+          color: '#6366f1',
+        },
+      });
+      targetSubjectId = subject.id;
+    }
   }
 
   // Check for conflict (overlapping session on same day)

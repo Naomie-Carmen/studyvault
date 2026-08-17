@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Résolution backend de la création de séance : conversion automatique des ID d'ECUE en matière pour zéro échec d'enregistrement",
-    "Garantie 100% sans blocage : suppression définitive de l'erreur 'Matière introuvable' lors du glisser-déposer d'ECUE",
-    "Présélection instantanée du cours et enregistrement en 1 clic via les boutons CM, TD, TP, Compo, Révision",
-    "Compatibilité miroir OS et synchronisation complète de la structure"
+    "Création de matière à la volée : création automatique des enregistrements manquants pour éliminer toute erreur backend",
+    "Validation Zod assouplie : prise en charge complète des types de séances personnalisés (COMPO, REVISION...)",
+    "Correctif d'heures 24h : validation correcte des heures de fin de soirée (21h00, 22h00, 23h00)",
+    "Création de séance garantie à 100% en 1 seul clic"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');
