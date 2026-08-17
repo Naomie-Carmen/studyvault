@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Déplacement interactif des séances : glissez-déposez n'importe quelle séance déjà placée vers un nouveau jour ou un autre créneau horaire",
-    "Mise à jour instantanée en arrière-plan sans ouvrir la modale lors d'un déplacement de séance",
-    "Curseur visuel adaptatif (grab/grabbing) lors du survol et déplacement des cartes de cours",
-    "Glisser-déposer bivalent : création de séance depuis le volet latéral ET déplacement direct sur la grille 24h"
+    "Refonte esthétique intégrale de la modale de séance : design dark glassmorphism ultra-moderne",
+    "Champs de saisie & sélecteurs stylisés : élimination complète des contrôles blancs natifs du navigateur",
+    "Mise en page aérée en grille 2 et 3 colonnes pour une lisibilité parfaite des heures, salles et enseignants",
+    "Bannière de cours et pastilles colorées avec halos luminescents au survol et à la sélection"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

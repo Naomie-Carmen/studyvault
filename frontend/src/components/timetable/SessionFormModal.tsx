@@ -374,10 +374,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Day & Times Row */}
-          <div className="form-row">
-            <div className="form-group flex-1">
-              <label>Jour *</label>
+          {/* Row 1: Day & Duration */}
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label>Jour de la semaine *</label>
               <select
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(Number(e.target.value))}
@@ -390,21 +390,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               </select>
             </div>
 
-            <div className="form-group flex-1">
-              <label>Début *</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => {
-                  setStartTime(e.target.value);
-                  updateEndTime(e.target.value, durationMinutes);
-                }}
-                required
-              />
-            </div>
-
-            <div className="form-group flex-1">
-              <label>Durée *</label>
+            <div className="form-group">
+              <label>Durée estimée *</label>
               <select
                 value={durationMinutes}
                 onChange={(e) => {
@@ -420,9 +407,25 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 ))}
               </select>
             </div>
+          </div>
 
-            <div className="form-group flex-1">
-              <label>Fin *</label>
+          {/* Row 2: Start Time & End Time */}
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label>Heure de début *</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  updateEndTime(e.target.value, durationMinutes);
+                }}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Heure de fin *</label>
               <input
                 type="time"
                 value={endTime}
@@ -432,9 +435,9 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Enseignant & Salle */}
-          <div className="form-row">
-            <div className="form-group flex-1">
+          {/* Row 3: Room, Instructor, Recurrence */}
+          <div className="form-grid-3">
+            <div className="form-group">
               <label>Salle (optionnel)</label>
               <input
                 type="text"
@@ -444,7 +447,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               />
             </div>
 
-            <div className="form-group flex-1">
+            <div className="form-group">
               <label>Enseignant (optionnel)</label>
               <input
                 type="text"
@@ -454,7 +457,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               />
             </div>
 
-            <div className="form-group flex-1">
+            <div className="form-group">
               <label>Récurrence</label>
               <select
                 value={recurrence}
@@ -467,7 +470,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Row 4: Notes */}
           <div className="form-group">
             <label>Notes & remarques (optionnel)</label>
             <input
@@ -509,20 +512,122 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
       <style>{`
         .session-modal-card {
-          width: 520px;
+          width: 580px;
           max-width: 95vw;
-          padding: 1.5rem;
+          padding: 1.75rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          background: rgba(15, 23, 42, 0.96);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 16px;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+          color: #f8fafc;
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-bottom: 0.75rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .title-group {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+
+        .title-group h3 {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #ffffff;
+          margin: 0;
+        }
+
+        .btn-close {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 0.25rem;
+          border-radius: 6px;
+        }
+        .btn-close:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .session-form {
           display: flex;
           flex-direction: column;
           gap: 1rem;
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .form-group label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .session-form input[type="text"],
+        .session-form input[type="time"],
+        .session-form select {
+          width: 100%;
+          padding: 0.55rem 0.85rem;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(30, 41, 59, 0.7);
+          color: #ffffff;
+          font-size: 0.85rem;
+          font-weight: 500;
+          outline: none;
+          transition: all 0.2s ease;
+          box-sizing: border-box;
+        }
+
+        .session-form input[type="text"]:focus,
+        .session-form input[type="time"]:focus,
+        .session-form select:focus {
+          border-color: #6366f1;
+          background: rgba(30, 41, 59, 0.95);
+          box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .session-form select option {
+          background: #0f172a;
+          color: #ffffff;
+        }
+
+        .form-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.85rem;
+        }
+
+        .form-grid-3 {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 0.85rem;
         }
 
         .selected-course-banner {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0.75rem 1rem;
-          border-radius: 8px;
+          padding: 0.85rem 1.1rem;
+          border-radius: 10px;
           background: rgba(99, 102, 241, 0.18);
           border: 1px solid rgba(99, 102, 241, 0.45);
         }
@@ -543,32 +648,36 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           color: #818cf8;
           font-weight: 600;
           text-transform: uppercase;
+          letter-spacing: 0.03em;
         }
 
         .banner-main-title {
-          font-size: 0.9rem;
+          font-size: 0.925rem;
           font-weight: 700;
           color: #ffffff;
         }
 
         .btn-switch-course {
-          background: none;
+          background: rgba(255, 255, 255, 0.08);
           border: 1px solid rgba(255, 255, 255, 0.2);
-          color: var(--text-secondary);
-          padding: 0.25rem 0.6rem;
-          border-radius: 4px;
+          color: #e2e8f0;
+          padding: 0.3rem 0.75rem;
+          border-radius: 6px;
           font-size: 0.75rem;
+          font-weight: 600;
           cursor: pointer;
+          transition: all 0.15s ease;
         }
         .btn-switch-course:hover {
           color: #ffffff;
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.18);
+          border-color: rgba(255, 255, 255, 0.4);
         }
 
         .section-label {
           font-size: 0.8rem;
           font-weight: 700;
-          color: var(--text-secondary);
+          color: #94a3b8;
           margin-bottom: 0.4rem;
           display: block;
         }
@@ -582,7 +691,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
         .type-chip-btn {
           display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
+          gap: 0.45rem;
           padding: 0.45rem 0.85rem;
           border-radius: 20px;
           border: 1px solid;
@@ -602,32 +711,41 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           border-radius: 50%;
         }
 
+        .btn-quick-create {
+          background: none;
+          border: none;
+          color: #818cf8;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+        }
+        .btn-quick-create:hover {
+          color: #a5b4fc;
+        }
+
         .btn-submit-large {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.6rem 1.25rem;
+          padding: 0.65rem 1.35rem;
           font-weight: 700;
-        }
-
-        .form-row {
-          display: flex;
-          gap: 0.75rem;
-        }
-
-        .flex-1 {
-          flex: 1;
-        }
-
-        .margin-top-sm {
-          margin-top: 0.5rem;
+          border-radius: 8px;
+          background: var(--gradient-primary);
+          color: #ffffff;
+          border: none;
+          cursor: pointer;
         }
 
         .modal-actions {
           display: flex;
           justify-content: flex-end;
           gap: 0.75rem;
-          margin-top: 1rem;
+          margin-top: 0.5rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
       `}</style>
     </div>
