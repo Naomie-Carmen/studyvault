@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Création de séance ultra-rapide : présélection automatique du cours déposé et sélection instantanée du type (CM, TD, Compo, Révision...)",
-    "Bannière de cours verrouillée : plus besoin de chercher dans les menus déroulants lors d'un glisser-déposer",
-    "Sélecteur de type par pastilles colorées : choix du type de cours en un seul clic",
-    "Résolution du problème d'association d'ECUE : reconnaissance directe des intitulés et codes de cours"
+    "Formulaire unifié et fluide : suppression des doubles menus déroulants et sélection directe du cours",
+    "Résolution du message de validation HTML ('Veuillez sélectionner un élément dans la liste')",
+    "Prise en charge automatique des identifiants d'ECUE glissés avec pré-remplissage garanti",
+    "Boutons pastilles colorées (CM, TD, TP, COMPO, EXAM, RÉVISION) accessibles en 1 seul clic"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

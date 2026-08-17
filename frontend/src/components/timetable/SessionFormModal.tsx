@@ -86,7 +86,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     setStartTime(initialStartTime);
     setDurationMinutes(initialDurationMinutes);
 
-    const effectiveEcue = initialEcueId || '';
+    const effectiveEcue = initialEcueId || initialSubjectId || '';
     const effectiveSub = initialSubjectId || initialEcueId || '';
 
     setSelectedEcueId(effectiveEcue);
@@ -141,7 +141,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     const activeId = subjectId || selectedEcueId;
     if (!activeId) return null;
     const match = allCourseOptions.find((o) => o.id === activeId || o.ecueId === activeId);
-    return match ? match.name : null;
+    return match ? match.name : 'Cours sélectionné';
   }, [allCourseOptions, subjectId, selectedEcueId]);
 
   // Pre-fill instructor when course changes
@@ -166,6 +166,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
       if (match.instructor) setInstructor(match.instructor);
     } else {
       setSubjectId(chosenId);
+      setSelectedEcueId(chosenId);
     }
     setShowManualCoursePicker(false);
   };
@@ -197,7 +198,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     const finalSubId = subjectId || selectedEcueId;
 
     if (!finalSubId) {
-      setErrorMsg('Veuillez sélectionner un cours ou une ECUE.');
+      setErrorMsg('Veuillez sélectionner un cours ou une ECUE dans la liste.');
       return;
     }
 
@@ -215,7 +216,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
       const payload: TimetableSessionInput = {
         subjectId: finalSubId,
-        ecueId: selectedEcueId || null,
+        ecueId: selectedEcueId || finalSubId,
         dayOfWeek: Number(dayOfWeek),
         startTime,
         endTime,
@@ -238,6 +239,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
       setSubmitting(false);
     }
   };
+
+  const activeCourseId = subjectId || selectedEcueId;
 
   return (
     <div className="modal-backdrop">
@@ -262,7 +265,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           )}
 
           {/* Locked Selected Course Banner OR Dropdown Switcher */}
-          {!showManualCoursePicker && selectedCourseLabel ? (
+          {!showManualCoursePicker && activeCourseId ? (
             <div className="selected-course-banner glass-card">
               <div className="banner-left">
                 <BookOpen size={18} className="text-indigo" />
@@ -276,13 +279,13 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 className="btn-switch-course"
                 onClick={() => setShowManualCoursePicker(true)}
               >
-                Changer
+                Changer de cours
               </button>
             </div>
           ) : (
             <div className="form-group">
               <div className="label-row">
-                <label>ECUE / Matière d'enseignement *</label>
+                <label>Cours / ECUE d'enseignement *</label>
                 <button
                   type="button"
                   className="btn-quick-create"
@@ -324,11 +327,15 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                 </div>
               ) : (
                 <select
-                  value={subjectId || selectedEcueId}
+                  value={activeCourseId}
                   onChange={(e) => handleSelectCourse(e.target.value)}
-                  required
                 >
                   <option value="">-- Sélectionnez une ECUE / matière --</option>
+                  {activeCourseId && !allCourseOptions.some((o) => o.id === activeCourseId) && (
+                    <option value={activeCourseId}>
+                      {selectedCourseLabel || '[Cours sélectionné]'}
+                    </option>
+                  )}
                   {allCourseOptions.map((opt) => (
                     <option key={opt.id} value={opt.id}>
                       {opt.name}
@@ -492,7 +499,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               ) : (
                 <>
                   <Check size={16} />
-                  <span>Ajouter la séance ({sessionType})</span>
+                  <span>Enregistrer la séance ({sessionType})</span>
                 </>
               )}
             </button>
@@ -516,8 +523,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           justify-content: space-between;
           padding: 0.75rem 1rem;
           border-radius: 8px;
-          background: rgba(99, 102, 241, 0.15);
-          border: 1px solid rgba(99, 102, 241, 0.4);
+          background: rgba(99, 102, 241, 0.18);
+          border: 1px solid rgba(99, 102, 241, 0.45);
         }
 
         .banner-left {
