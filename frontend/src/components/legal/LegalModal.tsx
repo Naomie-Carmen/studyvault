@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, FileText, ShieldCheck } from 'lucide-react';
-import privacyText from '../../legal/privacy.md?raw';
-import termsText from '../../legal/terms.md?raw';
+import { PRIVACY_POLICY_TEXT } from '../../legal/privacyText';
+import { TERMS_OF_SERVICE_TEXT } from '../../legal/termsText';
 
 interface LegalModalProps {
   type: 'privacy' | 'terms' | null;
@@ -15,7 +15,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
     ? 'Politique de Confidentialité (Loi n° 2013-450 — ARTCI)' 
     : 'Conditions Générales d\'Utilisation (CGU)';
   
-  const content = type === 'privacy' ? privacyText : termsText;
+  const content = type === 'privacy' ? PRIVACY_POLICY_TEXT : TERMS_OF_SERVICE_TEXT;
 
   return (
     <div className="legal-modal-backdrop" onClick={onClose}>
