@@ -48,26 +48,26 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
         .legal-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(8px);
+          background: rgba(0, 0, 0, 0.88);
+          backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1100;
+          z-index: 9999;
           padding: 1.25rem;
         }
 
         .legal-modal-dialog {
-          width: 720px;
+          width: 760px;
           max-width: 95vw;
-          max-height: 85vh;
+          max-height: 88vh;
           display: flex;
           flex-direction: column;
-          border-radius: 14px;
+          border-radius: 16px;
           background: #0f172a;
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(255, 255, 255, 0.2);
           overflow: hidden;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8);
         }
 
         .legal-modal-header {
@@ -75,8 +75,8 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
           align-items: center;
           justify-content: space-between;
           padding: 1.25rem 1.5rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(15, 23, 42, 0.9);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(15, 23, 42, 0.95);
         }
 
         .title-group {
@@ -86,7 +86,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
         }
 
         .title-group h3 {
-          font-size: 1.05rem;
+          font-size: 1.1rem;
           font-weight: 700;
           color: #ffffff;
           margin: 0;
@@ -97,24 +97,25 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
           border: none;
           color: var(--text-muted);
           cursor: pointer;
-          padding: 0.25rem;
+          padding: 0.35rem;
           border-radius: 6px;
+          transition: all 0.2s ease;
         }
-        .close-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.1); }
+        .close-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.15); }
 
         .legal-modal-body {
           flex: 1;
           overflow-y: auto;
-          padding: 1.5rem;
-          background: rgba(0, 0, 0, 0.2);
+          padding: 1.75rem;
+          background: rgba(10, 15, 30, 0.6);
         }
 
         .legal-text {
           white-space: pre-wrap;
-          font-family: inherit;
-          font-size: 0.875rem;
-          line-height: 1.6;
-          color: #cbd5e1;
+          font-family: system-ui, -apple-system, sans-serif;
+          font-size: 0.9rem;
+          line-height: 1.7;
+          color: #e2e8f0;
           margin: 0;
         }
 
@@ -123,24 +124,26 @@ export const LegalModal: React.FC<LegalModalProps> = ({ type, onClose }) => {
           align-items: center;
           justify-content: space-between;
           padding: 1rem 1.5rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(15, 23, 42, 0.9);
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(15, 23, 42, 0.95);
         }
 
         .footer-notice {
-          font-size: 0.75rem;
+          font-size: 0.78rem;
           color: var(--text-muted);
         }
 
         .btn-modal-close {
-          padding: 0.45rem 1.25rem;
+          padding: 0.5rem 1.5rem;
           border-radius: 8px;
           background: #6366f1;
           color: #ffffff;
           border: none;
           font-weight: 600;
           cursor: pointer;
+          transition: background 0.2s ease;
         }
+        .btn-modal-close:hover { background: #4f46e5; }
 
         .text-emerald { color: #34d399; }
         .text-indigo { color: #818cf8; }
