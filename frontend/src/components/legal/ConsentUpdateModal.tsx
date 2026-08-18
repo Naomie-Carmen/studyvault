@@ -16,9 +16,19 @@ export const ConsentUpdateModal: React.FC<ConsentUpdateModalProps> = ({ onConsen
     if (!accepted) return;
     setLoading(true);
     try {
-      const res = await fetchApi<{ consentAt: string }>('/user/consent', {
+      let res = await fetchApi<{ consentAt: string }>('/users/consent', {
         method: 'POST',
       });
+      if (!res.success) {
+        res = await fetchApi<{ consentAt: string }>('/user/consent', {
+          method: 'POST',
+        });
+      }
+      if (!res.success) {
+        res = await fetchApi<{ consentAt: string }>('/rgpd/accept-consent', {
+          method: 'POST',
+        });
+      }
       if (res.success) {
         onConsentAccepted();
       } else {

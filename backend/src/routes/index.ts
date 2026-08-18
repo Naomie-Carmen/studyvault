@@ -28,6 +28,7 @@ router.get('/health', getHealthStatus);
 // Sub-routers
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/user', userRoutes);
 router.use('/academic-profile', academicProfileRoutes);
 router.use('/academic-structure', academicStructureRoutes);
 router.use('/documents', documentRoutes);
