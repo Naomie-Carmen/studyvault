@@ -26,7 +26,7 @@ jobs:
               tag_name: context.ref.replace('refs/tags/', ''),
               name: `StudyVault Desktop ${context.ref.replace('refs/tags/', '')}`,
               body: 'Mise à jour automatique StudyVault.',
-              draft: false,
+              draft: true,
               prerelease: false
             });
             return data.id;
