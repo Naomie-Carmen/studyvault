@@ -15,7 +15,7 @@ import {
   Folder, 
   FolderOpen, 
   FileText, 
-  File, 
+  File as FileGenericIcon, 
   FileSpreadsheet, 
   Image as ImageIcon, 
   Film, 
@@ -143,6 +143,26 @@ export const LibraryPage: React.FC = () => {
     fetchEcueData();
   }, [fetchEcueData]);
 
+  const getMimeTypeFromExt = (ext: string) => {
+    const map: Record<string, string> = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      txt: 'text/plain',
+      csv: 'text/csv',
+      zip: 'application/zip',
+    };
+    return map[ext.toLowerCase()] || 'application/octet-stream';
+  };
+
   // Process file import from local paths (Desktop Tauri)
   const importFilePathsToCategory = useCallback(async (paths: string[], targetCat: DocumentCategoryItem | null) => {
     const currentEcue = activeEcueRef.current;
@@ -165,19 +185,32 @@ export const LibraryPage: React.FC = () => {
       formData.append('ecueId', currentEcue.ecue.id);
       if (targetCat) formData.append('categoryId', targetCat.id);
 
-      paths.forEach((p) => {
-        const fileName = p.split(/[/\\]/).pop() || 'document';
-        formData.append('filePath', p);
-        formData.append('fileName', fileName);
-      });
+      if (fileOrganizer.isTauri) {
+        const { readBinaryFile } = await import('@tauri-apps/api/fs');
+        for (const p of paths) {
+          const fileName = p.split(/[/\\]/).pop() || 'document';
+          const ext = fileName.split('.').pop() || '';
+          try {
+            const contents = await readBinaryFile(p);
+            const blob = new Blob([new Uint8Array(contents)], { type: getMimeTypeFromExt(ext) });
+            const file = new File([blob], fileName, { type: getMimeTypeFromExt(ext) });
+            formData.append('files', file);
+          } catch (e) {
+            console.error('Error reading binary file for upload:', p, e);
+          }
+        }
+      }
 
-      await docService.uploadFiles(formData);
+      const res = await docService.uploadFiles(formData);
+      if (res.success) {
+        showToast(`${paths.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
+      } else {
+        showToast(`Erreur d'ajout : ${res.error?.message || 'Échec du téléversement'}`);
+      }
     } catch (_err) {
-      /* ignore */
+      showToast('Erreur lors du téléversement du fichier.');
     } finally {
       fetchEcueData();
-      const catName = targetCat ? targetCat.name : 'Non classé';
-      showToast(`${paths.length} fichier(s) ajouté(s) à ${catName}`);
     }
   }, [fetchEcueData]);
 
@@ -370,32 +403,41 @@ export const LibraryPage: React.FC = () => {
           const paths = Array.isArray(selected) ? selected : [selected];
           if (paths.length > 0) {
             await importFilePathsToCategory(paths, targetCat);
+            return;
           }
         }
-      } catch (_e) {
-        /* ignore */
+        return;
+      } catch (err) {
+        console.warn('Tauri openDialog error, fallback to HTML file input:', err);
       }
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.multiple = true;
-      input.onchange = async (e: any) => {
-        const files: File[] = Array.from(e.target.files || []);
-        if (files.length > 0) {
-          const formData = new FormData();
-          formData.append('ecueId', selectedEcue.ecue.id);
-          if (targetCat) formData.append('categoryId', targetCat.id);
-          files.forEach((f) => formData.append('files', f));
+    }
 
+    // Web & Fallback HTML File Input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.onchange = async (e: any) => {
+      const files: File[] = Array.from(e.target.files || []);
+      if (files.length > 0) {
+        const formData = new FormData();
+        formData.append('ecueId', selectedEcue.ecue.id);
+        if (targetCat) formData.append('categoryId', targetCat.id);
+        files.forEach((f) => formData.append('files', f));
+
+        try {
           const res = await docService.uploadFiles(formData);
           if (res.success) {
             fetchEcueData();
             showToast(`${files.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
+          } else {
+            showToast(`Erreur d'ajout : ${res.error?.message || 'Échec'}`);
           }
+        } catch (_err) {
+          showToast('Erreur lors du téléversement.');
         }
-      };
-      input.click();
-    }
+      }
+    };
+    input.click();
   };
 
   const getDocIcon = (mimeType: string, name: string) => {
@@ -404,7 +446,7 @@ export const LibraryPage: React.FC = () => {
     if (mimeType.includes('sheet') || ext === 'xlsx' || ext === 'csv') return <FileSpreadsheet size={18} className="text-emerald-400" />;
     if (mimeType.includes('image') || ['png', 'jpg', 'jpeg'].includes(ext)) return <ImageIcon size={18} className="text-purple-400" />;
     if (mimeType.includes('video') || ['mp4', 'avi'].includes(ext)) return <Film size={18} className="text-blue-400" />;
-    return <File size={18} className="text-indigo-400" />;
+    return <FileGenericIcon size={18} className="text-indigo-400" />;
   };
 
   const formatSize = (bytes: number) => {
