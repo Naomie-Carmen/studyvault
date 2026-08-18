@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/useAuth';
 import { Mail, Lock, User, GraduationCap, UserPlus, AlertCircle, CheckCircle2, Eye, EyeOff, Ticket } from 'lucide-react';
 import { BetaBadge } from '../../components/common/BetaBadge';
+import { LegalModal } from '../../components/legal/LegalModal';
 
 interface RegisterPageProps {
   onNavigateLogin: () => void;
@@ -22,6 +23,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
   const [inviteCode, setInviteCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [legalModalType, setLegalModalType] = useState<'privacy' | 'terms' | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -187,7 +190,29 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
             </div>
           </div>
 
-          <button type="submit" className="submit-btn" disabled={isLoading || !isPasswordValid}>
+          {/* Mandatory Terms & Privacy Checkbox */}
+          <div className="terms-checkbox-group" style={{ margin: '1.25rem 0 1rem 0', display: 'flex', alignItems: 'flex-start', gap: '0.65rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <input
+              type="checkbox"
+              id="acceptTerms"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              style={{ marginTop: '0.2rem', width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <label htmlFor="acceptTerms" style={{ cursor: 'pointer', lineHeight: 1.4 }}>
+              J'ai lu et j'accepte la{' '}
+              <button type="button" onClick={() => setLegalModalType('privacy')} style={{ background: 'none', border: 'none', color: '#818cf8', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>
+                Politique de confidentialité
+              </button>{' '}
+              et les{' '}
+              <button type="button" onClick={() => setLegalModalType('terms')} style={{ background: 'none', border: 'none', color: '#818cf8', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>
+                CGU
+              </button>{' '}
+              (Loi n° 2013-450 / ARTCI).
+            </label>
+          </div>
+
+          <button type="submit" className="submit-btn" disabled={isLoading || !isPasswordValid || !acceptTerms}>
             <UserPlus size={18} />
             <span>{isLoading ? t('auth.registering', 'Inscription en cours...') : t('auth.registerBtn', 'Créer mon compte')}</span>
           </button>
@@ -200,6 +225,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
           </button>
         </div>
       </div>
+
+      <LegalModal type={legalModalType} onClose={() => setLegalModalType(null)} />
 
       <style>{`
         .auth-card-container {

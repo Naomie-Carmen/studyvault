@@ -20,7 +20,18 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
   try {
     if (!req.user) throw ApiError.unauthorized();
 
-    const result = await rgpdService.scheduleAccountDeletion(req.user.id);
+    const result = await rgpdService.deleteUserAccount(req.user.id);
+    sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function acceptConsent(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+
+    const result = await rgpdService.acceptUserConsent(req.user.id);
     sendSuccess(res, result);
   } catch (err) {
     next(err);

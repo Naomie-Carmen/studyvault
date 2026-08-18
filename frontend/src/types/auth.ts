@@ -6,6 +6,7 @@ export interface User {
   program?: string | null;
   level?: string | null;
   role?: string;
+  consentAt?: string | null;
   createdAt: string;
 }
 

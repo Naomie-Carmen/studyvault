@@ -4,8 +4,8 @@ import { ApiError } from '../utils/apiError';
 const prisma = new PrismaClient();
 
 export interface UserConsentInput {
-  analyticsOptIn: boolean;
-  contentAnalysisOptIn: boolean;
+  analyticsOptIn?: boolean;
+  contentAnalysisOptIn?: boolean;
 }
 
 export async function exportUserData(userId: string) {
@@ -18,6 +18,9 @@ export async function exportUserData(userId: string) {
       university: true,
       program: true,
       level: true,
+      role: true,
+      gradeMode: true,
+      consentAt: true,
       createdAt: true,
       updatedAt: true,
       academicYears: {
@@ -48,6 +51,7 @@ export async function exportUserData(userId: string) {
           createdAt: true,
         },
       },
+      notes: true,
       timetableSessions: true,
       timetableImports: {
         select: {
@@ -66,14 +70,17 @@ export async function exportUserData(userId: string) {
     throw ApiError.notFound('Utilisateur introuvable.');
   }
 
+  console.log(`[PRIVACY] User ${userId} exported data`);
+
   return {
     exportDate: new Date().toISOString(),
-    compliance: 'RGPD Article 20 - Droit à la portabilité des données',
+    legalReference: 'Loi n° 2013-450 du 19 juin 2013 (Côte d\'Ivoire) / ARTCI — Droit à la portabilité (Art. 42)',
+    editor: 'Data Service Mica (data.service.mica@gmail.com)',
     userData: user,
   };
 }
 
-export async function scheduleAccountDeletion(userId: string) {
+export async function deleteUserAccount(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -82,79 +89,91 @@ export async function scheduleAccountDeletion(userId: string) {
     throw ApiError.notFound('Utilisateur introuvable.');
   }
 
-  const purgeDate = new Date();
-  purgeDate.setDate(purgeDate.getDate() + 30); // 30-day grace period
-
-  // Soft delete user and revoke all refresh tokens
-  await prisma.user.update({
-    where: { id: userId },
+  // Create Archive record for legal 12-month retention
+  await prisma.userArchive.create({
     data: {
-      isScheduledForPurge: true,
-      purgeScheduledAt: purgeDate,
+      userId: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      createdAt: user.createdAt,
+      reason: 'Suppression par l\'utilisateur (droit à l\'oubli Loi n° 2013-450 / ARTCI)',
     },
   });
 
-  await prisma.refreshToken.updateMany({
-    where: { userId },
-    data: { isRevoked: true },
+  // Delete user account (cascade deletes all personal data)
+  await prisma.user.delete({
+    where: { id: userId },
   });
 
+  console.log(`[PRIVACY] User ${userId} deleted account`);
+
   return {
-    message: 'Compte désactivé et programmé pour suppression définitive sous 30 jours.',
-    purgeScheduledAt: purgeDate.toISOString(),
+    message: 'Compte supprimé avec succès. Les données ont été archivées pendant 12 mois conformément à la loi.',
   };
 }
 
+export async function acceptUserConsent(userId: string) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { consentAt: new Date() },
+    select: { id: true, email: true, consentAt: true },
+  });
+
+  console.log(`[PRIVACY] User ${userId} accepted privacy policy`);
+  return user;
+}
+
 export async function updateUserConsent(userId: string, input: UserConsentInput) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { consentAt: new Date() },
+  });
+
   return prisma.userConsent.upsert({
     where: { userId },
     update: {
-      analyticsOptIn: input.analyticsOptIn,
-      contentAnalysisOptIn: input.contentAnalysisOptIn,
+      analyticsOptIn: Boolean(input.analyticsOptIn),
+      contentAnalysisOptIn: Boolean(input.contentAnalysisOptIn),
     },
     create: {
       userId,
-      analyticsOptIn: input.analyticsOptIn,
-      contentAnalysisOptIn: input.contentAnalysisOptIn,
+      analyticsOptIn: Boolean(input.analyticsOptIn),
+      contentAnalysisOptIn: Boolean(input.contentAnalysisOptIn),
     },
   });
 }
 
 export async function getUserConsent(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { consentAt: true },
+  });
+
   const consent = await prisma.userConsent.findUnique({
     where: { userId },
   });
 
-  if (!consent) {
-    return {
-      analyticsOptIn: false,
-      contentAnalysisOptIn: false,
-      transactionalEmails: true,
-    };
-  }
-
-  return consent;
+  return {
+    consentAt: user?.consentAt || null,
+    analyticsOptIn: consent?.analyticsOptIn || false,
+    contentAnalysisOptIn: consent?.contentAnalysisOptIn || false,
+    transactionalEmails: true,
+  };
 }
 
 export function getPrivacyPolicy() {
   return {
     version: '1.0.0',
-    effectiveDate: '2026-01-01',
-    dataController: 'StudyVault SAS - 75005 Paris, France',
-    dpoContact: 'dpo@studyvault.fr',
+    effectiveDate: '2026-08-01',
+    dataController: 'Data Service Mica — Abidjan, Côte d\'Ivoire',
+    dpoContact: 'data.service.mica@gmail.com',
+    legalLaw: 'Loi n° 2013-450 du 19 juin 2013 relative à la protection des données à caractère personnel (Côte d\'Ivoire) + ARTCI',
     rights: [
-      'Droit d\'accès (Article 15 RGPD)',
-      'Droit de rectification (Article 16 RGPD)',
-      'Droit à l\'effacement / Droit à l\'oubli (Article 17 RGPD)',
-      'Droit à la limitation du traitement (Article 18 RGPD)',
-      'Droit à la portabilité des données (Article 20 RGPD)',
-      'Droit d\'opposition (Article 21 RGPD)',
+      'Droit d\'accès (Article 39)',
+      'Droit de rectification (Article 40)',
+      'Droit à l\'oubli / suppression (Article 41)',
+      'Droit à la portabilité (Article 42)',
+      'Droit d\'opposition (Article 43)',
     ],
-    retentionPeriods: {
-      documents: 'Conservés tant que le compte est actif',
-      trash: 'Purge automatique au bout de 30 jours',
-      deletedAccount: 'Purge définitive sous 30 jours',
-      logs: '1 an maximum',
-    },
   };
 }

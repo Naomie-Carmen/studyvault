@@ -30,6 +30,7 @@ model User {
   purgeScheduledAt          DateTime?
   bannedAt                  DateTime?
   lastLogin                 DateTime?
+  consentAt                 DateTime?
   gradeMode                 String                     @default("weighted") // "weighted" | "simple"
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt

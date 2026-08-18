@@ -1,62 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Settings, 
-  Languages, 
-  Sun, 
+  Globe, 
   Moon, 
+  Sun, 
   Monitor, 
-  Bell, 
-  UserCheck, 
   ShieldCheck, 
-  Database, 
   Info, 
-  ExternalLink,
-  Check,
-  ChevronRight,
-  Layers,
-  BookOpen
+  FileText, 
+  ChevronRight, 
+  Check, 
+  Layers, 
+  BookOpen, 
+  Download, 
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
-import { GradeConfigSection } from '../components/settings/GradeConfigSection';
-import { SessionTypeConfigSection } from '../components/settings/SessionTypeConfigSection';
-import { DefaultCategoriesConfigSection } from '../components/settings/DefaultCategoriesConfigSection';
+import { useAuth } from '../context/useAuth';
+import { API_BASE_URL, fetchApi, getClientAccessToken } from '../services/apiClient';
+import { LegalModal } from '../components/legal/LegalModal';
 
 interface SettingsPageProps {
   onNavigate?: (tab: string) => void;
 }
 
-const THEME_KEY = 'studyvault_theme';
-const NOTIF_KEY = 'studyvault_desktop_notifications';
 const STRUCTURE_MODE_KEY = 'studyvault_structure_mode';
-
-const isTauri = typeof window !== 'undefined' && Boolean(
-  (window as any).__TAURI__ ||
-  (window as any).__TAURI_IPC__ ||
-  (window as any).__TAURI_METADATA__ ||
-  window.location.protocol.startsWith('tauri') ||
-  window.location.protocol.startsWith('asset')
-);
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
   const { t, i18n } = useTranslation();
+  const { logout, user } = useAuth();
 
   const [currentLang, setCurrentLang] = useState<string>(i18n.language || 'fr');
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
-    return (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'system') || 'dark';
+    return (localStorage.getItem('studyvault_theme') as 'light' | 'dark' | 'system') || 'dark';
   });
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
-    return localStorage.getItem(NOTIF_KEY) === 'true';
-  });
+
   const [structureMode, setStructureMode] = useState<'ecue_is_subject' | 'ecue_has_subjects'>(() => {
     return (localStorage.getItem(STRUCTURE_MODE_KEY) as 'ecue_is_subject' | 'ecue_has_subjects') || 'ecue_is_subject';
   });
+
+  const [legalModalType, setLegalModalType] = useState<'privacy' | 'terms' | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleStructureModeChange = (mode: 'ecue_is_subject' | 'ecue_has_subjects') => {
     setStructureMode(mode);
     localStorage.setItem(STRUCTURE_MODE_KEY, mode);
   };
 
-  // Apply theme to document element
   const applyTheme = (theme: 'light' | 'dark' | 'system') => {
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
@@ -81,169 +73,159 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
 
   const handleThemeChange = (mode: 'light' | 'dark' | 'system') => {
     setThemeMode(mode);
-    localStorage.setItem(THEME_KEY, mode);
-    applyTheme(mode);
-  };
-
-  const handleToggleNotifications = () => {
-    const nextState = !notificationsEnabled;
-    setNotificationsEnabled(nextState);
-    localStorage.setItem(NOTIF_KEY, String(nextState));
+    localStorage.setItem('studyvault_theme', mode);
   };
 
   const handleNav = (tab: string) => {
-    if (onNavigate) {
-      onNavigate(tab);
+    if (onNavigate) onNavigate(tab);
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/user/me/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `studyvault-donnees-export-${user?.id || 'me'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Erreur lors de l\'exportation des données.');
+      }
+    } catch (_err) {
+      alert('Erreur réseau lors de l\'exportation.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetchApi('/user/me', {
+        method: 'DELETE',
+      });
+      if (res.success) {
+        alert('Votre compte a été supprimé. Vos données seront archivées 12 mois puis purgées définitivement.');
+        logout();
+      } else {
+        alert(res.error?.message || 'Erreur lors de la suppression du compte.');
+      }
+    } catch (_err) {
+      alert('Erreur réseau.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div className="page-header-icon">
-          <Settings size={24} />
-        </div>
-        <div className="header-title-box">
-          <h1>{t('settings.title', 'Paramètres')}</h1>
-          <p className="subtitle">{t('settings.subtitle', 'Personnalisez votre expérience et gérez vos préférences')}</p>
+    <div className="settings-page">
+      <div className="page-header glass-card">
+        <div className="header-info">
+          <h1>{t('settings.title', 'Paramètres & Mentions Légales')}</h1>
+          <p className="subtitle">{t('settings.subtitle', 'Personnalisez votre expérience, gérez la confidentialité et vos droits RGPD/Loi 2013-450')}</p>
         </div>
       </div>
 
-      <div className="settings-sections">
-        {/* Section 1: Langue */}
+      <div className="settings-grid">
+        {/* Section 1: Langue d'affichage */}
         <div className="glass-card settings-card">
           <div className="card-header">
-            <Languages size={22} className="section-icon" />
+            <Globe size={22} className="section-icon" />
             <div>
               <h3>{t('settings.language.title', 'Langue d\'affichage')}</h3>
               <p>{t('settings.language.desc', 'Choisissez la langue de l\'interface utilisateur')}</p>
             </div>
           </div>
 
-          <div className="options-grid">
+          <div className="options-group">
             <button
-              className={`option-btn ${currentLang.startsWith('fr') ? 'active' : ''}`}
+              className={`option-btn ${currentLang === 'fr' ? 'active' : ''}`}
               onClick={() => handleLanguageChange('fr')}
             >
-              <span className="option-flag">🇫🇷</span>
-              <span className="option-label">{t('settings.language.fr', 'Français 🇫🇷')}</span>
-              {currentLang.startsWith('fr') && <Check size={18} className="check-mark" />}
+              <span>{t('settings.language.fr', 'Français 🇫🇷')}</span>
+              {currentLang === 'fr' && <Check size={18} className="check-mark" />}
             </button>
 
             <button
-              className={`option-btn ${currentLang.startsWith('en') ? 'active' : ''}`}
+              className={`option-btn ${currentLang === 'en' ? 'active' : ''}`}
               onClick={() => handleLanguageChange('en')}
             >
-              <span className="option-flag">🇬🇧</span>
-              <span className="option-label">{t('settings.language.en', 'English 🇬🇧')}</span>
-              {currentLang.startsWith('en') && <Check size={18} className="check-mark" />}
+              <span>{t('settings.language.en', 'English 🇬🇧')}</span>
+              {currentLang === 'en' && <Check size={18} className="check-mark" />}
             </button>
           </div>
         </div>
 
-        {/* Section 2: Thème */}
+        {/* Section 2: Apparence et Thème */}
         <div className="glass-card settings-card">
           <div className="card-header">
-            <Sun size={22} className="section-icon" />
+            <Moon size={22} className="section-icon" />
             <div>
               <h3>{t('settings.theme.title', 'Apparence et Thème')}</h3>
               <p>{t('settings.theme.desc', 'Sélectionnez le mode d\'affichage visuel de StudyVault')}</p>
             </div>
           </div>
 
-          <div className="options-grid three-cols">
-            <button
-              className={`option-btn ${themeMode === 'dark' ? 'active' : ''}`}
-              onClick={() => handleThemeChange('dark')}
-            >
-              <Moon size={20} />
-              <span>{t('settings.theme.dark', 'Sombre')}</span>
-              {themeMode === 'dark' && <Check size={18} className="check-mark" />}
-            </button>
-
+          <div className="options-group">
             <button
               className={`option-btn ${themeMode === 'light' ? 'active' : ''}`}
               onClick={() => handleThemeChange('light')}
             >
-              <Sun size={20} />
+              <Sun size={18} />
               <span>{t('settings.theme.light', 'Clair')}</span>
               {themeMode === 'light' && <Check size={18} className="check-mark" />}
+            </button>
+
+            <button
+              className={`option-btn ${themeMode === 'dark' ? 'active' : ''}`}
+              onClick={() => handleThemeChange('dark')}
+            >
+              <Moon size={18} />
+              <span>{t('settings.theme.dark', 'Sombre')}</span>
+              {themeMode === 'dark' && <Check size={18} className="check-mark" />}
             </button>
 
             <button
               className={`option-btn ${themeMode === 'system' ? 'active' : ''}`}
               onClick={() => handleThemeChange('system')}
             >
-              <Monitor size={20} />
+              <Monitor size={18} />
               <span>{t('settings.theme.system', 'Système')}</span>
               {themeMode === 'system' && <Check size={18} className="check-mark" />}
             </button>
           </div>
         </div>
 
-        {/* Section 3: Notifications Desktop */}
-        <div className="glass-card settings-card">
-          <div className="card-header">
-            <Bell size={22} className="section-icon" />
-            <div>
-              <h3>{t('settings.notifications.title', 'Notifications Desktop')}</h3>
-              <p>{t('settings.notifications.desc', 'Recevoir des alertes de l\'application sur votre système')}</p>
-            </div>
-          </div>
-
-          <div className="toggle-row">
-            <div>
-              <span className="toggle-status-label">
-                {notificationsEnabled
-                  ? t('settings.notifications.enabled', 'Notifications activées')
-                  : t('settings.notifications.disabled', 'Notifications désactivées')}
-              </span>
-              {!isTauri && (
-                <p className="toggle-web-notice">
-                  {t('settings.notifications.webNotice', 'Les notifications natives sont optimisées pour l\'application Desktop StudyVault.')}
-                </p>
-              )}
-            </div>
-
-            <button
-              className={`toggle-switch ${notificationsEnabled ? 'on' : ''} ${!isTauri ? 'disabled' : ''}`}
-              onClick={handleToggleNotifications}
-              disabled={!isTauri}
-            >
-              <span className="toggle-slider" />
-            </button>
-          </div>
-        </div>
-
-        {/* Section 3.5: Barème de notation */}
-        <GradeConfigSection />
-
-        {/* Section 3.55: Types de Séance */}
-        <SessionTypeConfigSection />
-
-        {/* Section 3.56: Compartiments par Défaut */}
-        <DefaultCategoriesConfigSection />
-
-        {/* Section 3.6: Structure Pédagogique */}
+        {/* Section 3: Structure Académique */}
         <div className="glass-card settings-card">
           <div className="card-header">
             <Layers size={22} className="section-icon" />
             <div>
-              <h3>{t('settings.structure.title', 'Mode de Structure Pédagogique')}</h3>
-              <p>{t('settings.structure.desc', 'Définissez la relation entre les ECUE et les matières de cours')}</p>
+              <h3>{t('settings.structure.title', 'Mode de Structure Académique')}</h3>
+              <p>{t('settings.structure.desc', 'Définissez la hiérarchie de vos cours et matières')}</p>
             </div>
           </div>
 
-          <div className="options-grid">
+          <div className="options-group vertical">
             <button
               className={`option-btn ${structureMode === 'ecue_is_subject' ? 'active' : ''}`}
               onClick={() => handleStructureModeChange('ecue_is_subject')}
             >
               <Layers size={20} />
               <div style={{ textAlign: 'left' }}>
-                <span className="option-label" style={{ fontWeight: 600 }}>{t('settings.structure.ecueIsSubject', 'ECUE = Matière (Recommandé)')}</span>
+                <span className="option-label" style={{ fontWeight: 600 }}>{t('settings.structure.ecueIsSubject', 'ECUE = Matière directe (LMD Classique)')}</span>
                 <span style={{ fontSize: '0.75rem', opacity: 0.75, display: 'block' }}>
-                  {t('settings.structure.ecueIsSubjectDesc', 'Chaque ECUE agit directement comme matière de cours.')}
+                  {t('settings.structure.ecueIsSubjectDesc', 'Chaque ECUE correspond directement à une matière de cours.')}
                 </span>
               </div>
               {structureMode === 'ecue_is_subject' && <Check size={18} className="check-mark" />}
@@ -265,32 +247,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Section 4: Compte & Données */}
+        {/* Section 4: Mentions Légales, Portabilité & Droits RGPD / Loi 2013-450 */}
         <div className="glass-card settings-card">
           <div className="card-header">
-            <UserCheck size={22} className="section-icon" />
+            <ShieldCheck size={22} className="section-icon" />
             <div>
-              <h3>{t('settings.account.title', 'Gestion du Compte et Données')}</h3>
-              <p>{t('settings.account.desc', 'Accès rapide aux paramètres de votre profil et confidentialité')}</p>
+              <h3>📜 Mentions Légales & Confidentialité</h3>
+              <p>Conforme à la Loi n° 2013-450 (Côte d'Ivoire) & Autorité ARTCI</p>
             </div>
           </div>
 
           <div className="links-list">
-            <button className="link-item-btn" onClick={() => handleNav('academic-profile')}>
-              <UserCheck size={18} className="link-icon" />
-              <span>{t('settings.account.profileLink', 'Gérer mon profil universitaire')}</span>
+            <button className="link-item-btn" onClick={() => setLegalModalType('privacy')}>
+              <ShieldCheck size={18} className="link-icon text-emerald" />
+              <span>Politique de confidentialité</span>
               <ChevronRight size={18} className="arrow-icon" />
             </button>
 
-            <button className="link-item-btn" onClick={() => handleNav('privacy-settings')}>
-              <ShieldCheck size={18} className="link-icon" />
-              <span>{t('settings.account.privacyLink', 'Confidentialité & Paramètres RGPD')}</span>
+            <button className="link-item-btn" onClick={() => setLegalModalType('terms')}>
+              <FileText size={18} className="link-icon text-indigo" />
+              <span>Conditions d'utilisation (CGU)</span>
               <ChevronRight size={18} className="arrow-icon" />
             </button>
 
-            <button className="link-item-btn" onClick={() => handleNav('my-data')}>
-              <Database size={18} className="link-icon" />
-              <span>{t('settings.account.myDataLink', 'Consulter et exporter mes données')}</span>
+            <button className="link-item-btn" onClick={handleExportData} disabled={isExporting}>
+              <Download size={18} className="link-icon text-amber" />
+              <span>📦 Exporter mes données (JSON) — Art. 42 Portabilité</span>
+              <ChevronRight size={18} className="arrow-icon" />
+            </button>
+
+            <button className="link-item-btn btn-danger" onClick={() => setShowDeleteModal(true)}>
+              <Trash2 size={18} className="link-icon text-red" />
+              <span>🗑️ Supprimer mon compte — Droit à l'oubli Art. 41</span>
               <ChevronRight size={18} className="arrow-icon" />
             </button>
 
@@ -300,7 +288,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Section 5: À propos de l'application */}
+        {/* Section 5: À propos de l'application & Éditeur */}
         <div className="glass-card settings-card">
           <div className="card-header">
             <Info size={22} className="section-icon" />
@@ -310,240 +298,272 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          <div className="app-info-row">
-            <div>
-              <span className="info-label">{t('settings.app.version', 'Version actuelle')}</span>
-              <span className="info-val">v1.0.3 (Bêta Fermée)</span>
+          <div className="app-info-content">
+            <div className="info-row">
+              <span className="info-label">Version</span>
+              <span className="info-value">v1.2.28 (Bêta Fermée)</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Éditeur responsable</span>
+              <span className="info-value"><strong>Data Service Mica</strong></span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Siège social</span>
+              <span className="info-value">Abidjan, Côte d'Ivoire 🇨🇮</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Contact & DPO</span>
+              <span className="info-value text-indigo">data.service.mica@gmail.com</span>
             </div>
 
-            <button className="btn-secondary" onClick={() => handleNav('changelog')}>
-              <ExternalLink size={16} />
-              <span>{t('settings.app.changelogBtn', 'Voir les notes de version')}</span>
-            </button>
+            <div className="app-actions" style={{ marginTop: '1rem' }}>
+              <button className="btn-secondary" onClick={() => handleNav('changelog')}>
+                {t('settings.app.changelogBtn', 'Voir les notes de version')}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Markdown Legal Modal */}
+      <LegalModal type={legalModalType} onClose={() => setLegalModalType(null)} />
+
+      {/* Confirmation Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="modal-backdrop" onClick={() => setShowDeleteModal(false)}>
+          <div className="modal-dialog glass-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header text-red">
+              <AlertTriangle size={24} />
+              <h3>Confirmation de suppression de compte</h3>
+            </div>
+            <p className="modal-body-text">
+              Êtes-vous sûr de vouloir supprimer définitivement votre compte <strong>{user?.email}</strong> ?
+              <br /><br />
+              <strong>Action irréversible.</strong> Vos données seront archivées pendant 12 mois conformément à la Loi n° 2013-450 relative à la protection des données à caractère personnel en Côte d'Ivoire, puis purgées définitivement.
+            </p>
+            <div className="modal-footer">
+              <button className="btn-modal-cancel" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                Annuler
+              </button>
+              <button className="btn-modal-confirm-delete" onClick={handleDeleteAccount} disabled={isDeleting}>
+                {isDeleting ? 'Suppression...' : '🗑️ Confirmer la suppression'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        .page-container {
-          max-width: 100%;
-          width: 100%;
-          margin: 0;
-          padding: 1.5rem 0;
-        }
-        .page-header {
-          margin-bottom: 2rem;
-        }
-        .header-title {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-        .header-icon {
-          color: #6366f1;
-        }
-        .header-title h1 {
-          font-size: 1.8rem;
-          margin: 0;
-          font-weight: 700;
-        }
-        .subtitle {
-          color: var(--text-muted, #94a3b8);
-          margin-top: 0.25rem;
-          font-size: 0.95rem;
-        }
-        .settings-sections {
+        .settings-page {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
         }
+
+        .page-header {
+          padding: 1.25rem 1.5rem;
+          border-radius: 12px;
+        }
+
+        .settings-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+          gap: 1.25rem;
+        }
+
         .settings-card {
-          padding: 1.75rem;
-          border-radius: 16px;
-          background: var(--bg-card, rgba(30, 41, 59, 0.7));
-          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+          padding: 1.5rem;
+          border-radius: 12px;
           display: flex;
           flex-direction: column;
-          gap: 1.2rem;
+          gap: 1.25rem;
         }
+
         .card-header {
           display: flex;
           align-items: flex-start;
-          gap: 1rem;
+          gap: 0.85rem;
         }
-        .section-icon {
-          color: #6366f1;
-          margin-top: 0.2rem;
-          flex-shrink: 0;
-        }
+
         .card-header h3 {
-          margin: 0 0 0.25rem 0;
-          font-size: 1.15rem;
-          font-weight: 600;
+          font-size: 1.05rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin: 0 0 0.2rem 0;
         }
+
         .card-header p {
+          font-size: 0.8rem;
+          color: var(--text-muted);
           margin: 0;
-          font-size: 0.88rem;
-          color: var(--text-muted, #94a3b8);
         }
-        .options-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
+
+        .options-group {
+          display: flex;
+          gap: 0.5rem;
         }
-        .options-grid.three-cols {
-          grid-template-columns: repeat(3, 1fr);
+
+        .options-group.vertical {
+          flex-direction: column;
         }
-        @media (max-width: 640px) {
-          .options-grid.three-cols {
-            grid-template-columns: 1fr;
-          }
-        }
+
         .option-btn {
+          flex: 1;
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 0.9rem 1.2rem;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-          color: var(--text-primary, #f8fafc);
-          font-size: 0.95rem;
-          font-weight: 500;
+          justify-content: space-between;
+          gap: 0.5rem;
+          padding: 0.65rem 0.85rem;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(0, 0, 0, 0.2);
+          color: var(--text-secondary);
+          font-size: 0.85rem;
           cursor: pointer;
           transition: all 0.2s ease;
-          position: relative;
         }
-        .option-btn:hover {
-          background: rgba(99, 102, 241, 0.1);
-          border-color: rgba(99, 102, 241, 0.3);
-        }
+
         .option-btn.active {
           background: rgba(99, 102, 241, 0.15);
           border-color: #6366f1;
-          color: #818cf8;
+          color: #ffffff;
           font-weight: 600;
         }
-        .option-flag {
-          font-size: 1.2rem;
-        }
-        .check-mark {
-          margin-left: auto;
-          color: #6366f1;
-        }
-        .toggle-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-top: 0.5rem;
-        }
-        .toggle-status-label {
-          font-weight: 500;
-          font-size: 0.95rem;
-        }
-        .toggle-web-notice {
-          font-size: 0.8rem;
-          color: var(--text-muted, #64748b);
-          margin: 0.3rem 0 0 0;
-        }
-        .toggle-switch {
-          width: 52px;
-          height: 28px;
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 20px;
-          border: none;
-          padding: 3px;
-          cursor: pointer;
-          transition: background 0.3s ease;
-          position: relative;
-        }
-        .toggle-switch.on {
-          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-        }
-        .toggle-switch.disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-        .toggle-slider {
-          display: block;
-          width: 22px;
-          height: 22px;
-          background: white;
-          border-radius: 50%;
-          transition: transform 0.3s ease;
-        }
-        .toggle-switch.on .toggle-slider {
-          transform: translateX(24px);
-        }
+
         .links-list {
           display: flex;
           flex-direction: column;
-          gap: 0.6rem;
+          gap: 0.5rem;
         }
+
         .link-item-btn {
           display: flex;
           align-items: center;
-          gap: 0.8rem;
-          padding: 0.9rem 1.2rem;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-          color: var(--text-primary, #f8fafc);
-          font-size: 0.92rem;
+          gap: 0.75rem;
+          padding: 0.75rem 0.85rem;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(0, 0, 0, 0.2);
+          color: var(--text-primary);
+          font-size: 0.85rem;
           cursor: pointer;
-          transition: all 0.2s ease;
           text-align: left;
+          transition: all 0.2s ease;
         }
+
         .link-item-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(99, 102, 241, 0.3);
-          transform: translateX(4px);
+          background: rgba(255, 255, 255, 0.05);
         }
-        .link-icon {
-          color: #6366f1;
+
+        .link-item-btn.btn-danger:hover {
+          background: rgba(239, 68, 68, 0.15);
+          border-color: rgba(239, 68, 68, 0.4);
         }
+
         .arrow-icon {
           margin-left: auto;
-          color: var(--text-muted, #64748b);
+          color: var(--text-muted);
         }
-        .app-info-row {
+
+        .app-info-content {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+          font-size: 0.85rem;
+        }
+
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.4rem 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .info-label { color: var(--text-muted); }
+        .info-value { color: var(--text-primary); }
+
+        .btn-secondary {
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-primary);
+          font-size: 0.825rem;
+          cursor: pointer;
+        }
+
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(8px);
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          padding-top: 0.5rem;
-          flex-wrap: wrap;
+          justify-content: center;
+          z-index: 1200;
+          padding: 1rem;
+        }
+
+        .modal-dialog {
+          width: 440px;
+          padding: 1.5rem;
+          border-radius: 14px;
+          background: #0f172a;
+          border: 1px solid rgba(239, 68, 68, 0.4);
+          display: flex;
+          flex-direction: column;
           gap: 1rem;
         }
-        .info-label {
-          display: block;
-          font-size: 0.85rem;
-          color: var(--text-muted, #94a3b8);
-          margin-bottom: 0.2rem;
-        }
-        .info-val {
-          font-weight: 600;
-          font-size: 0.95rem;
-          color: #818cf8;
-        }
-        .btn-secondary {
+
+        .modal-header {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
-          background: rgba(255, 255, 255, 0.08);
-          color: var(--text-primary, #f8fafc);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          padding: 0.7rem 1.3rem;
+          gap: 0.65rem;
+        }
+
+        .modal-header h3 {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #ffffff;
+        }
+
+        .modal-body-text {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          line-height: 1.5;
+        }
+
+        .modal-footer {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 0.6rem;
+        }
+
+        .btn-modal-cancel {
+          padding: 0.45rem 0.85rem;
           border-radius: 8px;
-          font-weight: 500;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
           cursor: pointer;
-          transition: background 0.2s ease;
         }
-        .btn-secondary:hover {
-          background: rgba(255, 255, 255, 0.12);
+
+        .btn-modal-confirm-delete {
+          padding: 0.45rem 1rem;
+          border-radius: 8px;
+          background: #dc2626;
+          color: #ffffff;
+          border: none;
+          font-weight: 700;
+          cursor: pointer;
         }
+
+        .text-emerald { color: #34d399; }
+        .text-indigo { color: #818cf8; }
+        .text-amber { color: #fbbf24; }
+        .text-red { color: #f87171; }
       `}</style>
     </div>
   );
 };
-
-export default SettingsPage;

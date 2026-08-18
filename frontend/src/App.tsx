@@ -23,6 +23,7 @@ import { getHealthCheck } from './services/healthService';
 import { HealthCheckData } from './types/api';
 import { useAuth } from './context/useAuth';
 import { TOUR_DONE_KEY } from './components/onboarding/tourConstants';
+import { ConsentUpdateModal } from './components/legal/ConsentUpdateModal';
 
 import './i18n/config';
 
@@ -32,13 +33,13 @@ const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage'));
 const MyDataPage = lazy(() => import('./pages/MyDataPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const UpdatePage = lazy(() => import('./pages/UpdatePage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const BetaLandingPage = lazy(() => import('./pages/BetaLandingPage').then(m => ({ default: m.BetaLandingPage })));
 const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').then(m => ({ default: m.BetaDashboardPage })));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 
 export const App: React.FC = () => {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, user, refreshSession, isLoading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('landing');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
@@ -336,7 +337,7 @@ export const App: React.FC = () => {
       case 'settings':
         return (
           <Suspense fallback={<div className="lazy-loading">Chargement des paramètres…</div>}>
-            <SettingsPage onNavigate={(tab) => handleTabChange(tab)} />
+            <SettingsPage onNavigate={(tab: string) => handleTabChange(tab)} />
           </Suspense>
         );
 
@@ -404,6 +405,11 @@ export const App: React.FC = () => {
 
       {/* Cookie Consent Banner */}
       <CookieConsentBanner />
+
+      {/* Mandatory Privacy Policy Consent Modal for First Login / Updated Policy */}
+      {isAuthenticated && user && !user.consentAt && (
+        <ConsentUpdateModal onConsentAccepted={refreshSession} />
+      )}
 
       {/* Floating Beta Feedback Widget */}
       <FeedbackWidget />
