@@ -355,6 +355,7 @@
   },
   "print": {
     "title": "My Week",
+    "modalTitle": "Preview & Print — My Week",
     "from": "FROM:",
     "to": "TO:",
     "doNotForget": "DON'T FORGET",
@@ -362,11 +363,14 @@
     "noSessions": "No classes",
     "room": "Room",
     "styleLabel": "Style:",
+    "styleTheme": "My Week Theme",
     "styleGrid24h": "24h Grid",
     "styleCompactList": "Compact list",
     "orientationLabel": "Orientation:",
     "landscape": "Landscape",
+    "landscapeGrid": "Landscape (24h Grid)",
     "portrait": "Portrait",
+    "portraitOriginal": "Portrait (Original Format)",
     "hours": "Hours",
     "printBtn": "Print / Export PDF",
     "days": {

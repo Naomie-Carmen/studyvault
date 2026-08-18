@@ -2,13 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { getSessionTypeColor } from '../../utils/sessionTypesConfig';
-import { Printer, LayoutGrid, List, FileSpreadsheet, Smartphone } from 'lucide-react';
+import { Printer, LayoutGrid, List, FileSpreadsheet, Smartphone, X } from 'lucide-react';
 
 type TimetableWeekData = Record<number, TimetableSession[]>;
 
 interface PrintWeeklySheetProps {
   weekData: TimetableWeekData | null;
   selectedWeekMonday?: Date;
+  isOpen: boolean;
+  onClose: () => void;
   defaultStyle?: 'grid24h' | 'compactList';
   defaultOrientation?: 'landscape' | 'portrait';
 }
@@ -58,6 +60,8 @@ function hexToPastelBg(hexColor: string): string {
 export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
   weekData,
   selectedWeekMonday,
+  isOpen,
+  onClose,
   defaultStyle = 'grid24h',
   defaultOrientation = 'landscape',
 }) => {
@@ -106,7 +110,7 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
     return list;
   }, [weekData, DAYS]);
 
-  // Compute total sessions count for page ceiling check (>40 blocks -> page 2 suite ceiling)
+  // Compute total sessions count for page ceiling check
   const totalSessionsCount = useMemo(() => {
     if (!weekData) return 0;
     return Object.values(weekData).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
@@ -140,7 +144,6 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
       }
     });
 
-    // Map sessions to visual positioning properties
     const positioned: {
       session: TimetableSession;
       topPercent: number;
@@ -170,7 +173,6 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
             leftPercent: idx * (100 / count),
           });
         } else {
-          // More than 3 overlapping: place first 3, indicate +n on 3rd
           if (idx < 3) {
             positioned.push({
               session: sess,
@@ -181,7 +183,6 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
               overflowCount: idx === 2 ? count - 3 : undefined,
             });
           } else {
-            // hidden beyond top 3
             positioned.push({
               session: sess,
               topPercent,
@@ -198,37 +199,33 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
     return positioned;
   };
 
+  const getSortedDaySessions = (dayKey: number): TimetableSession[] => {
+    if (!weekData || !Array.isArray(weekData[dayKey])) return [];
+    return [...weekData[dayKey]].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  };
+
   const handleTriggerPrint = () => {
     window.print();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`print-weekly-sheet-root ${orientation}`}>
-      {/* Top Controls Bar (hidden during actual printing) */}
-      <div className="print-controls-bar no-print">
-        <div className="controls-group">
-          <label className="control-label">{t('print.styleLabel', 'Style :')}</label>
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={`segmented-btn ${printStyle === 'grid24h' ? 'active' : ''}`}
-              onClick={() => setPrintStyle('grid24h')}
-            >
-              <LayoutGrid size={14} />
-              <span>{t('print.styleGrid24h', 'Grille 24h')}</span>
-            </button>
-            <button
-              type="button"
-              className={`segmented-btn ${printStyle === 'compactList' ? 'active' : ''}`}
-              onClick={() => setPrintStyle('compactList')}
-            >
-              <List size={14} />
-              <span>{t('print.styleCompactList', 'Liste compacte')}</span>
-            </button>
+    <div className="print-modal-backdrop no-print-backdrop">
+      <div className="print-modal-dialog glass-card">
+        {/* Modal Header Bar */}
+        <div className="print-modal-header no-print">
+          <div className="title-group">
+            <Printer size={20} className="text-indigo" />
+            <h3>{t('print.modalTitle', 'Aperçu & Impression — Ma Semaine')}</h3>
           </div>
+          <button type="button" className="btn-close-modal" onClick={onClose} title="Fermer">
+            <X size={18} />
+          </button>
         </div>
 
-        {printStyle === 'grid24h' && (
+        {/* Top Options Controls Bar */}
+        <div className="print-controls-bar no-print">
           <div className="controls-group">
             <label className="control-label">{t('print.orientationLabel', 'Orientation :')}</label>
             <div className="segmented-control">
@@ -238,7 +235,7 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
                 onClick={() => setOrientation('landscape')}
               >
                 <FileSpreadsheet size={14} />
-                <span>{t('print.landscape', 'Paysage')}</span>
+                <span>{t('print.landscapeGrid', 'Paysage (Grille 24h)')}</span>
               </button>
               <button
                 type="button"
@@ -246,386 +243,452 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
                 onClick={() => setOrientation('portrait')}
               >
                 <Smartphone size={14} />
-                <span>{t('print.portrait', 'Portrait')}</span>
+                <span>{t('print.portraitOriginal', 'Portrait (Format d\'origine)')}</span>
               </button>
             </div>
           </div>
-        )}
 
-        <button type="button" className="btn-print-now" onClick={handleTriggerPrint}>
-          <Printer size={16} />
-          <span>{t('print.printBtn', 'Imprimer / Exporter PDF')}</span>
-        </button>
-      </div>
-
-      {/* Main Printable Container */}
-      <div className={`printable-content-wrapper ${orientation}`}>
-        {printStyle === 'compactList' ? (
-          /* ==================== V1: COMPACT LIST TEMPLATE ==================== */
-          <div className="compact-list-template sheet-inner">
-            <div className="sheet-header">
-              <div className="week-dates-box">
-                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
-                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
-              </div>
-              <div className="title-box">
-                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
-                <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
-                  <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#d5afa6" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div className="ribbon-badge">
-                <span>PLANNER</span>
-              </div>
-            </div>
-
-            <div className="compact-grid">
-              {DAYS.map((day) => {
-                const daySessions = weekData && weekData[day.key] ? [...weekData[day.key]].sort((a, b) => a.startTime.localeCompare(b.startTime)) : [];
-                return (
-                  <div key={day.key} className="compact-day-card">
-                    <h3 className="day-card-title">{day.label}</h3>
-                    <div className="compact-sessions-list">
-                      {daySessions.length === 0 ? (
-                        <div className="empty-day-placeholder" />
-                      ) : (
-                        daySessions.map((sess) => {
-                          const typeColor = sColor(sess);
-                          return (
-                            <div key={sess.id} className="compact-session-row" style={{ borderLeftColor: typeColor }}>
-                              <div className="sess-time">{sess.startTime}–{sess.endTime}</div>
-                              <div className="sess-title">{sess.subject?.name || sess.ecue?.title || 'Séance'}</div>
-                              {sess.room && <div className="sess-room">📍 {sess.room}</div>}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="compact-day-card not-forget-card">
-                <h3 className="day-card-title not-forget-title">{t('print.doNotForget', 'NE PAS OUBLIER')}</h3>
-                {notForgetSessions.length > 0 && (
-                  <div className="not-forget-items-list">
-                    {notForgetSessions.map((nf, i) => (
-                      <span key={i} className="nf-item-chip">
-                        📌 {nf.title} ({nf.type}, {nf.dayLabel} {nf.time})
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="ruled-wavy-lines">
-                  <div className="ruled-line" />
-                  <div className="ruled-line" />
-                  <div className="ruled-line" />
-                </div>
-              </div>
+          <div className="controls-group">
+            <label className="control-label">{t('print.styleLabel', 'Style :')}</label>
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${printStyle === 'grid24h' ? 'active' : ''}`}
+                onClick={() => setPrintStyle('grid24h')}
+              >
+                <LayoutGrid size={14} />
+                <span>{t('print.styleTheme', 'Thème Ma Semaine')}</span>
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${printStyle === 'compactList' ? 'active' : ''}`}
+                onClick={() => setPrintStyle('compactList')}
+              >
+                <List size={14} />
+                <span>{t('print.styleCompactList', 'Liste compacte')}</span>
+              </button>
             </div>
           </div>
-        ) : orientation === 'landscape' ? (
-          /* ==================== V2: 24H LANDSCAPE GRID TEMPLATE ==================== */
-          <div className="grid24h-landscape-template sheet-inner">
-            {/* Header */}
-            <div className="sheet-header">
-              <div className="week-dates-box">
-                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
-                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
-              </div>
 
-              <div className="title-box">
-                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
-                <svg className="flourish-svg" width="140" height="14" viewBox="0 0 140 14" fill="none">
-                  <path d="M2 7 C35 1, 52 13, 70 7 C88 1, 105 13, 138 7" stroke="#cfa69c" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-              </div>
+          <button type="button" className="btn-print-now" onClick={handleTriggerPrint}>
+            <Printer size={16} />
+            <span>{t('print.printBtn', 'Imprimer / Exporter PDF')}</span>
+          </button>
+        </div>
 
-              <div className="pink-ribbon-corner">
-                <svg width="70" height="70" viewBox="0 0 100 100" fill="none">
-                  <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
-                  <circle cx="50" cy="48" r="6" fill="#E2A697" />
-                  <path d="M46 53 C38 72, 22 88, 14 92 C22 84, 40 68, 48 56 Z" fill="#E2A697" opacity="0.95"/>
-                  <path d="M54 53 C62 72, 78 88, 86 92 C78 84, 60 68, 52 56 Z" fill="#E2A697" opacity="0.95"/>
-                </svg>
-              </div>
-            </div>
-
-            {/* 24h Grid Body */}
-            <div className="grid-landscape-body">
-              {/* Day Headers Row */}
-              <div className="day-headers-row">
-                <div className="time-header-cell">{t('print.hours', 'Heures')}</div>
-                {DAYS.map((d) => (
-                  <div key={d.key} className="day-header-cell">
-                    {d.label}
-                  </div>
-                ))}
-              </div>
-
-              {/* 24h Grid Matrix */}
-              <div className="grid-matrix-container">
-                {/* Left Hours Column */}
-                <div className="hours-left-column">
-                  {HOURS_24.map((h, i) => (
-                    <div key={i} className="hour-time-label">
-                      <span>{h}</span>
+        {/* Scrollable Preview Canvas Container */}
+        <div className="print-preview-scroll-body">
+          <div className={`print-weekly-sheet-root ${orientation}`}>
+            <div className={`printable-content-wrapper ${orientation}`}>
+              {printStyle === 'compactList' ? (
+                /* ==================== COMPACT LIST TEMPLATE ==================== */
+                <div className="compact-list-template sheet-inner">
+                  <div className="sheet-header">
+                    <div className="week-dates-box">
+                      <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                      <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
                     </div>
-                  ))}
-                </div>
-
-                {/* 7 Day Columns */}
-                <div className="days-columns-wrapper">
-                  {/* Horizontal Hour Lines Background */}
-                  <div className="hour-lines-bg">
-                    {HOURS_24.map((_, i) => (
-                      <div key={i} className="hour-line-row">
-                        <div className="half-hour-dotted-line" />
-                      </div>
-                    ))}
+                    <div className="title-box">
+                      <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                      <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
+                        <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#d5afa6" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div className="ribbon-badge">
+                      <span>PLANNER</span>
+                    </div>
                   </div>
 
-                  {/* Columns Overlay */}
-                  <div className="days-columns-overlay">
+                  <div className="compact-grid">
                     {DAYS.map((day) => {
-                      const positionedSessions = getPositionedDaySessions(day.key);
+                      const daySessions = getSortedDaySessions(day.key);
                       return (
-                        <div key={day.key} className="day-column-cell">
-                          {positionedSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent, overflowCount, hidden }, idx) => {
-                            if (hidden) return null;
-                            const typeColor = sColor(session);
-                            const pastelBg = hexToPastelBg(typeColor);
-                            const titleText = session.subject?.name || session.ecue?.title || 'Séance';
+                        <div key={day.key} className="compact-day-card">
+                          <h3 className="day-card-title">{day.label}</h3>
+                          <div className="compact-sessions-list">
+                            {daySessions.length === 0 ? (
+                              <div className="empty-day-placeholder" />
+                            ) : (
+                              daySessions.map((sess) => {
+                                const typeColor = sColor(sess);
+                                return (
+                                  <div key={sess.id} className="compact-session-row" style={{ borderLeftColor: typeColor }}>
+                                    <div className="sess-time">{sess.startTime}–{sess.endTime}</div>
+                                    <div className="sess-title">{sess.subject?.name || sess.ecue?.title || 'Séance'}</div>
+                                    {sess.room && <div className="sess-room">📍 {sess.room}</div>}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
 
+                    <div className="compact-day-card not-forget-card">
+                      <h3 className="day-card-title not-forget-title">{t('print.doNotForget', 'NE PAS OUBLIER')}</h3>
+                      {notForgetSessions.length > 0 && (
+                        <div className="not-forget-items-list">
+                          {notForgetSessions.map((nf, i) => (
+                            <span key={i} className="nf-item-chip">
+                              📌 {nf.title} ({nf.type}, {nf.dayLabel} {nf.time})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="ruled-wavy-lines">
+                        <div className="ruled-line" />
+                        <div className="ruled-line" />
+                        <div className="ruled-line" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : orientation === 'landscape' ? (
+                /* ==================== V2: 24H LANDSCAPE GRID TEMPLATE ==================== */
+                <div className="grid24h-landscape-template sheet-inner">
+                  {/* Header */}
+                  <div className="sheet-header">
+                    <div className="week-dates-box">
+                      <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                      <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+                    </div>
+
+                    <div className="title-box">
+                      <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                      <svg className="flourish-svg" width="140" height="14" viewBox="0 0 140 14" fill="none">
+                        <path d="M2 7 C35 1, 52 13, 70 7 C88 1, 105 13, 138 7" stroke="#cfa69c" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+
+                    <div className="pink-ribbon-corner">
+                      <svg width="70" height="70" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
+                        <circle cx="50" cy="48" r="6" fill="#E2A697" />
+                        <path d="M46 53 C38 72, 22 88, 14 92 C22 84, 40 68, 48 56 Z" fill="#E2A697" opacity="0.95"/>
+                        <path d="M54 53 C62 72, 78 88, 86 92 C78 84, 60 68, 52 56 Z" fill="#E2A697" opacity="0.95"/>
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* 24h Grid Body */}
+                  <div className="grid-landscape-body">
+                    {/* Day Headers Row */}
+                    <div className="day-headers-row">
+                      <div className="time-header-cell">{t('print.hours', 'Heures')}</div>
+                      {DAYS.map((d) => (
+                        <div key={d.key} className="day-header-cell">
+                          {d.label}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 24h Grid Matrix */}
+                    <div className="grid-matrix-container">
+                      {/* Left Hours Column */}
+                      <div className="hours-left-column">
+                        {HOURS_24.map((h, i) => (
+                          <div key={i} className="hour-time-label">
+                            <span>{h}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 7 Day Columns */}
+                      <div className="days-columns-wrapper">
+                        {/* Horizontal Hour Lines Background */}
+                        <div className="hour-lines-bg">
+                          {HOURS_24.map((_, i) => (
+                            <div key={i} className="hour-line-row">
+                              <div className="half-hour-dotted-line" />
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Columns Overlay */}
+                        <div className="days-columns-overlay">
+                          {DAYS.map((day) => {
+                            const positionedSessions = getPositionedDaySessions(day.key);
                             return (
-                              <div
-                                key={session.id || idx}
-                                className="landscape-session-block"
-                                style={{
-                                  top: `${topPercent}%`,
-                                  height: `${heightPercent}%`,
-                                  left: `${leftPercent}%`,
-                                  width: `${widthPercent}%`,
-                                  backgroundColor: pastelBg,
-                                  borderColor: typeColor,
-                                }}
-                              >
-                                <div className="session-block-text" style={{ color: '#2c2c2c' }}>
-                                  <strong>{session.startTime}–{session.endTime}</strong> · <span className="sess-type-tag" style={{ color: typeColor }}>{session.sessionType}</span> {titleText} {session.room ? `· ${session.room}` : ''}
-                                </div>
-                                {overflowCount && overflowCount > 0 && (
-                                  <span className="overflow-badge">+{overflowCount}</span>
-                                )}
+                              <div key={day.key} className="day-column-cell">
+                                {positionedSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent, overflowCount, hidden }, idx) => {
+                                  if (hidden) return null;
+                                  const typeColor = sColor(session);
+                                  const pastelBg = hexToPastelBg(typeColor);
+                                  const titleText = session.subject?.name || session.ecue?.title || 'Séance';
+
+                                  return (
+                                    <div
+                                      key={session.id || idx}
+                                      className="landscape-session-block"
+                                      style={{
+                                        top: `${topPercent}%`,
+                                        height: `${heightPercent}%`,
+                                        left: `${leftPercent}%`,
+                                        width: `${widthPercent}%`,
+                                        backgroundColor: pastelBg,
+                                        borderColor: typeColor,
+                                      }}
+                                    >
+                                      <div className="session-block-text" style={{ color: '#2c2c2c' }}>
+                                        <strong>{session.startTime}–{session.endTime}</strong> · <span className="sess-type-tag" style={{ color: typeColor }}>{session.sessionType}</span> {titleText} {session.room ? `· ${session.room}` : ''}
+                                      </div>
+                                      {overflowCount && overflowCount > 0 && (
+                                        <span className="overflow-badge">+{overflowCount}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })}
                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Banner: NE PAS OUBLIER */}
+                  <div className="bottom-banner-not-forget">
+                    <div className="not-forget-header">
+                      <span className="nf-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')} :</span>
+                      {notForgetSessions.length > 0 ? (
+                        <div className="nf-sessions-inline">
+                          {notForgetSessions.map((nf, i) => (
+                            <span key={i} className="nf-tag">
+                              <strong>{nf.title}</strong> ({nf.type} - {nf.dayLabel} {nf.time})
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="nf-empty-hint">{isEn ? "No exam or composition scheduled this week." : "Aucune composition ni examen cette semaine."}</span>
+                      )}
+                      {totalSessionsCount > 40 && (
+                        <span className="suite-page-badge">📄 Page 1 / 2 (Suite sur Page 2)</span>
+                      )}
+                    </div>
+
+                    <div className="wavy-lines-container">
+                      <svg width="100%" height="18" viewBox="0 0 500 18" preserveAspectRatio="none" fill="none">
+                        <path d="M0 4 Q 15 0, 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 T 270 4 T 300 4 T 330 4 T 360 4 T 390 4 T 420 4 T 450 4 T 480 4 T 500 4" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                        <path d="M0 10 Q 15 6, 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 T 270 10 T 300 10 T 330 10 T 360 10 T 390 10 T 420 10 T 450 10 T 480 10 T 500 10" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                        <path d="M0 16 Q 15 12, 30 16 T 60 16 T 90 16 T 120 16 T 150 16 T 180 16 T 210 16 T 240 16 T 270 16 T 300 16 T 330 16 T 360 16 T 390 16 T 420 16 T 450 16 T 480 16 T 500 16" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ==================== PORTRAIT (FORMAT D'ORIGINE) TEMPLATE ==================== */
+                <div className="original-portrait-template sheet-inner">
+                  {/* Header */}
+                  <div className="sheet-header">
+                    <div className="week-dates-box">
+                      <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                      <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+                    </div>
+
+                    <div className="title-box">
+                      <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                      <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
+                        <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#d5afa6" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+
+                    <div className="pink-ribbon-corner">
+                      <svg width="65" height="65" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
+                        <circle cx="50" cy="48" r="6" fill="#E2A697" />
+                        <path d="M46 53 C38 72, 22 88, 14 92 C22 84, 40 68, 48 56 Z" fill="#E2A697" opacity="0.95"/>
+                        <path d="M54 53 C62 72, 78 88, 86 92 C78 84, 60 68, 52 56 Z" fill="#E2A697" opacity="0.95"/>
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* 3-Row Original Planner Grid Layout */}
+                  <div className="planner-3row-grid">
+                    {/* Row 1: Lundi, Mardi, Mercredi */}
+                    {DAYS.slice(0, 3).map((day) => {
+                      const daySessions = getSortedDaySessions(day.key);
+                      return (
+                        <div key={day.key} className="planner-day-card">
+                          <h3 className="day-card-title">{day.label}</h3>
+                          <div className="sessions-list-box">
+                            {daySessions.length === 0 ? (
+                              <div className="empty-day-fill" />
+                            ) : (
+                              daySessions.map((sess) => {
+                                const typeColor = sColor(sess);
+                                return (
+                                  <div key={sess.id} className="planner-session-item" style={{ borderLeftColor: typeColor }}>
+                                    <div className="sess-main-line">
+                                      <span className="sess-time-tag">{sess.startTime}–{sess.endTime}</span>
+                                      <span className="sess-title-text">{sess.subject?.name || sess.ecue?.title || 'Séance'}</span>
+                                    </div>
+                                    {(sess.room || sess.sessionType) && (
+                                      <div className="sess-sub-line">
+                                        <span className="type-badge-inline" style={{ color: typeColor }}>{sess.sessionType}</span>
+                                        {sess.room && <span> · Salle {sess.room}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
+
+                    {/* Row 2: Jeudi, Vendredi, Samedi */}
+                    {DAYS.slice(3, 6).map((day) => {
+                      const daySessions = getSortedDaySessions(day.key);
+                      return (
+                        <div key={day.key} className="planner-day-card">
+                          <h3 className="day-card-title">{day.label}</h3>
+                          <div className="sessions-list-box">
+                            {daySessions.length === 0 ? (
+                              <div className="empty-day-fill" />
+                            ) : (
+                              daySessions.map((sess) => {
+                                const typeColor = sColor(sess);
+                                return (
+                                  <div key={sess.id} className="planner-session-item" style={{ borderLeftColor: typeColor }}>
+                                    <div className="sess-main-line">
+                                      <span className="sess-time-tag">{sess.startTime}–{sess.endTime}</span>
+                                      <span className="sess-title-text">{sess.subject?.name || sess.ecue?.title || 'Séance'}</span>
+                                    </div>
+                                    {(sess.room || sess.sessionType) && (
+                                      <div className="sess-sub-line">
+                                        <span className="type-badge-inline" style={{ color: typeColor }}>{sess.sessionType}</span>
+                                        {sess.room && <span> · Salle {sess.room}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Row 3: Dimanche (1 col) + NE PAS OUBLIER (2 cols wide) */}
+                    {(() => {
+                      const sunday = DAYS[6];
+                      const sundaySessions = getSortedDaySessions(sunday.key);
+                      return (
+                        <>
+                          <div className="planner-day-card">
+                            <h3 className="day-card-title">{sunday.label}</h3>
+                            <div className="sessions-list-box">
+                              {sundaySessions.length === 0 ? (
+                                <div className="empty-day-fill" />
+                              ) : (
+                                sundaySessions.map((sess) => {
+                                  const typeColor = sColor(sess);
+                                  return (
+                                    <div key={sess.id} className="planner-session-item" style={{ borderLeftColor: typeColor }}>
+                                      <div className="sess-main-line">
+                                        <span className="sess-time-tag">{sess.startTime}–{sess.endTime}</span>
+                                        <span className="sess-title-text">{sess.subject?.name || sess.ecue?.title || 'Séance'}</span>
+                                      </div>
+                                      {(sess.room || sess.sessionType) && (
+                                        <div className="sess-sub-line">
+                                          <span className="type-badge-inline" style={{ color: typeColor }}>{sess.sessionType}</span>
+                                          {sess.room && <span> · Salle {sess.room}</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="planner-day-card not-forget-card-2cols">
+                            <h3 className="day-card-title not-forget-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')}</h3>
+                            {notForgetSessions.length > 0 && (
+                              <div className="not-forget-items-list" style={{ marginBottom: '0.5rem' }}>
+                                {notForgetSessions.map((nf, i) => (
+                                  <span key={i} className="nf-item-chip">
+                                    📌 {nf.title} ({nf.type}, {nf.dayLabel} {nf.time})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="wavy-lines-container" style={{ marginTop: 'auto' }}>
+                              <svg width="100%" height="24" viewBox="0 0 400 24" preserveAspectRatio="none" fill="none">
+                                <path d="M0 6 Q 20 0, 40 6 T 80 6 T 120 6 T 160 6 T 200 6 T 240 6 T 280 6 T 320 6 T 360 6 T 400 6" stroke="#cfa69c" strokeWidth="1.2" opacity="0.8" />
+                                <path d="M0 14 Q 20 8, 40 14 T 80 14 T 120 14 T 160 14 T 200 14 T 240 14 T 280 14 T 320 14 T 360 14 T 400 14" stroke="#cfa69c" strokeWidth="1.2" opacity="0.8" />
+                                <path d="M0 22 Q 20 16, 40 22 T 80 22 T 120 22 T 160 22 T 200 22 T 240 22 T 280 22 T 320 22 T 360 22 T 400 22" stroke="#cfa69c" strokeWidth="1.2" opacity="0.8" />
+                              </svg>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Bottom Banner: NE PAS OUBLIER */}
-            <div className="bottom-banner-not-forget">
-              <div className="not-forget-header">
-                <span className="nf-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')} :</span>
-                {notForgetSessions.length > 0 ? (
-                  <div className="nf-sessions-inline">
-                    {notForgetSessions.map((nf, i) => (
-                      <span key={i} className="nf-tag">
-                        <strong>{nf.title}</strong> ({nf.type} - {nf.dayLabel} {nf.time})
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="nf-empty-hint">{isEn ? "No exam or composition scheduled this week." : "Aucune composition ni examen cette semaine."}</span>
-                )}
-                {totalSessionsCount > 40 && (
-                  <span className="suite-page-badge">📄 Page 1 / 2 (Suite sur Page 2)</span>
-                )}
-              </div>
-
-              <div className="wavy-lines-container">
-                <svg width="100%" height="18" viewBox="0 0 500 18" preserveAspectRatio="none" fill="none">
-                  <path d="M0 4 Q 15 0, 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 T 270 4 T 300 4 T 330 4 T 360 4 T 390 4 T 420 4 T 450 4 T 480 4 T 500 4" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
-                  <path d="M0 10 Q 15 6, 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 T 270 10 T 300 10 T 330 10 T 360 10 T 390 10 T 420 10 T 450 10 T 480 10 T 500 10" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
-                  <path d="M0 16 Q 15 12, 30 16 T 60 16 T 90 16 T 120 16 T 150 16 T 180 16 T 210 16 T 240 16 T 270 16 T 300 16 T 330 16 T 360 16 T 390 16 T 420 16 T 450 16 T 480 16 T 500 16" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
-                </svg>
-              </div>
+              )}
             </div>
           </div>
-        ) : (
-          /* ==================== V2: 24H PORTRAIT GRID TEMPLATE ==================== */
-          <div className="grid24h-portrait-template sheet-inner">
-            {/* Header */}
-            <div className="sheet-header">
-              <div className="week-dates-box">
-                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
-                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
-              </div>
-
-              <div className="title-box">
-                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
-                <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
-                  <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#cfa69c" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-
-              <div className="pink-ribbon-corner">
-                <svg width="60" height="60" viewBox="0 0 100 100" fill="none">
-                  <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
-                  <circle cx="50" cy="48" r="6" fill="#E2A697" />
-                </svg>
-              </div>
-            </div>
-
-            {/* 2 Main Columns: Left (Lundi..Jeudi) & Right (Vendredi..Dimanche + NE PAS OUBLIER) */}
-            <div className="portrait-columns-grid">
-              {/* Left Column: Lundi, Mardi, Mercredi, Jeudi */}
-              <div className="portrait-column-section">
-                {DAYS.slice(0, 4).map((day) => {
-                  const posSessions = getPositionedDaySessions(day.key);
-                  return (
-                    <div key={day.key} className="portrait-day-card">
-                      <div className="portrait-day-title">{day.label}</div>
-                      <div className="portrait-mini-grid">
-                        <div className="mini-hours-col">
-                          {HOURS_24.map((h, i) => (
-                            <span key={i} className="mini-hour-label">{h}</span>
-                          ))}
-                        </div>
-                        <div className="mini-grid-content">
-                          <div className="mini-lines-bg">
-                            {HOURS_24.map((_, i) => (
-                              <div key={i} className="mini-hour-line" />
-                            ))}
-                          </div>
-                          <div className="mini-blocks-overlay">
-                            {posSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent }, idx) => {
-                              const typeColor = sColor(session);
-                              const titleText = session.subject?.name || session.ecue?.title || 'Séance';
-                              return (
-                                <div
-                                  key={session.id || idx}
-                                  className="portrait-session-block"
-                                  style={{
-                                    top: `${topPercent}%`,
-                                    height: `${heightPercent}%`,
-                                    left: `${leftPercent}%`,
-                                    width: `${widthPercent}%`,
-                                    backgroundColor: hexToPastelBg(typeColor),
-                                    borderColor: typeColor,
-                                  }}
-                                >
-                                  <span>{session.startTime} {titleText}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Right Column: Vendredi, Samedi, Dimanche + NE PAS OUBLIER */}
-              <div className="portrait-column-section">
-                {DAYS.slice(4, 7).map((day) => {
-                  const posSessions = getPositionedDaySessions(day.key);
-                  return (
-                    <div key={day.key} className="portrait-day-card">
-                      <div className="portrait-day-title">{day.label}</div>
-                      <div className="portrait-mini-grid">
-                        <div className="mini-hours-col">
-                          {HOURS_24.map((h, i) => (
-                            <span key={i} className="mini-hour-label">{h}</span>
-                          ))}
-                        </div>
-                        <div className="mini-grid-content">
-                          <div className="mini-lines-bg">
-                            {HOURS_24.map((_, i) => (
-                              <div key={i} className="mini-hour-line" />
-                            ))}
-                          </div>
-                          <div className="mini-blocks-overlay">
-                            {posSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent }, idx) => {
-                              const typeColor = sColor(session);
-                              const titleText = session.subject?.name || session.ecue?.title || 'Séance';
-                              return (
-                                <div
-                                  key={session.id || idx}
-                                  className="portrait-session-block"
-                                  style={{
-                                    top: `${topPercent}%`,
-                                    height: `${heightPercent}%`,
-                                    left: `${leftPercent}%`,
-                                    width: `${widthPercent}%`,
-                                    backgroundColor: hexToPastelBg(typeColor),
-                                    borderColor: typeColor,
-                                  }}
-                                >
-                                  <span>{session.startTime} {titleText}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* NE PAS OUBLIER Box in Portrait */}
-                <div className="portrait-not-forget-card">
-                  <div className="portrait-day-title not-forget-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')}</div>
-                  {notForgetSessions.length > 0 ? (
-                    <div className="nf-portrait-items">
-                      {notForgetSessions.map((nf, i) => (
-                        <div key={i} className="nf-portrait-row">
-                          • {nf.title} ({nf.type} - {nf.dayLabel} {nf.time})
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="wavy-lines-container" style={{ marginTop: '0.4rem' }}>
-                    <svg width="100%" height="16" viewBox="0 0 300 16" preserveAspectRatio="none" fill="none">
-                      <path d="M0 4 Q 15 0, 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 T 270 4 T 300 4" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
-                      <path d="M0 10 Q 15 6, 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 T 270 10 T 300 10" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Styles */}
       <style>{`
-        @page {
-          size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
-          margin: 8mm;
+        .print-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
         }
 
-        .print-weekly-sheet-root {
-          font-family: 'Inter', -apple-system, sans-serif;
-          color: #2c2c2c;
-          background: #F5F0E6;
+        .print-modal-dialog {
+          width: 1050px;
+          max-width: 95vw;
+          max-height: 92vh;
+          display: flex;
+          flex-direction: column;
+          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 16px;
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+          overflow: hidden;
+        }
+
+        .print-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1rem 1.5rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-close-modal {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 0.35rem;
+          border-radius: 6px;
+        }
+        .btn-close-modal:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.15);
         }
 
         .print-controls-bar {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0.75rem 1.25rem;
-          background: rgba(15, 23, 42, 0.9);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
-          margin-bottom: 1rem;
+          padding: 0.75rem 1.5rem;
+          background: rgba(30, 41, 59, 0.8);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           color: #ffffff;
           flex-wrap: wrap;
           gap: 1rem;
@@ -687,7 +750,26 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
           box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
-        /* Printable Area */
+        .print-preview-scroll-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 1.5rem;
+          background: #1e293b;
+          display: flex;
+          justify-content: center;
+        }
+
+        .print-weekly-sheet-root {
+          font-family: 'Inter', -apple-system, sans-serif;
+          color: #2c2c2c;
+          background: #F5F0E6;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          border-radius: 8px;
+          overflow: hidden;
+          width: 100%;
+          max-width: 900px;
+        }
+
         .printable-content-wrapper {
           background-color: #F5F0E6;
           width: 100%;
@@ -696,11 +778,11 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
 
         .sheet-inner {
           background-color: #F5F0E6;
-          padding: 0.8rem;
+          padding: 1rem;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.6rem;
         }
 
         .sheet-header {
@@ -720,7 +802,7 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
 
         .planner-title {
           font-family: 'Parisienne', 'Great Vibes', cursive;
-          font-size: 2.4rem;
+          font-size: 2.6rem;
           margin: 0;
           color: #2b2b2b;
           font-weight: 400;
@@ -733,7 +815,89 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
           align-items: center;
         }
 
-        /* V2 LANDSCAPE STYLES */
+        /* 3-ROW PLANNER GRID FORMAT (PORTRAIT FORMAT D'ORIGINE) */
+        .planner-3row-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.75rem;
+          flex: 1;
+        }
+
+        .planner-day-card {
+          background: #faf7f2;
+          border: 1px solid #d8cdb8;
+          border-radius: 8px;
+          padding: 0.6rem;
+          display: flex;
+          flex-direction: column;
+          min-height: 150px;
+        }
+
+        .not-forget-card-2cols {
+          grid-column: span 2;
+        }
+
+        .day-card-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 0.95rem;
+          font-weight: 700;
+          text-align: center;
+          margin: 0 0 0.5rem 0;
+          color: #2c2c2c;
+          border-bottom: 1px solid #e8e0d0;
+          padding-bottom: 0.3rem;
+        }
+
+        .sessions-list-box {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          flex: 1;
+        }
+
+        .planner-session-item {
+          background: #ffffff;
+          border-left: 3px solid #d5afa6;
+          border-radius: 4px;
+          padding: 0.3rem 0.45rem;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        .sess-main-line {
+          font-size: 0.78rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+
+        .sess-time-tag {
+          color: #666;
+          font-size: 0.7rem;
+        }
+
+        .sess-title-text {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .sess-sub-line {
+          font-size: 0.68rem;
+          color: #666666;
+          margin-top: 0.1rem;
+        }
+
+        .type-badge-inline {
+          font-weight: 700;
+        }
+
+        .empty-day-fill {
+          flex: 1;
+        }
+
+        /* 24H LANDSCAPE GRID STYLES */
         .grid-landscape-body {
           display: flex;
           flex-direction: column;
@@ -771,9 +935,7 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
         .grid-matrix-container {
           display: grid;
           grid-template-columns: 42px 1fr;
-          height: calc(100vh - 170px);
-          min-height: 480px;
-          max-height: 620px;
+          height: 480px;
           position: relative;
         }
 
@@ -905,117 +1067,34 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
           font-style: italic;
         }
 
-        .wavy-lines-container {
-          margin-top: 0.25rem;
-        }
-
-        /* V2 PORTRAIT STYLES */
-        .portrait-columns-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.6rem;
-        }
-
-        .portrait-column-section {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .portrait-day-card {
-          border: 1px solid #d8cdb8;
-          border-radius: 6px;
-          background: #faf7f2;
-          padding: 0.35rem;
-        }
-
-        .portrait-day-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #2c2c2c;
-          border-bottom: 1px solid #e8e0d0;
-          padding-bottom: 0.15rem;
-          margin-bottom: 0.25rem;
-        }
-
-        .portrait-mini-grid {
-          display: grid;
-          grid-template-columns: 32px 1fr;
-          height: 140px;
-        }
-
-        .mini-hours-col {
-          display: grid;
-          grid-template-rows: repeat(24, 1fr);
-          border-right: 1px solid #e8e0d0;
-        }
-
-        .mini-hour-label {
-          font-size: 5.5pt;
-          color: #7a6e5d;
-          line-height: 1;
-        }
-
-        .mini-grid-content {
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .mini-lines-bg {
-          display: grid;
-          grid-template-rows: repeat(24, 1fr);
-          position: absolute;
-          inset: 0;
-        }
-
-        .mini-hour-line {
-          border-bottom: 1px solid #eee7db;
-        }
-
-        .mini-blocks-overlay {
-          position: absolute;
-          inset: 0;
-        }
-
-        .portrait-session-block {
-          position: absolute;
-          box-sizing: border-box;
-          border-left: 2px solid;
-          border-radius: 2px;
-          padding: 0 2px;
-          font-size: 5.5pt;
-          overflow: hidden;
-          white-space: nowrap;
-          text-overflow: ellipsis;
-        }
-
-        .portrait-not-forget-card {
-          border: 1px solid #d8cdb8;
-          border-radius: 6px;
-          background: #fcfaf7;
-          padding: 0.4rem;
-        }
-
-        .nf-portrait-items {
-          font-size: 0.7rem;
-          color: #5c3a32;
-          display: flex;
-          flex-direction: column;
-          gap: 0.15rem;
-        }
-
-        /* Hide elements on print */
+        /* PRINT MEDIA OVERRIDES */
         @media print {
-          .no-print {
-            display: none !important;
+          @page {
+            size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
+            margin: 8mm;
           }
-          body {
-            background: #F5F0E6 !important;
+          .no-print, .no-print-backdrop {
+            background: transparent !important;
+            padding: 0 !important;
+            position: static !important;
+            inset: auto !important;
           }
-          .printable-content-wrapper {
-            background: #F5F0E6 !important;
+          .print-modal-dialog {
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+          }
+          .print-preview-scroll-body {
+            padding: 0 !important;
+            background: transparent !important;
+          }
+          .print-weekly-sheet-root {
+            box-shadow: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
           }
         }
       `}</style>
@@ -1023,7 +1102,6 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
   );
 };
 
-// Helper for session color lookup
 function sColor(session: TimetableSession): string {
   if (session.color) return session.color;
   return getSessionTypeColor(session.sessionType);

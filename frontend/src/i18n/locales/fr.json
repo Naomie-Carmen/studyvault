@@ -324,6 +324,7 @@
   },
   "print": {
     "title": "Ma Semaine",
+    "modalTitle": "Aperçu & Impression — Ma Semaine",
     "from": "DU :",
     "to": "AU :",
     "doNotForget": "NE PAS OUBLIER",
@@ -331,11 +332,14 @@
     "noSessions": "Aucun cours",
     "room": "Salle",
     "styleLabel": "Style :",
+    "styleTheme": "Thème Ma Semaine",
     "styleGrid24h": "Grille 24h",
     "styleCompactList": "Liste compacte",
     "orientationLabel": "Orientation :",
     "landscape": "Paysage",
+    "landscapeGrid": "Paysage (Grille 24h)",
     "portrait": "Portrait",
+    "portraitOriginal": "Portrait (Format d'origine)",
     "hours": "Heures",
     "printBtn": "Imprimer / Exporter PDF",
     "days": {

@@ -79,6 +79,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   const [selectedSession, setSelectedSession] = useState<TimetableSession | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
 
   const isCurrentWeek = useMemo(() =>
     selectedWeekMonday.getFullYear() === currentMonday.getFullYear() &&
@@ -200,9 +201,9 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         </div>
 
         <div className="header-actions">
-          <button className="btn-print-week" onClick={() => window.print()} title={t('timetable.printWeek', 'Imprimer ma semaine')}>
+          <button className="btn-print-week" onClick={() => setIsPrintOpen(true)} title={t('timetable.printWeek', 'Visualiser & Imprimer')}>
             <Printer size={16} />
-            <span>{t('timetable.printWeek', 'Imprimer ma semaine')}</span>
+            <span>{t('timetable.printWeek', 'Imprimer / Aperçu')}</span>
           </button>
 
           <button className="btn-import-file" onClick={() => setIsImportOpen(true)}>
@@ -317,8 +318,13 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         onSuccess={loadData}
       />
 
-      {/* Print Sheet Hidden Container */}
-      <PrintWeeklySheet weekData={weekData} selectedWeekMonday={selectedWeekMonday} />
+      {/* Print Sheet Modal Preview (Hidden on screen unless opened via button) */}
+      <PrintWeeklySheet
+        weekData={weekData}
+        selectedWeekMonday={selectedWeekMonday}
+        isOpen={isPrintOpen}
+        onClose={() => setIsPrintOpen(false)}
+      />
 
       <style>{`
         .timetable-page {

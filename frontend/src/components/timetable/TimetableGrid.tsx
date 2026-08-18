@@ -399,12 +399,13 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
         .grid-table {
           display: flex;
           flex-direction: column;
-          min-width: 900px;
+          width: 100%;
+          min-width: 0;
         }
 
         .grid-header-row {
           display: grid;
-          grid-template-columns: 60px repeat(7, 1fr);
+          grid-template-columns: 50px repeat(7, minmax(0, 1fr));
           position: sticky;
           top: 0;
           z-index: 20;
@@ -448,7 +449,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
 
         .grid-body-container {
           display: grid;
-          grid-template-columns: 60px repeat(7, 1fr);
+          grid-template-columns: 50px repeat(7, minmax(0, 1fr));
           position: relative;
         }
 
