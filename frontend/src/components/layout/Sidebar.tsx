@@ -317,6 +317,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="nav-section">
               <span className="section-title">{t('nav.administration', 'ADMINISTRATION')}</span>
               <button
+                className={`nav-item ${selectedTab === 'admin-users' ? 'active' : ''}`}
+                onClick={() => handleNav('admin-users')}
+              >
+                <ShieldCheck size={18} className="text-amber" />
+                <span>{t('nav.adminUsers', '🛡️ Administration Utilisateurs')}</span>
+              </button>
+              <button
                 className={`nav-item ${selectedTab === 'admin-dashboard' ? 'active' : ''}`}
                 onClick={() => handleNav('admin-dashboard')}
               >

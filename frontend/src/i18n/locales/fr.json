@@ -15,6 +15,7 @@
     "privacySettings": "Confidentialité RGPD",
     "myData": "Mes Données",
     "administration": "ADMINISTRATION",
+    "adminUsers": "🛡️ Administration Utilisateurs",
     "adminDashboard": "Dashboard Bêta (Admin)",
     "helpResources": "AIDE & RESSOURCES",
     "updates": "Mises à jour",
@@ -370,5 +371,12 @@
     "success": "Succès",
     "error": "Erreur",
     "deleting": "Suppression..."
+  },
+  "admin": {
+    "usersTitle": "Administration — Gestion des Utilisateurs",
+    "usersSubtitle": "Gestion des comptes inscrits, bannissement distant et historique des suppressions.",
+    "tabActiveUsers": "Comptes Inscrits & Bannis",
+    "tabArchivedUsers": "Historique des Supprimés",
+    "searchPlaceholder": "Rechercher par email ou nom..."
   }
 }

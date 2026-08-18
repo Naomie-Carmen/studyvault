@@ -35,6 +35,7 @@ const UpdatePage = lazy(() => import('./pages/UpdatePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BetaLandingPage = lazy(() => import('./pages/BetaLandingPage').then(m => ({ default: m.BetaLandingPage })));
 const BetaDashboardPage = lazy(() => import('./pages/admin/BetaDashboardPage').then(m => ({ default: m.BetaDashboardPage })));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 
 export const App: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -336,6 +337,13 @@ export const App: React.FC = () => {
         return (
           <Suspense fallback={<div className="lazy-loading">Chargement des paramètres…</div>}>
             <SettingsPage onNavigate={(tab) => handleTabChange(tab)} />
+          </Suspense>
+        );
+
+      case 'admin-users':
+        return (
+          <Suspense fallback={<div className="lazy-loading">Chargement du panneau d'administration…</div>}>
+            <AdminUsersPage />
           </Suspense>
         );
 

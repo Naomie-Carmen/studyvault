@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../utils/apiError';
 import { verifyAccessToken } from '../utils/jwt';
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
+const prisma = new PrismaClient();
+
+export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -13,9 +16,28 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = payload;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { bannedAt: true, role: true },
+    });
+
+    if (!user) {
+      return next(ApiError.unauthorized('Utilisateur introuvable.', 'USER_NOT_FOUND'));
+    }
+
+    if (user.bannedAt) {
+      return next(ApiError.forbidden('Compte suspendu. Contactez le support.', 'ACCOUNT_BANNED'));
+    }
+
+    req.user = {
+      ...payload,
+      role: user.role,
+    };
     next();
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return next(error);
+    }
     return next(ApiError.unauthorized('Jeton d\'accès invalide ou expiré.', 'INVALID_TOKEN'));
   }
 }
@@ -23,11 +45,9 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 /**
  * Authentification "douce" : accepte soit le header Authorization Bearer,
  * soit le jeton passé en query string (?token=...) pour les URLs utilisées
- * directement dans un <img>, un <iframe> ou window.open() (prévisualisation
- * et téléchargement de fichiers). Sans jeton valide, la requête continue et
- * c'est au contrôleur de refuser l'accès (401).
+ * directement dans un <img>, un <iframe> ou window.open().
  */
-export function requireAuthOrToken(req: Request, _res: Response, next: NextFunction): void {
+export async function requireAuthOrToken(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   let token: string | undefined;
 
@@ -43,7 +63,17 @@ export function requireAuthOrToken(req: Request, _res: Response, next: NextFunct
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = payload;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { bannedAt: true, role: true },
+    });
+
+    if (user && !user.bannedAt) {
+      req.user = {
+        ...payload,
+        role: user.role,
+      };
+    }
     next();
   } catch (_error) {
     return next(ApiError.unauthorized('Jeton d\'accès invalide ou expiré.', 'INVALID_TOKEN'));

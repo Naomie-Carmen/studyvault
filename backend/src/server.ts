@@ -1,5 +1,41 @@
 import app from './app';
 import { env } from './config/env';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function ensureDefaultAdmin() {
+  try {
+    const naomieUser = await prisma.user.findFirst({
+      where: { email: { contains: 'naomie', mode: 'insensitive' } },
+    });
+
+    if (naomieUser) {
+      if (naomieUser.role !== 'admin') {
+        await prisma.user.update({
+          where: { id: naomieUser.id },
+          data: { role: 'admin' },
+        });
+        console.info(`[ADMIN SEED] User ${naomieUser.email} granted admin role.`);
+      }
+    } else {
+      const firstUser = await prisma.user.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+      if (firstUser && firstUser.role !== 'admin') {
+        await prisma.user.update({
+          where: { id: firstUser.id },
+          data: { role: 'admin' },
+        });
+        console.info(`[ADMIN SEED] Earliest user ${firstUser.email} granted admin role.`);
+      }
+    }
+  } catch (err) {
+    console.error('[ADMIN SEED] Error ensuring default admin:', err);
+  }
+}
+
+ensureDefaultAdmin();
 
 const server = app.listen(env.PORT, () => {
   console.info(`==================================================`);
@@ -21,3 +57,4 @@ const shutdown = (signal: string) => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+

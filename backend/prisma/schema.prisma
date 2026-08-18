@@ -28,6 +28,8 @@ model User {
   betaFeedbackCount         Int                        @default(0)
   isScheduledForPurge       Boolean                    @default(false)
   purgeScheduledAt          DateTime?
+  bannedAt                  DateTime?
+  lastLogin                 DateTime?
   gradeMode                 String                     @default("weighted") // "weighted" | "simple"
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -49,6 +51,18 @@ model User {
   notes                     Note[]
   weekArchives              WeekArchive[]
   documentCategories        DocumentCategory[]
+
+  @@index([email])
+}
+
+model UserArchive {
+  id        String   @id @default(uuid())
+  userId    String
+  email     String
+  fullName  String?
+  createdAt DateTime
+  deletedAt DateTime @default(now())
+  reason    String?
 
   @@index([email])
 }

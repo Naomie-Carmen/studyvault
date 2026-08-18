@@ -2,6 +2,7 @@ export interface AuthUserPayload {
   id: string;
   email: string;
   fullName: string;
+  role?: string;
 }
 
 export interface UserProfileResponse {

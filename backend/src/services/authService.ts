@@ -101,10 +101,20 @@ export async function loginUser(input: LoginInput): Promise<{ user: UserProfileR
     throw ApiError.badRequest('Identifiants invalides.', 'INVALID_CREDENTIALS');
   }
 
+  if (user.bannedAt) {
+    throw ApiError.forbidden('Compte suspendu. Contactez le support.', 'ACCOUNT_BANNED');
+  }
+
   const isValidPassword = await bcrypt.compare(input.password, user.passwordHash);
   if (!isValidPassword) {
     throw ApiError.badRequest('Identifiants invalides.', 'INVALID_CREDENTIALS');
   }
+
+  // Update lastLogin
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLogin: new Date() },
+  });
 
   const authUserPayload = { id: user.id, email: user.email, fullName: user.fullName };
   const accessToken = generateAccessToken(authUserPayload);
@@ -141,6 +151,10 @@ export async function refreshSession(refreshTokenInput: string): Promise<{ user:
 
   if (!storedToken || storedToken.isRevoked || storedToken.expiresAt < new Date()) {
     throw ApiError.unauthorized('Session révoquée ou expirée.', 'REVOKED_REFRESH_TOKEN');
+  }
+
+  if (storedToken.user.bannedAt) {
+    throw ApiError.forbidden('Compte suspendu. Contactez le support.', 'ACCOUNT_BANNED');
   }
 
   // Revoke previous refresh token (Rotation)

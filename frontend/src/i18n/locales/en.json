@@ -15,6 +15,7 @@
     "privacySettings": "GDPR Privacy",
     "myData": "My Data",
     "administration": "ADMINISTRATION",
+    "adminUsers": "🛡️ User Administration",
     "adminDashboard": "Beta Dashboard (Admin)",
     "helpResources": "HELP & RESOURCES",
     "updates": "Updates",
@@ -401,5 +402,12 @@
     "success": "Success",
     "error": "Error",
     "deleting": "Deleting..."
+  },
+  "admin": {
+    "usersTitle": "Administration — User Management",
+    "usersSubtitle": "Registered accounts management, remote banning, and deletion history.",
+    "tabActiveUsers": "Registered & Banned Accounts",
+    "tabArchivedUsers": "Deleted Accounts History",
+    "searchPlaceholder": "Search by email or name..."
   }
 }
