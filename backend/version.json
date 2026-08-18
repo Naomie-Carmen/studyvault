@@ -1,6 +1,6 @@
 {
-  "version": "1.2.22",
-  "releaseDate": "2026-08-17",
+  "version": "1.2.23",
+  "releaseDate": "2026-08-18",
   "channel": "stable",
   "notes": [
     "Design dark theme professionnel unifié (color-scheme: dark) sur 100% des formulaires et modales",
@@ -9,6 +9,16 @@
     "Modale de séance réorganisée en grille 2 colonnes ultra-propre avec alignement parfait"
   ],
   "history": [
+    {
+      "version": "1.2.22",
+      "releaseDate": "2026-08-17",
+      "highlights": [
+        "Emploi du temps 24h & Thème Ma Semaine : Grille widescreen 100%, fiche d'impression format d'origine (Portrait/Paysage) et modale d'aperçu d'impression",
+        "Habitudes personnalisées : Création express d'habitudes (+ Habitude) dans le volet latéral avec palette 8 couleurs et récurrence hebdomadaire",
+        "Bibliothèque & Drag & Drop Windows : Glisser-déposer de fichiers externes depuis l'explorateur OS avec surbrillance verte, copie dans les sous-dossiers locaux et sélecteur de fichiers par clic",
+        "Visionneuse de documents intégrée : Lecture plein écran sans téléchargement pour PDF (iframe Blob), images, fichiers texte/code et ouverture directe par l'application système par défaut"
+      ]
+    },
     {
       "version": "1.2.21",
       "releaseDate": "2026-08-17",
