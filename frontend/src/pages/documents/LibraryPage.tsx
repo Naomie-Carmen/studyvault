@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree, ECUE } from '../../types/structure';
 import { DocumentItem, DocumentCategoryItem } from '../../types/document';
 import * as structureService from '../../services/academicStructureService';
 import * as docService from '../../services/documentService';
 import * as fileOrganizer from '../../services/fileOrganizer';
+import { FilePreviewModal } from '../../components/documents/FilePreviewModal';
 import { 
   Library, 
   Search, 
@@ -21,14 +22,11 @@ import {
   Trash2, 
   ExternalLink,
   UploadCloud,
-  Info
+  Info,
+  CheckCircle2
 } from 'lucide-react';
 
-interface LibraryPageProps {
-  onNavigateToDocuments?: (subjectId: string) => void;
-}
-
-export const LibraryPage: React.FC<LibraryPageProps> = () => {
+export const LibraryPage: React.FC = () => {
   const { t } = useTranslation();
   const [tree, setTree] = useState<AcademicStructureTree | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,8 +50,25 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
   const [showAddCatModal, setShowAddCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
-  // Drag over category state (for visual green highlight)
+  // Drag over category state (green highlight) & active ref for zoneSurvolee
   const [dragOverCatId, setDragOverCatId] = useState<string | null>(null);
+  const activeZoneRef = useRef<DocumentCategoryItem | null>(null);
+  const activeEcueRef = useRef(selectedEcue);
+
+  // Document preview modal state
+  const [selectedDocForPreview, setSelectedDocForPreview] = useState<DocumentItem | null>(null);
+
+  // Toast feedback state
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  useEffect(() => {
+    activeEcueRef.current = selectedEcue;
+  }, [selectedEcue]);
 
   const loadStructureTree = useCallback(async () => {
     setLoading(true);
@@ -100,7 +115,6 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
 
       if (catRes.success && catRes.data) {
         setCategories(catRes.data);
-        // Sync directory structure in desktop Tauri
         if (fileOrganizer.isTauri) {
           for (const cat of catRes.data) {
             fileOrganizer.ensureCategoryFolder(
@@ -128,6 +142,67 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
   useEffect(() => {
     fetchEcueData();
   }, [fetchEcueData]);
+
+  // Process file import from local paths (Desktop Tauri)
+  const importFilePathsToCategory = useCallback(async (paths: string[], targetCat: DocumentCategoryItem | null) => {
+    const currentEcue = activeEcueRef.current;
+    if (!currentEcue || paths.length === 0) return;
+
+    if (fileOrganizer.isTauri) {
+      await fileOrganizer.copyFilesToCategoryFolder(
+        paths,
+        currentEcue.semNumber,
+        currentEcue.ueCode,
+        currentEcue.ueTitle,
+        currentEcue.ecue.code,
+        currentEcue.ecue.title,
+        targetCat?.name
+      );
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('ecueId', currentEcue.ecue.id);
+      if (targetCat) formData.append('categoryId', targetCat.id);
+
+      paths.forEach((p) => {
+        const fileName = p.split(/[/\\]/).pop() || 'document';
+        formData.append('filePath', p);
+        formData.append('fileName', fileName);
+      });
+
+      await docService.uploadFiles(formData);
+    } catch (_err) {
+      /* ignore */
+    } finally {
+      fetchEcueData();
+      const catName = targetCat ? targetCat.name : 'Non classé';
+      showToast(`${paths.length} fichier(s) ajouté(s) à ${catName}`);
+    }
+  }, [fetchEcueData]);
+
+  // Wire Tauri event listener for tauri://drag-drop / tauri://file-drop
+  useEffect(() => {
+    if (!fileOrganizer.isTauri) return;
+    let unlisten: (() => void) | null = null;
+
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen<{ paths: string[] }>('tauri://drag-drop', async (event) => {
+        const paths = event.payload?.paths || (event.payload as any) || [];
+        if (Array.isArray(paths) && paths.length > 0) {
+          const targetCat = activeZoneRef.current;
+          await importFilePathsToCategory(paths, targetCat);
+          setDragOverCatId(null);
+        }
+      }).then((fn) => {
+        unlisten = fn;
+      });
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [importFilePathsToCategory]);
 
   const toggleUe = (ueId: string) => {
     setExpandedUeIds((prev) => ({ ...prev, [ueId]: !prev[ueId] }));
@@ -189,11 +264,12 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'internal-doc', docId: doc.id, oldCatId: doc.categoryId }));
   };
 
-  const handleDragOverCategory = (e: React.DragEvent, catId: string | null) => {
+  const handleDragOverCategory = (e: React.DragEvent, catId: string | null, catObj: DocumentCategoryItem | null) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     if (dragOverCatId !== catId) {
       setDragOverCatId(catId);
+      activeZoneRef.current = catObj;
     }
   };
 
@@ -242,7 +318,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
       }
     }
 
-    // Drag & Drop External Files FROM Windows File Explorer
+    // Drag & Drop External Files FROM Windows File Explorer (HTML5 files array)
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       const formData = new FormData();
@@ -255,6 +331,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
         const uploadRes = await docService.uploadFiles(formData);
         if (uploadRes.success) {
           fetchEcueData();
+          showToast(`${files.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
 
           if (fileOrganizer.isTauri) {
             const paths = files.map((f) => (f as any).path).filter(Boolean);
@@ -277,6 +354,50 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
     }
   };
 
+  // Fallback Click Importer (opens native dialog on Desktop or input file on Web)
+  const handleCategoryClickImport = async (targetCat: DocumentCategoryItem | null) => {
+    if (!selectedEcue) return;
+
+    if (fileOrganizer.isTauri) {
+      try {
+        const { open: openDialog } = await import('@tauri-apps/api/dialog');
+        const selected = await openDialog({
+          multiple: true,
+          title: `Sélectionner des fichiers pour ${targetCat ? targetCat.name : 'Non classé'}`,
+        });
+
+        if (selected) {
+          const paths = Array.isArray(selected) ? selected : [selected];
+          if (paths.length > 0) {
+            await importFilePathsToCategory(paths, targetCat);
+          }
+        }
+      } catch (_e) {
+        /* ignore */
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.onchange = async (e: any) => {
+        const files: File[] = Array.from(e.target.files || []);
+        if (files.length > 0) {
+          const formData = new FormData();
+          formData.append('ecueId', selectedEcue.ecue.id);
+          if (targetCat) formData.append('categoryId', targetCat.id);
+          files.forEach((f) => formData.append('files', f));
+
+          const res = await docService.uploadFiles(formData);
+          if (res.success) {
+            fetchEcueData();
+            showToast(`${files.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
+          }
+        }
+      };
+      input.click();
+    }
+  };
+
   const getDocIcon = (mimeType: string, name: string) => {
     const ext = name.split('.').pop()?.toLowerCase() || '';
     if (mimeType.includes('pdf') || ext === 'pdf') return <FileText size={18} className="text-red-400" />;
@@ -287,6 +408,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
   };
 
   const formatSize = (bytes: number) => {
+    if (!bytes) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -294,6 +416,14 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
 
   return (
     <div className="library-page">
+      {/* Toast Notification Banner */}
+      {toastMsg && (
+        <div className="toast-notification-banner glass-card">
+          <CheckCircle2 size={18} className="text-emerald" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* Top Page Header */}
       <div className="page-header glass-card">
         <div className="header-info">
@@ -424,9 +554,9 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                 </div>
 
                 {!fileOrganizer.isTauri && (
-                  <div className="web-notice-pill" title="Miroir local disponible dans l'application Desktop">
+                  <div className="web-notice-pill" title="Ajout de fichiers disponible dans l'app desktop">
                     <Info size={14} />
-                    <span>Mode Web · App Desktop pour miroir OS</span>
+                    <span>Mode Web · Ajout de fichiers optimisé dans l'app desktop</span>
                   </div>
                 )}
               </div>
@@ -444,7 +574,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                       <div
                         key={cat.id}
                         className={`category-card glass-card ${isDragOver ? 'drag-over' : ''}`}
-                        onDragOver={(e) => handleDragOverCategory(e, cat.id)}
+                        onDragOver={(e) => handleDragOverCategory(e, cat.id, cat)}
                         onDragLeave={handleDragLeaveCategory}
                         onDrop={(e) => handleDropOnCategory(e, cat)}
                       >
@@ -456,6 +586,13 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                           </div>
 
                           <div className="cat-actions">
+                            <button
+                              className="icon-action-btn"
+                              onClick={() => handleCategoryClickImport(cat)}
+                              title={`Ajouter des fichiers à ${cat.name}`}
+                            >
+                              <Plus size={14} />
+                            </button>
                             <button
                               className="icon-action-btn"
                               onClick={() => handleOpenFolder(cat.name)}
@@ -474,11 +611,11 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                         </div>
 
                         {/* Documents List inside Category */}
-                        <div className="category-docs-list">
+                        <div className="category-docs-list" onClick={() => handleCategoryClickImport(cat)}>
                           {catDocs.length === 0 ? (
                             <div className="drop-hint">
                               <UploadCloud size={20} />
-                              <span>Glissez-déposez vos fichiers ici</span>
+                              <span>Glissez-déposez ou cliquez pour ajouter des fichiers</span>
                             </div>
                           ) : (
                             catDocs.map((doc) => (
@@ -487,11 +624,11 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                                 className="doc-item-row"
                                 draggable
                                 onDragStart={(e) => handleDocDragStart(e, doc)}
-                                onClick={() => {
-                                  const previewUrl = docService.getPreviewUrl(doc.id);
-                                  window.open(previewUrl, '_blank');
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDocForPreview(doc);
                                 }}
-                                title="Cliquer pour prévisualiser · Glisser pour déplacer"
+                                title="Cliquer pour lire sans télécharger · Glisser pour déplacer"
                               >
                                 {getDocIcon(doc.mimeType, doc.originalName)}
                                 <div className="doc-item-name">{doc.originalName}</div>
@@ -512,7 +649,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                     return (
                       <div
                         className={`category-card glass-card unclassified-card ${isDragOver ? 'drag-over' : ''}`}
-                        onDragOver={(e) => handleDragOverCategory(e, 'unclassified')}
+                        onDragOver={(e) => handleDragOverCategory(e, 'unclassified', null)}
                         onDragLeave={handleDragLeaveCategory}
                         onDrop={(e) => handleDropOnCategory(e, null)}
                       >
@@ -522,12 +659,21 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                             <h3>Non classé</h3>
                             <span className="count-badge">{unclassifiedDocs.length}</span>
                           </div>
+
+                          <button
+                            className="icon-action-btn"
+                            onClick={() => handleCategoryClickImport(null)}
+                            title="Ajouter des fichiers non classés"
+                          >
+                            <Plus size={14} />
+                          </button>
                         </div>
 
-                        <div className="category-docs-list">
+                        <div className="category-docs-list" onClick={() => handleCategoryClickImport(null)}>
                           {unclassifiedDocs.length === 0 ? (
                             <div className="drop-hint text-muted">
-                              <span>Aucun document non classé</span>
+                              <UploadCloud size={18} />
+                              <span>Glissez-déposez ou cliquez pour ajouter des fichiers</span>
                             </div>
                           ) : (
                             unclassifiedDocs.map((doc) => (
@@ -536,10 +682,11 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
                                 className="doc-item-row"
                                 draggable
                                 onDragStart={(e) => handleDocDragStart(e, doc)}
-                                onClick={() => {
-                                  const previewUrl = docService.getPreviewUrl(doc.id);
-                                  window.open(previewUrl, '_blank');
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDocForPreview(doc);
                                 }}
+                                title="Cliquer pour lire sans télécharger · Glisser pour déplacer"
                               >
                                 {getDocIcon(doc.mimeType, doc.originalName)}
                                 <div className="doc-item-name">{doc.originalName}</div>
@@ -558,38 +705,23 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
         </div>
       </div>
 
-      {/* Add Category Modal */}
+      {/* Create Category Modal */}
       {showAddCatModal && (
-        <div className="modal-backdrop">
-          <div className="glass-card modal-content" style={{ width: '360px', padding: '1.5rem' }}>
-            <h3>Nouveau Compartiment</h3>
-            <p className="subtitle" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Créera automatiquement un sous-dossier correspondant sur votre ordinateur.
-            </p>
+        <div className="modal-backdrop" onClick={() => setShowAddCatModal(false)}>
+          <div className="modal-card glass-card" onClick={(e) => e.stopPropagation()}>
+            <h3>+ Nouveau compartiment</h3>
+            <p className="subtitle">Exemples: Cours, TD, TP, Examens, Fiches de révision...</p>
             <form onSubmit={handleCreateCategory}>
               <input
                 type="text"
-                placeholder="ex: Annales, Projets, TP, Resumés..."
+                placeholder="Nom du compartiment (ex : Fiches de révision)"
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  background: 'rgba(0,0,0,0.3)',
-                  color: 'var(--text-primary)',
-                  marginBottom: '1rem',
-                }}
                 autoFocus
                 required
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowAddCatModal(false)}
-                >
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowAddCatModal(false)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn-primary">
@@ -601,19 +733,53 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
         </div>
       )}
 
+      {/* Integrated Fullscreen Document Viewer Modal */}
+      <FilePreviewModal
+        isOpen={!!selectedDocForPreview}
+        onClose={() => setSelectedDocForPreview(null)}
+        document={selectedDocForPreview}
+      />
+
       <style>{`
+        .toast-notification-banner {
+          position: fixed;
+          top: 1.25rem;
+          right: 1.5rem;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          padding: 0.75rem 1.25rem;
+          border-radius: 10px;
+          background: #0f172a;
+          border: 1px solid #10b981;
+          color: #ffffff;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+          font-weight: 600;
+          font-size: 0.875rem;
+        }
+
+        .category-card.drag-over {
+          border-color: #10b981 !important;
+          background: rgba(16, 185, 129, 0.15) !important;
+          box-shadow: 0 0 20px rgba(16, 185, 129, 0.35) !important;
+          transform: scale(1.01);
+        }
+
+        .text-emerald { color: #10b981; }
+
         .library-page {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 1.25rem;
         }
 
         .page-header {
-          padding: 1.25rem 1.5rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 1rem;
+          padding: 1.25rem 1.5rem;
+          border-radius: 12px;
         }
 
         .header-info {
@@ -636,22 +802,23 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
         .header-actions {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.75rem;
         }
 
         .library-layout {
           display: grid;
-          grid-template-columns: 280px 1fr;
-          gap: 1rem;
+          grid-template-columns: 320px 1fr;
+          gap: 1.25rem;
           align-items: flex-start;
         }
 
         .library-sidebar {
-          padding: 1rem;
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
-          max-height: 80vh;
+          gap: 1rem;
+          padding: 1rem;
+          border-radius: 12px;
+          max-height: 78vh;
         }
 
         .sidebar-search {
@@ -662,17 +829,17 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
 
         .sidebar-search input {
           width: 100%;
-          padding: 0.4rem 0.6rem 0.4rem 2.2rem;
-          border-radius: 6px;
+          padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(0, 0, 0, 0.2);
           color: var(--text-primary);
-          font-size: 0.8rem;
+          font-size: 0.85rem;
         }
 
         .search-icon {
           position: absolute;
-          left: 0.6rem;
+          left: 0.75rem;
           color: var(--text-muted);
         }
 
@@ -680,28 +847,29 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.75rem;
+          padding-right: 0.25rem;
         }
 
         .sem-header {
-          font-size: 0.7rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: var(--primary);
           text-transform: uppercase;
           letter-spacing: 0.05em;
-          margin-top: 0.35rem;
+          margin-bottom: 0.35rem;
         }
 
         .ue-header {
           display: flex;
           align-items: center;
           gap: 0.35rem;
-          font-size: 0.8rem;
+          font-size: 0.825rem;
           font-weight: 600;
           color: var(--text-secondary);
           cursor: pointer;
-          padding: 0.25rem 0.35rem;
-          border-radius: 4px;
+          padding: 0.3rem 0.4rem;
+          border-radius: 6px;
         }
         .ue-header:hover {
           background: rgba(255, 255, 255, 0.05);
@@ -711,67 +879,63 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
         .ue-code-badge {
           font-size: 0.68rem;
           font-weight: 700;
-          padding: 0.1rem 0.35rem;
-          border-radius: 4px;
-          background: rgba(99, 102, 241, 0.2);
           color: #818cf8;
-        }
-
-        .ue-title {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          background: rgba(99, 102, 241, 0.15);
+          padding: 0.05rem 0.35rem;
+          border-radius: 4px;
         }
 
         .ecue-list {
-          padding-left: 0.75rem;
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          padding-left: 1rem;
           margin-top: 0.25rem;
         }
 
         .ecue-item {
           display: flex;
           align-items: center;
-          gap: 0.4rem;
-          padding: 0.35rem 0.5rem;
+          gap: 0.45rem;
+          padding: 0.4rem 0.6rem;
           border-radius: 6px;
           cursor: pointer;
-          font-size: 0.8rem;
-          color: var(--text-secondary);
           transition: all 0.15s ease;
+          border: 1px solid transparent;
         }
+
         .ecue-item:hover {
-          background: rgba(255, 255, 255, 0.06);
-          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.05);
         }
+
         .ecue-item.selected {
-          background: rgba(99, 102, 241, 0.2);
-          color: var(--text-primary);
-          font-weight: 600;
-          border-left: 3px solid #6366f1;
+          background: rgba(99, 102, 241, 0.15);
+          border-color: rgba(99, 102, 241, 0.4);
+          color: #ffffff;
         }
 
         .ecue-folder-icon {
-          color: #6366f1;
+          color: var(--primary);
           flex-shrink: 0;
         }
 
         .ecue-info {
           display: flex;
           flex-direction: column;
-          overflow: hidden;
+          min-width: 0;
         }
 
         .ecue-name {
+          font-size: 0.8rem;
+          font-weight: 500;
+          color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
         .ecue-ects {
-          font-size: 0.65rem;
+          font-size: 0.68rem;
           color: var(--text-muted);
         }
 
@@ -781,86 +945,101 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
           gap: 1rem;
         }
 
+        .empty-selection {
+          padding: 4rem;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          border-radius: 12px;
+        }
+
+        .ecue-workspace {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
         .ecue-workspace-header {
-          padding: 1rem 1.25rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
+          padding: 1rem 1.25rem;
+          border-radius: 12px;
         }
 
         .ecue-title-group {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.6rem;
         }
 
         .sem-tag, .ue-tag {
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 700;
-          padding: 0.15rem 0.5rem;
+          padding: 0.15rem 0.45rem;
           border-radius: 4px;
-          background: rgba(99, 102, 241, 0.2);
+          background: rgba(99, 102, 241, 0.15);
           color: #818cf8;
         }
 
         .web-notice-pill {
-          display: inline-flex;
+          display: flex;
           align-items: center;
           gap: 0.35rem;
           font-size: 0.75rem;
           color: var(--text-muted);
-          padding: 0.25rem 0.65rem;
-          border-radius: 12px;
           background: rgba(255, 255, 255, 0.05);
+          padding: 0.3rem 0.65rem;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
         }
 
         .categories-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 1rem;
         }
 
         .category-card {
+          border-radius: 12px;
           padding: 1rem;
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
-          border: 2px dashed rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
+          min-height: 180px;
           transition: all 0.2s ease;
-          min-height: 220px;
-        }
-
-        .category-card.drag-over {
-          border-color: #10b981;
-          background: rgba(16, 185, 129, 0.12);
-          box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+          position: relative;
         }
 
         .category-card-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid var(--border-color);
         }
 
         .cat-title-row {
           display: flex;
           align-items: center;
-          gap: 0.4rem;
+          gap: 0.5rem;
         }
 
         .cat-title-row h3 {
           font-size: 0.95rem;
           font-weight: 700;
+          color: var(--text-primary);
         }
 
         .count-badge {
           font-size: 0.7rem;
           font-weight: 700;
-          padding: 0.1rem 0.4rem;
+          padding: 0.05rem 0.4rem;
           border-radius: 10px;
           background: rgba(255, 255, 255, 0.1);
-          color: var(--text-muted);
+          color: var(--text-secondary);
         }
 
         .cat-actions {
@@ -869,34 +1048,61 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
           gap: 0.25rem;
         }
 
+        .icon-action-btn {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          padding: 0.25rem;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .icon-action-btn:hover {
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .icon-action-btn.btn-delete:hover {
+          color: #ef4444;
+          background: rgba(239, 68, 68, 0.15);
+        }
+
         .category-docs-list {
           display: flex;
           flex-direction: column;
-          gap: 0.4rem;
+          gap: 0.35rem;
           flex: 1;
+          min-height: 100px;
+          cursor: pointer;
         }
 
         .drop-hint {
+          flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           gap: 0.35rem;
-          padding: 2rem 0;
+          border: 1.5px dashed rgba(255, 255, 255, 0.15);
+          border-radius: 8px;
+          padding: 1.25rem;
           color: var(--text-muted);
           font-size: 0.78rem;
           text-align: center;
+          transition: border-color 0.15s ease;
+        }
+        .drop-hint:hover {
+          border-color: var(--primary);
+          color: var(--text-primary);
         }
 
         .doc-item-row {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.45rem 0.65rem;
+          padding: 0.4rem 0.6rem;
           border-radius: 6px;
-          background: rgba(30, 41, 59, 0.7);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          cursor: grab;
+          background: rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          cursor: pointer;
           transition: all 0.15s ease;
         }
         .doc-item-row:hover {
@@ -908,38 +1114,59 @@ export const LibraryPage: React.FC<LibraryPageProps> = () => {
           flex: 1;
           font-size: 0.8rem;
           font-weight: 500;
+          color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
         .doc-item-size {
-          font-size: 0.7rem;
+          font-size: 0.68rem;
           color: var(--text-muted);
         }
 
-        .icon-action-btn {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          padding: 0.2rem;
-          border-radius: 4px;
-        }
-        .icon-action-btn:hover {
-          color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .icon-action-btn.btn-delete:hover {
-          color: #ef4444;
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
         }
 
-        .empty-selection, .docs-loading, .sidebar-loading, .sidebar-empty {
-          padding: 3rem;
-          text-align: center;
-          color: var(--text-muted);
-          font-size: 0.85rem;
+        .modal-card {
+          width: 400px;
+          padding: 1.5rem;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
         }
+
+        .modal-card input {
+          width: 100%;
+          padding: 0.65rem 0.85rem;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(0, 0, 0, 0.3);
+          color: #ffffff;
+          font-size: 0.875rem;
+          margin-top: 0.5rem;
+        }
+
+        .modal-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 0.5rem;
+          margin-top: 1rem;
+        }
+
+        .text-muted { color: var(--text-muted); }
+        .text-indigo { color: var(--primary); }
+        .text-amber { color: #f59e0b; }
       `}</style>
     </div>
   );

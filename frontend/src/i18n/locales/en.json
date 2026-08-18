@@ -98,6 +98,8 @@
     "title": "Schedule & Timetable",
     "subtitle": "Manage your weekly sessions and study plans.",
     "printWeek": "Print my week",
+    "addHabitBtn": "+ Habit",
+    "habitPlaceholder": "Piano, Reading, Prayer...",
     "viewGridTitle": "Weekly Grid View",
     "viewGrid": "Grid",
     "viewListTitle": "Chronological List View",
@@ -382,6 +384,14 @@
       "saturday": "Saturday",
       "sunday": "Sunday"
     }
+  },
+  "viewer": {
+    "openExternal": "Open externally",
+    "download": "Download",
+    "unsupportedTitle": "Preview not available for this format",
+    "unsupportedMsg": "The file cannot be previewed directly.",
+    "openDefaultApp": "Open with default app",
+    "downloadFile": "Download file"
   },
   "common": {
     "loading": "Loading...",

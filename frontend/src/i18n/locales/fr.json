@@ -97,7 +97,17 @@
   "timetable": {
     "title": "Planning & Emploi du Temps",
     "subtitle": "Gérez vos séances hebdomadaires et vos révisions.",
-    "printWeek": "Imprimer ma semaine"
+    "printWeek": "Imprimer ma semaine",
+    "addHabitBtn": "+ Habitude",
+    "habitPlaceholder": "Piano, Lecture, Prière..."
+  },
+  "viewer": {
+    "openExternal": "Ouvrir externement",
+    "download": "Télécharger",
+    "unsupportedTitle": "Aperçu non disponible pour ce format",
+    "unsupportedMsg": "Le fichier ne peut pas être prévisualisé directement.",
+    "openDefaultApp": "Ouvrir avec l'application par défaut",
+    "downloadFile": "Télécharger le fichier"
   },
   "library": {
     "title": "Bibliothèque Académique",

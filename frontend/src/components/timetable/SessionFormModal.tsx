@@ -101,7 +101,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     const isPersoMode = initialIsPerso ?? (matchType ? matchType.perso : false);
     setIsPerso(isPersoMode);
     if (isPersoMode) {
-      setPersonalLabel('');
+      setPersonalLabel(initialSubjectId || '');
+      setRecurrence('weekly');
+    } else {
+      setRecurrence('weekly');
     }
 
     const effectiveEcue = initialEcueId || initialSubjectId || '';

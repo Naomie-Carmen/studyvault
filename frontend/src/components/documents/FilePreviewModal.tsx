@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DocumentItem } from '../../types/document';
 import { getPreviewUrl } from '../../services/documentService';
 import * as previewService from '../../services/previewService';
+import * as fileOrganizer from '../../services/fileOrganizer';
 import { PDFViewer } from '../viewers/PDFViewer';
 import { ImageViewer } from '../viewers/ImageViewer';
 import { DocumentInfoPanel } from '../viewers/DocumentInfoPanel';
-import { X, Download, FileText, Info } from 'lucide-react';
+import { X, Download, FileText, Info, ExternalLink } from 'lucide-react';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -18,29 +20,114 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onClose,
   document,
 }) => {
+  const { t } = useTranslation();
   const [showInfo, setShowInfo] = useState(false);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [loadingText, setLoadingText] = useState(false);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
+  const ext = useMemo(() => {
+    if (!document) return '';
+    return document.originalName.split('.').pop()?.toLowerCase() || '';
+  }, [document]);
+
+  const isPdf = useMemo(() => {
+    if (!document) return false;
+    return document.mimeType === 'application/pdf' || ext === 'pdf';
+  }, [document, ext]);
+
+  const isImage = useMemo(() => {
+    if (!document) return false;
+    return document.mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext);
+  }, [document, ext]);
+
+  const isText = useMemo(() => {
+    if (!document) return false;
+    return (
+      document.mimeType.startsWith('text/') ||
+      ['txt', 'md', 'json', 'js', 'ts', 'css', 'html', 'py', 'c', 'cpp', 'java', 'log'].includes(ext)
+    );
+  }, [document, ext]);
+
+  // Escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Load Blob or Text content for preview
   useEffect(() => {
     if (isOpen && document) {
-      // Record view consultation event in background
       previewService.recordDocumentView(document.id, 5).catch(() => {});
+
+      const url = getPreviewUrl(document.id);
+
+      // Fetch blob to construct in-app Object URL for PDF/Images
+      fetch(url)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          setObjectUrl(blobUrl);
+        })
+        .catch(() => {
+          setObjectUrl(url);
+        });
+
+      if (isText) {
+        setLoadingText(true);
+        fetch(url)
+          .then((res) => res.text())
+          .then((text) => {
+            setTextContent(text);
+          })
+          .catch(() => {
+            setTextContent("Erreur de chargement du texte.");
+          })
+          .finally(() => setLoadingText(false));
+      }
+    } else {
+      setObjectUrl(null);
+      setTextContent(null);
     }
-  }, [isOpen, document]);
+
+    return () => {
+      if (objectUrl && objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [isOpen, document, isText]);
 
   if (!isOpen || !document) return null;
 
-  const previewUrl = getPreviewUrl(document.id);
-  const isPdf = document.mimeType === 'application/pdf';
-  const isImage = document.mimeType.startsWith('image/');
+  const previewUrl = objectUrl || getPreviewUrl(document.id);
 
   const handleDownload = () => {
-    window.open(`${previewUrl.replace('/preview', '/download')}`, '_blank');
+    const downloadUrl = getPreviewUrl(document.id).replace('/preview', '/download');
+    const a = window.document.createElement('a');
+    a.href = downloadUrl;
+    a.download = document.originalName;
+    a.click();
+  };
+
+  const handleOpenExternally = async () => {
+    if (document.filePath) {
+      await fileOrganizer.openDocumentFile(document.filePath);
+    } else {
+      handleDownload();
+    }
   };
 
   return (
     <div className="preview-modal-backdrop" onClick={onClose}>
-      <div className="preview-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Top Header */}
+      <div className="preview-modal-container glass-card" onClick={(e) => e.stopPropagation()}>
+        {/* Top Header Bar */}
         <div className="preview-modal-header">
           <div className="title-group">
             <FileText size={18} className="text-indigo" />
@@ -48,6 +135,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </div>
 
           <div className="header-actions">
+            {fileOrganizer.isTauri && (
+              <button
+                className="btn-action btn-secondary-action"
+                onClick={handleOpenExternally}
+                title="Ouvrir avec l'application système par défaut"
+              >
+                <ExternalLink size={15} />
+                <span>{t('viewer.openExternal', 'Ouvrir externement')}</span>
+              </button>
+            )}
+
             <button
               className={`btn-info ${showInfo ? 'active' : ''}`}
               onClick={() => setShowInfo(!showInfo)}
@@ -55,48 +153,59 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             >
               <Info size={16} />
             </button>
-            <button className="btn-action" onClick={handleDownload} title="Télécharger">
+
+            <button className="btn-action" onClick={handleDownload} title="Télécharger le fichier">
               <Download size={16} />
-              <span>Télécharger</span>
+              <span>{t('viewer.download', 'Télécharger')}</span>
             </button>
+
             <button className="btn-close" onClick={onClose} title="Fermer (Échap)">
               <X size={20} />
             </button>
           </div>
         </div>
 
-        {/* Viewport Content */}
+        {/* Viewport Content Area */}
         <div className="preview-modal-body">
           {isPdf ? (
-            <PDFViewer
-              previewUrl={previewUrl}
-              title={document.originalName}
-              onClose={onClose}
-            />
+            <PDFViewer previewUrl={previewUrl} title={document.originalName} onClose={onClose} />
           ) : isImage ? (
-            <ImageViewer
-              previewUrl={previewUrl}
-              title={document.originalName}
-              onClose={onClose}
-            />
+            <ImageViewer previewUrl={previewUrl} title={document.originalName} onClose={onClose} />
+          ) : isText ? (
+            <div className="text-preview-container">
+              {loadingText ? (
+                <div className="loading-spinner">Chargement du contenu texte...</div>
+              ) : (
+                <pre className="text-preview-content">{textContent}</pre>
+              )}
+            </div>
           ) : (
             <div className="unsupported-viewer">
               <FileText size={56} className="text-indigo mb-2" />
-              <h3>Prévisualisation directe indisponible</h3>
-              <p>Ce format de fichier ({document.mimeType}) ne peut pas être affiché directement.</p>
-              <button className="download-cta-btn" onClick={handleDownload}>
-                <Download size={18} />
-                <span>Télécharger le fichier</span>
-              </button>
+              <h3>{t('viewer.unsupportedTitle', 'Aperçu non disponible pour ce format')}</h3>
+              <p>
+                {t(
+                  'viewer.unsupportedMsg',
+                  `Le fichier "${document.originalName}" (${ext.toUpperCase()}) ne peut pas être prévisualisé directement.`
+                )}
+              </p>
+              <div className="unsupported-actions">
+                {fileOrganizer.isTauri && (
+                  <button className="download-cta-btn secondary" onClick={handleOpenExternally}>
+                    <ExternalLink size={18} />
+                    <span>{t('viewer.openDefaultApp', "Ouvrir avec l'application par défaut")}</span>
+                  </button>
+                )}
+                <button className="download-cta-btn" onClick={handleDownload}>
+                  <Download size={18} />
+                  <span>{t('viewer.downloadFile', 'Télécharger le fichier')}</span>
+                </button>
+              </div>
             </div>
           )}
 
           {/* Slide-over Info Panel */}
-          <DocumentInfoPanel
-            document={document}
-            isOpen={showInfo}
-            onClose={() => setShowInfo(false)}
-          />
+          <DocumentInfoPanel document={document} isOpen={showInfo} onClose={() => setShowInfo(false)} />
         </div>
       </div>
 
@@ -104,26 +213,26 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         .preview-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(8px);
+          background: rgba(0, 0, 0, 0.88);
+          backdrop-filter: blur(10px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 120;
+          z-index: 999;
           padding: 1rem;
         }
 
         .preview-modal-container {
           width: 100%;
-          max-width: 1150px;
-          height: 88vh;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-lg);
+          max-width: 1200px;
+          height: 90vh;
+          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 14px;
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: var(--shadow-lg);
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
         }
 
         .preview-modal-header {
@@ -131,8 +240,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           align-items: center;
           justify-content: space-between;
           padding: 0.75rem 1.25rem;
-          background: rgba(0, 0, 0, 0.4);
-          border-bottom: 1px solid var(--border-color);
+          background: rgba(15, 23, 42, 0.95);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .title-group {
@@ -145,7 +254,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         .doc-name {
           font-weight: 600;
           font-size: 0.95rem;
-          color: var(--text-primary);
+          color: #ffffff;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -158,17 +267,18 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         }
 
         .btn-info {
-          color: var(--text-muted);
+          color: #94a3b8;
           padding: 0.4rem;
-          border-radius: var(--radius-md);
+          border-radius: 6px;
           background: rgba(255, 255, 255, 0.05);
-          border: 1px solid var(--border-color);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          cursor: pointer;
         }
 
         .btn-info.active {
-          color: var(--primary);
-          background: rgba(99, 102, 241, 0.15);
-          border-color: rgba(99, 102, 241, 0.3);
+          color: #818cf8;
+          background: rgba(99, 102, 241, 0.2);
+          border-color: rgba(99, 102, 241, 0.4);
         }
 
         .btn-action {
@@ -176,32 +286,64 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           align-items: center;
           gap: 0.35rem;
           padding: 0.4rem 0.85rem;
-          border-radius: var(--radius-md);
-          background: var(--gradient-primary);
+          border-radius: 6px;
+          background: var(--gradient-primary, linear-gradient(135deg, #6366f1 0%, #a855f7 100%));
           color: #ffffff;
           font-size: 0.8rem;
           font-weight: 600;
+          border: none;
+          cursor: pointer;
+        }
+
+        .btn-secondary-action {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          color: #cbd5e1;
+        }
+        .btn-secondary-action:hover {
+          background: rgba(255, 255, 255, 0.15);
+          color: #ffffff;
         }
 
         .btn-close {
-          color: var(--text-muted);
+          color: #94a3b8;
           padding: 0.35rem;
           border-radius: 50%;
+          background: none;
+          border: none;
+          cursor: pointer;
         }
 
         .btn-close:hover {
-          color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.15);
         }
 
         .preview-modal-body {
           flex: 1;
-          background: #0f172a;
+          background: #090d16;
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
+        }
+
+        .text-preview-container {
+          width: 100%;
+          height: 100%;
+          padding: 1.5rem;
+          overflow-y: auto;
+          background: #0b0f19;
+          color: #e2e8f0;
+          font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        .text-preview-content {
+          font-size: 0.85rem;
+          line-height: 1.6;
+          white-space: pre-wrap;
+          word-break: break-word;
         }
 
         .unsupported-viewer {
@@ -211,33 +353,49 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           justify-content: center;
           gap: 0.75rem;
           text-align: center;
-          padding: 2rem;
+          padding: 2.5rem;
         }
 
         .unsupported-viewer h3 {
-          font-size: 1.2rem;
-          color: var(--text-primary);
+          font-size: 1.25rem;
+          color: #ffffff;
+          font-weight: 700;
         }
 
         .unsupported-viewer p {
           font-size: 0.875rem;
-          color: var(--text-muted);
+          color: #94a3b8;
+          max-width: 500px;
+        }
+
+        .unsupported-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-top: 0.75rem;
         }
 
         .download-cta-btn {
-          margin-top: 0.5rem;
-          display: flex;
+          display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.75rem 1.25rem;
-          border-radius: var(--radius-md);
-          background: var(--gradient-primary);
+          padding: 0.65rem 1.1rem;
+          border-radius: 8px;
+          background: var(--gradient-primary, linear-gradient(135deg, #6366f1 0%, #a855f7 100%));
           color: #ffffff;
           font-weight: 600;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
+          border: none;
+          cursor: pointer;
         }
 
-        .text-indigo { color: var(--primary); }
+        .download-cta-btn.secondary {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: #ffffff;
+        }
+
+        .text-indigo { color: #818cf8; }
       `}</style>
     </div>
   );

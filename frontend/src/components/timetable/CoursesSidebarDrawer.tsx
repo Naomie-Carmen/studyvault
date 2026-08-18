@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree } from '../../types/structure';
-import { GripVertical, ChevronDown, ChevronRight, BookOpen, PanelLeftClose, PanelLeftOpen, Star } from 'lucide-react';
-import { getSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
+import { GripVertical, ChevronDown, ChevronRight, BookOpen, PanelLeftClose, PanelLeftOpen, Star, Plus } from 'lucide-react';
+import { getSessionTypes, saveSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
 
 interface CoursesSidebarDrawerProps {
   tree: AcademicStructureTree | null;
@@ -10,6 +10,17 @@ interface CoursesSidebarDrawerProps {
   onToggle: () => void;
   isPastWeek?: boolean;
 }
+
+const PALETTE_8 = [
+  '#ec4899', // Pink
+  '#8b5cf6', // Purple
+  '#10b981', // Emerald
+  '#f59e0b', // Amber
+  '#06b6d4', // Cyan
+  '#ef4444', // Red
+  '#84cc16', // Lime
+  '#6366f1', // Indigo
+];
 
 export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.memo(({
   tree,
@@ -20,9 +31,14 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
   const { t } = useTranslation();
   const [expandedUeIds, setExpandedUeIds] = useState<Record<string, boolean>>({});
 
+  const [sessionTypes, setSessionTypesState] = useState<SessionTypeConfig[]>(() => getSessionTypes());
+  const [showAddHabit, setShowAddHabit] = useState(false);
+  const [habitName, setHabitName] = useState('');
+  const [habitColor, setHabitColor] = useState('#ec4899');
+
   const personalTypes = useMemo(() => {
-    return getSessionTypes().filter((t) => t.perso);
-  }, []);
+    return sessionTypes.filter((t) => t.perso);
+  }, [sessionTypes]);
 
   const toggleUe = (ueId: string) => {
     setExpandedUeIds((prev) => ({ ...prev, [ueId]: !prev[ueId] }));
@@ -73,6 +89,25 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
     } catch (_e) {
       /* ignore */
     }
+  };
+
+  const handleCreateHabit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!habitName.trim()) return;
+
+    const codeId = habitName.trim().toUpperCase().slice(0, 10);
+    const newType: SessionTypeConfig = {
+      id: codeId,
+      label: habitName.trim(),
+      color: habitColor,
+      perso: true,
+    };
+
+    const updated = [...sessionTypes, newType];
+    saveSessionTypes(updated);
+    setSessionTypesState(updated);
+    setHabitName('');
+    setShowAddHabit(false);
   };
 
   if (!isOpen) {
@@ -190,9 +225,60 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
         {/* Section ⭐ Perso under ECUEs */}
         <div className="perso-drawer-group">
           <div className="perso-section-header">
-            <Star size={14} className="text-amber" />
-            <span>⭐ {t('timetable.persoSection', 'Perso')}</span>
+            <div className="header-left">
+              <Star size={14} className="text-amber" />
+              <span>⭐ {t('timetable.persoSection', 'Perso')}</span>
+            </div>
+            {!isPastWeek && (
+              <button
+                type="button"
+                className="btn-add-habit-sm"
+                onClick={() => setShowAddHabit(!showAddHabit)}
+                title="Ajouter une habitude perso en 2 clics"
+              >
+                <Plus size={12} />
+                <span>{t('timetable.addHabitBtn', '+ Habitude')}</span>
+              </button>
+            )}
           </div>
+
+          {/* Quick Habit Creator Form */}
+          {showAddHabit && (
+            <form onSubmit={handleCreateHabit} className="add-habit-inline-card glass-card">
+              <input
+                type="text"
+                placeholder={t('timetable.habitPlaceholder', 'Piano, Lecture, Prière...')}
+                value={habitName}
+                onChange={(e) => setHabitName(e.target.value)}
+                className="habit-name-input"
+                autoFocus
+                required
+              />
+              <div className="color-palette-row">
+                {PALETTE_8.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`color-dot-btn ${habitColor === c ? 'active' : ''}`}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setHabitColor(c)}
+                  />
+                ))}
+              </div>
+              <div className="habit-card-actions">
+                <button type="submit" className="btn-save-habit">
+                  Ajouter
+                </button>
+                <button
+                  type="button"
+                  className="btn-cancel-habit"
+                  onClick={() => setShowAddHabit(false)}
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="perso-blocks-list">
             {personalTypes.map((type) => (
@@ -376,13 +462,107 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
         .perso-section-header {
           display: flex;
           align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.5rem;
+        }
+
+        .header-left {
+          display: flex;
+          align-items: center;
           gap: 0.35rem;
           font-size: 0.78rem;
           font-weight: 700;
           color: #f59e0b;
           text-transform: uppercase;
           letter-spacing: 0.05em;
-          margin-bottom: 0.5rem;
+        }
+
+        .btn-add-habit-sm {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+          padding: 0.15rem 0.45rem;
+          border-radius: 4px;
+          border: 1px solid rgba(236, 72, 153, 0.4);
+          background: rgba(236, 72, 153, 0.15);
+          color: #f472b6;
+          font-size: 0.7rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-add-habit-sm:hover {
+          background: rgba(236, 72, 153, 0.3);
+          color: #ffffff;
+        }
+
+        .add-habit-inline-card {
+          padding: 0.65rem;
+          margin-bottom: 0.6rem;
+          border-radius: 8px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(236, 72, 153, 0.4);
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .habit-name-input {
+          padding: 0.35rem 0.6rem;
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: rgba(0, 0, 0, 0.3);
+          color: #ffffff;
+          font-size: 0.8rem;
+          outline: none;
+        }
+
+        .color-palette-row {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          flex-wrap: wrap;
+        }
+
+        .color-dot-btn {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          cursor: pointer;
+          transition: transform 0.15s ease;
+        }
+        .color-dot-btn.active {
+          border-color: #ffffff;
+          transform: scale(1.25);
+        }
+
+        .habit-card-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 0.4rem;
+        }
+
+        .btn-save-habit {
+          padding: 0.2rem 0.6rem;
+          border-radius: 4px;
+          background: #ec4899;
+          color: #ffffff;
+          font-size: 0.72rem;
+          font-weight: 700;
+          border: none;
+          cursor: pointer;
+        }
+
+        .btn-cancel-habit {
+          padding: 0.2rem 0.5rem;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-muted);
+          font-size: 0.72rem;
+          border: none;
+          cursor: pointer;
         }
 
         .perso-blocks-list {

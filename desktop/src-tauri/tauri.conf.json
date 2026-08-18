@@ -82,7 +82,8 @@
         "width": 1280,
         "center": true,
         "focus": true,
-        "visible": true
+        "visible": true,
+        "dragDropEnabled": true
       }
     ]
   }
