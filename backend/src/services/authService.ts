@@ -16,6 +16,7 @@ function sanitizeUser(user: {
   program?: string | null;
   level?: string | null;
   role?: string | null;
+  consentAt?: Date | null;
   createdAt: Date;
 }): UserProfileResponse {
   return {
@@ -26,6 +27,7 @@ function sanitizeUser(user: {
     program: user.program,
     level: user.level,
     role: user.role || 'user',
+    consentAt: user.consentAt ? user.consentAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -100,6 +102,7 @@ export async function registerUser(input: RegisterInput, deviceId?: string): Pro
       betaStatus: isBetaActive ? 'active' : 'none',
       betaInviteCode: input.inviteCode || null,
       betaActivatedAt: isBetaActive ? new Date() : null,
+      consentAt: new Date(),
     },
   });
 
