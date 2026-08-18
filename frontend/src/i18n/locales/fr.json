@@ -377,6 +377,10 @@
     "usersSubtitle": "Gestion des comptes inscrits, bannissement distant et historique des suppressions.",
     "tabActiveUsers": "Comptes Inscrits & Bannis",
     "tabArchivedUsers": "Historique des Supprimés",
+    "tabDevices": "💻 Appareils",
     "searchPlaceholder": "Rechercher par email ou nom..."
+  },
+  "cgu": {
+    "deviceNotice": "Un identifiant d'appareil est utilisé pour appliquer la limite de comptes par appareil."
   }
 }

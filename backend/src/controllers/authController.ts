@@ -39,7 +39,8 @@ export async function register(req: Request, res: Response, next: NextFunction):
       throw ApiError.badRequest(issue.message, 'VALIDATION_ERROR', parseResult.error.format());
     }
 
-    const { user, accessToken, refreshToken } = await authService.registerUser(parseResult.data);
+    const deviceId = (req.headers['x-device-id'] as string) || req.body.deviceId;
+    const { user, accessToken, refreshToken } = await authService.registerUser(parseResult.data, deviceId);
     setRefreshTokenCookie(res, refreshToken);
 
     sendSuccess(res, { user, accessToken, refreshToken }, 201);
@@ -56,7 +57,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw ApiError.badRequest(issue.message, 'VALIDATION_ERROR', parseResult.error.format());
     }
 
-    const { user, accessToken, refreshToken } = await authService.loginUser(parseResult.data);
+    const deviceId = (req.headers['x-device-id'] as string) || req.body.deviceId;
+    const { user, accessToken, refreshToken } = await authService.loginUser(parseResult.data, deviceId);
     setRefreshTokenCookie(res, refreshToken);
 
     sendSuccess(res, { user, accessToken, refreshToken }, 200);

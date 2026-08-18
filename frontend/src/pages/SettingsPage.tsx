@@ -293,6 +293,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
               <span>{t('settings.account.myDataLink', 'Consulter et exporter mes données')}</span>
               <ChevronRight size={18} className="arrow-icon" />
             </button>
+
+            <div className="device-notice-box" style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              🔒 {t('cgu.deviceNotice', 'Un identifiant d\'appareil est utilisé pour appliquer la limite de comptes par appareil.')}
+            </div>
           </div>
         </div>
 

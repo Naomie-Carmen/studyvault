@@ -65,12 +65,24 @@ fn handle_menu_event(event: WindowMenuEvent) {
     }
 }
 
+#[tauri::command]
+fn get_device_id() -> String {
+    let comp = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "DESKTOP-PC".to_string());
+    let user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_else(|_| "USER".to_string());
+    format!("DESKTOP-{}-{}", comp.trim(), user.trim())
+}
+
 fn main() {
     let menu = create_app_menu();
 
     tauri::Builder::default()
         .menu(menu)
         .on_menu_event(handle_menu_event)
+        .invoke_handler(tauri::generate_handler![get_device_id])
         .run(tauri::generate_context!())
         .expect("Erreur lors du lancement de l'application StudyVault Desktop");
 }

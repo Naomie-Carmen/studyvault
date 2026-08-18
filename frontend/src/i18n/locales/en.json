@@ -408,6 +408,10 @@
     "usersSubtitle": "Registered accounts management, remote banning, and deletion history.",
     "tabActiveUsers": "Registered & Banned Accounts",
     "tabArchivedUsers": "Deleted Accounts History",
+    "tabDevices": "💻 Devices",
     "searchPlaceholder": "Search by email or name..."
+  },
+  "cgu": {
+    "deviceNotice": "A device identifier is used to enforce account limits per device."
   }
 }

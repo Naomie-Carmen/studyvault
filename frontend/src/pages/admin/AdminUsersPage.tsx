@@ -12,7 +12,12 @@ import {
   AlertTriangle, 
   Mail, 
   CheckCircle2, 
-  Archive
+  Archive,
+  Laptop,
+  Lock,
+  Unlock,
+  Star,
+  Settings
 } from 'lucide-react';
 
 interface ActiveUserItem {
@@ -26,6 +31,7 @@ interface ActiveUserItem {
   bannedAt: string | null;
   lastLogin: string | null;
   createdAt: string;
+  devices?: Array<{ id: string; label?: string; blocked?: boolean }>;
 }
 
 interface ArchivedUserItem {
@@ -38,13 +44,28 @@ interface ArchivedUserItem {
   reason?: string | null;
 }
 
+interface DeviceItem {
+  id: string;
+  label: string;
+  blocked: boolean;
+  unlimited: boolean;
+  firstSeen: string;
+  lastSeen: string;
+  accountCount: number;
+  userEmails: string[];
+}
+
 export const AdminUsersPage: React.FC = () => {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'archived'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'archived' | 'devices'>('users');
   const [users, setUsers] = useState<ActiveUserItem[]>([]);
   const [archivedUsers, setArchivedUsers] = useState<ArchivedUserItem[]>([]);
+  const [devices, setDevices] = useState<DeviceItem[]>([]);
+  const [maxAccountsPerDevice, setMaxAccountsPerDevice] = useState<number>(2);
+  const [savingMax, setSavingMax] = useState<boolean>(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +105,7 @@ export const AdminUsersPage: React.FC = () => {
         } else {
           setError('Impossible de charger la liste des utilisateurs.');
         }
-      } else {
+      } else if (activeTab === 'archived') {
         const res = await fetch(`${API_BASE_URL}/admin/users/archived`, { headers });
         if (res.ok) {
           const json = await res.json();
@@ -92,6 +113,17 @@ export const AdminUsersPage: React.FC = () => {
           setArchivedUsers(list);
         } else {
           setError('Impossible de charger les archives.');
+        }
+      } else if (activeTab === 'devices') {
+        const res = await fetch(`${API_BASE_URL}/admin/devices`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          setDevices(json.data?.devices || []);
+          if (typeof json.data?.maxAccountsPerDevice === 'number') {
+            setMaxAccountsPerDevice(json.data.maxAccountsPerDevice);
+          }
+        } else {
+          setError('Impossible de charger les appareils.');
         }
       }
     } catch (_err) {
@@ -177,6 +209,93 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
+  const handleBlockDevice = async (deviceId: string) => {
+    try {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/admin/devices/${encodeURIComponent(deviceId)}/block`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        showToast(`L'appareil ${deviceId} a été bloqué.`);
+        loadData();
+      } else {
+        alert(json.error?.message || 'Erreur lors du blocage.');
+      }
+    } catch (_e) {
+      alert('Erreur réseau lors du blocage.');
+    }
+  };
+
+  const handleUnblockDevice = async (deviceId: string) => {
+    try {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/admin/devices/${encodeURIComponent(deviceId)}/unblock`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        showToast(`L'appareil ${deviceId} a été débloqué.`);
+        loadData();
+      } else {
+        alert(json.error?.message || 'Erreur lors du déblocage.');
+      }
+    } catch (_e) {
+      alert('Erreur réseau lors du déblocage.');
+    }
+  };
+
+  const handleToggleUnlimited = async (deviceId: string, currentStatus: boolean) => {
+    try {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/admin/devices/${encodeURIComponent(deviceId)}/unlimited`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ unlimited: !currentStatus }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        showToast(`Mode illimité ${!currentStatus ? 'activé' : 'désactivé'} pour l'appareil.`);
+        loadData();
+      } else {
+        alert(json.error?.message || 'Erreur lors de la modification du statut.');
+      }
+    } catch (_e) {
+      alert('Erreur réseau.');
+    }
+  };
+
+  const handleSaveMaxSetting = async (newVal: number) => {
+    setSavingMax(true);
+    try {
+      const token = getClientAccessToken();
+      const res = await fetch(`${API_BASE_URL}/admin/settings/max-per-device`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ max: newVal }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setMaxAccountsPerDevice(newVal);
+        showToast(`Limite globale de comptes par appareil mise à jour (${newVal}).`);
+      } else {
+        alert(json.error?.message || 'Erreur lors de la mise à jour.');
+      }
+    } catch (_e) {
+      alert('Erreur réseau.');
+    } finally {
+      setSavingMax(false);
+    }
+  };
+
   if (currentUser?.role !== 'admin') {
     return (
       <div className="admin-access-denied glass-card">
@@ -191,6 +310,13 @@ export const AdminUsersPage: React.FC = () => {
     if (!dateStr) return 'Jamais';
     const d = new Date(dateStr);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const getShortDeviceId = (id: string) => {
+    if (id.startsWith('DESKTOP-')) {
+      return id.length > 22 ? `${id.substring(0, 20)}...` : id;
+    }
+    return id.length > 18 ? `${id.substring(0, 16)}...` : id;
   };
 
   return (
@@ -210,8 +336,8 @@ export const AdminUsersPage: React.FC = () => {
             <ShieldCheck size={26} />
           </div>
           <div>
-            <h1>{t('admin.usersTitle', 'Administration — Gestion des Utilisateurs')}</h1>
-            <p className="subtitle">{t('admin.usersSubtitle', 'Gestion des comptes inscrits, bannissement distant et historique des suppressions.')}</p>
+            <h1>{t('admin.usersTitle', 'Administration — Gestion des Utilisateurs & Appareils')}</h1>
+            <p className="subtitle">{t('admin.usersSubtitle', 'Gestion des comptes inscrits, bannissement distant, contrôle des appareils et limite de comptes par PC.')}</p>
           </div>
         </div>
 
@@ -229,6 +355,13 @@ export const AdminUsersPage: React.FC = () => {
         >
           <UserCheck size={16} />
           <span>{t('admin.tabActiveUsers', 'Comptes Inscrits & Bannis')}</span>
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'devices' ? 'active' : ''}`}
+          onClick={() => setActiveTab('devices')}
+        >
+          <Laptop size={16} />
+          <span>{t('admin.tabDevices', '💻 Appareils')}</span>
         </button>
         <button
           className={`tab-btn ${activeTab === 'archived' ? 'active' : ''}`}
@@ -290,6 +423,7 @@ export const AdminUsersPage: React.FC = () => {
                   <tr>
                     <th>Utilisateur</th>
                     <th>Rôle</th>
+                    <th>Appareil PC/Web</th>
                     <th>Date Inscription</th>
                     <th>Dernier Login</th>
                     <th>Statut</th>
@@ -300,6 +434,7 @@ export const AdminUsersPage: React.FC = () => {
                   {users.map((u) => {
                     const isBanned = Boolean(u.bannedAt);
                     const isAdmin = u.role === 'admin';
+                    const mainDevice = u.devices && u.devices.length > 0 ? u.devices[0] : null;
 
                     return (
                       <tr key={u.id} className={isBanned ? 'row-banned' : ''}>
@@ -317,6 +452,16 @@ export const AdminUsersPage: React.FC = () => {
                           <span className={`role-badge ${isAdmin ? 'admin' : 'user'}`}>
                             {isAdmin ? '🛡️ Admin' : 'Étudiant'}
                           </span>
+                        </td>
+
+                        <td>
+                          {mainDevice ? (
+                            <span className={`device-badge ${mainDevice.id.startsWith('DESKTOP-') ? 'desktop' : 'web'}`} title={mainDevice.id}>
+                              <Laptop size={12} /> {getShortDeviceId(mainDevice.id)}
+                            </span>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.75rem' }}>—</span>
+                          )}
                         </td>
 
                         <td>
@@ -371,6 +516,150 @@ export const AdminUsersPage: React.FC = () => {
                               </button>
                             </div>
                           )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'devices' ? (
+        <div className="devices-tab-container glass-card">
+          {/* Global Max Limit Setting Control */}
+          <div className="global-setting-card">
+            <div className="setting-info">
+              <Settings size={20} className="text-amber" />
+              <div>
+                <h4>Limite globale de comptes autorisés par appareil</h4>
+                <p className="subtitle">Nombre maximal de comptes qu'un utilisateur peut inscrire sur la même machine (1 à 10).</p>
+              </div>
+            </div>
+
+            <div className="max-selector-group">
+              {[1, 2, 3, 4, 5].map((num) => (
+                <button
+                  key={num}
+                  className={`max-chip ${maxAccountsPerDevice === num ? 'active' : ''}`}
+                  onClick={() => handleSaveMaxSetting(num)}
+                  disabled={savingMax}
+                >
+                  {num} {num === 1 ? 'compte' : 'comptes'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Devices Data Table */}
+          {loading ? (
+            <div className="loading-box">Chargement de la liste des appareils...</div>
+          ) : error ? (
+            <div className="error-box">{error}</div>
+          ) : devices.length === 0 ? (
+            <div className="empty-box">Aucun appareil répertorié.</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Identifiant Appareil</th>
+                    <th>Plateforme</th>
+                    <th>Comptes Liés</th>
+                    <th>Dernière Activité</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((dev) => {
+                    const isExceeded = dev.accountCount > maxAccountsPerDevice && !dev.unlimited;
+
+                    return (
+                      <tr key={dev.id} className={dev.blocked ? 'row-banned' : ''}>
+                        <td>
+                          <div className="device-id-cell">
+                            <span className="device-id-code" title={dev.id}>{dev.id}</span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className={`device-badge ${dev.id.startsWith('DESKTOP-') ? 'desktop' : 'web'}`}>
+                            <Laptop size={12} /> {dev.label || (dev.id.startsWith('DESKTOP-') ? 'Desktop Windows' : 'Navigateur Web')}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="accounts-linked-cell">
+                            <span className={`account-count-tag ${isExceeded ? 'exceeded' : ''}`}>
+                              {dev.accountCount} compte(s)
+                            </span>
+
+                            {dev.userEmails && dev.userEmails.length > 0 && (
+                              <div className="emails-list">
+                                {dev.userEmails.map((email, idx) => (
+                                  <span key={idx} className="email-chip">{email}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className="date-text">{formatDate(dev.lastSeen)}</span>
+                        </td>
+
+                        <td>
+                          {dev.blocked ? (
+                            <span className="status-badge banned">
+                              <Lock size={12} /> Bloqué
+                            </span>
+                          ) : dev.unlimited ? (
+                            <span className="status-badge unlimited">
+                              <Star size={12} /> Illimité (+1)
+                            </span>
+                          ) : isExceeded ? (
+                            <span className="status-badge warning" title="Nombre de comptes au-dessus de la limite globale">
+                              <AlertTriangle size={12} /> Limite Dépassée ({dev.accountCount}/{maxAccountsPerDevice})
+                            </span>
+                          ) : (
+                            <span className="status-badge active">
+                              <CheckCircle2 size={12} /> Conforme
+                            </span>
+                          )}
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <div className="actions-cell">
+                            {dev.blocked ? (
+                              <button
+                                className="btn-action-unban"
+                                onClick={() => handleUnblockDevice(dev.id)}
+                                title="Autoriser l'appareil"
+                              >
+                                <Unlock size={14} />
+                                <span>Débloquer</span>
+                              </button>
+                            ) : (
+                              <button
+                                className="btn-action-ban"
+                                onClick={() => handleBlockDevice(dev.id)}
+                                title="Bloquer l'appareil à distance"
+                              >
+                                <Lock size={14} />
+                                <span>Bloquer</span>
+                              </button>
+                            )}
+
+                            <button
+                              className={`btn-action-unlimited ${dev.unlimited ? 'active' : ''}`}
+                              onClick={() => handleToggleUnlimited(dev.id, dev.unlimited)}
+                              title={dev.unlimited ? 'Désactiver le mode illimité' : 'Accorder des comptes illimités sur cet appareil'}
+                            >
+                              <Star size={14} />
+                              <span>{dev.unlimited ? 'Illimité ✓' : '+1 Illimité'}</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -598,12 +887,60 @@ export const AdminUsersPage: React.FC = () => {
           box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
-        .users-tab-container, .archived-tab-container {
+        .users-tab-container, .archived-tab-container, .devices-tab-container {
           padding: 1.25rem;
           border-radius: 12px;
           display: flex;
           flex-direction: column;
           gap: 1rem;
+        }
+
+        .global-setting-card {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1rem 1.25rem;
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          border-radius: 10px;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .setting-info {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .setting-info h4 {
+          font-size: 0.925rem;
+          font-weight: 700;
+          color: #ffffff;
+          margin: 0;
+        }
+
+        .max-selector-group {
+          display: flex;
+          gap: 0.4rem;
+        }
+
+        .max-chip {
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: rgba(0, 0, 0, 0.4);
+          color: var(--text-secondary);
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .max-chip.active {
+          background: #f59e0b;
+          color: #0f172a;
+          border-color: #f59e0b;
+          font-weight: 700;
         }
 
         .controls-bar {
@@ -692,6 +1029,56 @@ export const AdminUsersPage: React.FC = () => {
           background: rgba(239, 68, 68, 0.06);
         }
 
+        .device-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.72rem;
+          font-weight: 600;
+          padding: 0.2rem 0.55rem;
+          border-radius: 6px;
+        }
+        .device-badge.desktop { background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); }
+        .device-badge.web { background: rgba(14, 165, 233, 0.18); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+
+        .device-id-code {
+          font-family: monospace;
+          font-size: 0.78rem;
+          color: #cbd5e1;
+          background: rgba(0, 0, 0, 0.4);
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+        }
+
+        .accounts-linked-cell {
+          display: flex;
+          flex-direction: column;
+          gap: 0.3rem;
+        }
+
+        .account-count-tag {
+          font-weight: 700;
+          font-size: 0.78rem;
+          color: #34d399;
+        }
+        .account-count-tag.exceeded {
+          color: #f87171;
+        }
+
+        .emails-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.25rem;
+        }
+
+        .email-chip {
+          font-size: 0.7rem;
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--text-secondary);
+          padding: 0.1rem 0.4rem;
+          border-radius: 4px;
+        }
+
         .user-cell {
           display: flex;
           align-items: center;
@@ -745,6 +1132,8 @@ export const AdminUsersPage: React.FC = () => {
         }
         .status-badge.active { background: rgba(16, 185, 129, 0.18); color: #34d399; }
         .status-badge.banned { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .status-badge.unlimited { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .status-badge.warning { background: rgba(245, 158, 11, 0.25); color: #f59e0b; }
 
         .actions-cell {
           display: flex;
@@ -753,7 +1142,7 @@ export const AdminUsersPage: React.FC = () => {
           gap: 0.4rem;
         }
 
-        .btn-action-ban, .btn-action-unban, .btn-action-delete {
+        .btn-action-ban, .btn-action-unban, .btn-action-delete, .btn-action-unlimited {
           display: inline-flex;
           align-items: center;
           gap: 0.3rem;
@@ -778,6 +1167,17 @@ export const AdminUsersPage: React.FC = () => {
           color: #34d399;
         }
         .btn-action-unban:hover { background: rgba(16, 185, 129, 0.35); color: #ffffff; }
+
+        .btn-action-unlimited {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+        }
+        .btn-action-unlimited.active {
+          background: rgba(245, 158, 11, 0.2);
+          border-color: #f59e0b;
+          color: #fbbf24;
+        }
 
         .btn-action-delete {
           background: rgba(255, 255, 255, 0.05);

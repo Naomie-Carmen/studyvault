@@ -46,6 +46,11 @@ export async function getAdminUsers(req: Request, res: Response, next: NextFunct
           bannedAt: true,
           lastLogin: true,
           createdAt: true,
+          devices: {
+            select: { id: true, label: true, blocked: true },
+            take: 1,
+            orderBy: { lastSeen: 'desc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,

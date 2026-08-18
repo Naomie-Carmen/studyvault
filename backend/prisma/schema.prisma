@@ -51,8 +51,27 @@ model User {
   notes                     Note[]
   weekArchives              WeekArchive[]
   documentCategories        DocumentCategory[]
+  devices                   Device[]                   @relation("UserDevices")
 
   @@index([email])
+}
+
+model Device {
+  id        String   @id
+  label     String?
+  blocked   Boolean  @default(false)
+  unlimited Boolean  @default(false)
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @default(now())
+  users     User[]   @relation("UserDevices")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model UserArchive {

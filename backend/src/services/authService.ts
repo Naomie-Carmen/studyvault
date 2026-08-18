@@ -30,12 +30,44 @@ function sanitizeUser(user: {
   };
 }
 
-export async function registerUser(input: RegisterInput): Promise<{ user: UserProfileResponse } & AuthTokens> {
+export async function getMaxAccountsPerDevice(): Promise<number> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: 'maxAccountsPerDevice' } });
+  return setting ? Math.max(1, parseInt(setting.value, 10) || 2) : 2;
+}
+
+export async function setMaxAccountsPerDevice(val: number): Promise<number> {
+  const clamped = Math.max(1, Math.min(10, val));
+  await prisma.systemSetting.upsert({
+    where: { key: 'maxAccountsPerDevice' },
+    create: { key: 'maxAccountsPerDevice', value: String(clamped) },
+    update: { value: String(clamped) },
+  });
+  return clamped;
+}
+
+export async function registerUser(input: RegisterInput, deviceId?: string): Promise<{ user: UserProfileResponse } & AuthTokens> {
   const existingUser = await prisma.user.findUnique({
     where: { email: input.email },
   });
   if (existingUser) {
     throw ApiError.badRequest('Un compte existe déjà avec cette adresse email.', 'EMAIL_EXISTS');
+  }
+
+  if (deviceId) {
+    const device = await prisma.device.findUnique({
+      where: { id: deviceId },
+      include: { users: true },
+    });
+
+    if (device?.blocked) {
+      throw ApiError.forbidden('Cet appareil est bloqué.', 'DEVICE_BLOCKED');
+    }
+
+    const maxAllowed = await getMaxAccountsPerDevice();
+    const currentAccountsCount = device ? device.users.length : 0;
+    if (device && !device.unlimited && currentAccountsCount >= maxAllowed) {
+      throw ApiError.forbidden('Limite de comptes atteinte sur cet appareil. Contactez le support.', 'DEVICE_ACCOUNT_LIMIT');
+    }
   }
 
   // Beta Closed validation
@@ -71,6 +103,22 @@ export async function registerUser(input: RegisterInput): Promise<{ user: UserPr
     },
   });
 
+  if (deviceId) {
+    await prisma.device.upsert({
+      where: { id: deviceId },
+      create: {
+        id: deviceId,
+        label: deviceId.startsWith('DESKTOP-') ? 'Application Desktop' : 'Navigateur Web',
+        lastSeen: new Date(),
+        users: { connect: { id: user.id } },
+      },
+      update: {
+        lastSeen: new Date(),
+        users: { connect: { id: user.id } },
+      },
+    });
+  }
+
   const authUserPayload = { id: user.id, email: user.email, fullName: user.fullName };
   const accessToken = generateAccessToken(authUserPayload);
   const refreshToken = generateRefreshToken(authUserPayload);
@@ -92,7 +140,7 @@ export async function registerUser(input: RegisterInput): Promise<{ user: UserPr
   };
 }
 
-export async function loginUser(input: LoginInput): Promise<{ user: UserProfileResponse } & AuthTokens> {
+export async function loginUser(input: LoginInput, deviceId?: string): Promise<{ user: UserProfileResponse } & AuthTokens> {
   const user = await prisma.user.findUnique({
     where: { email: input.email },
   });
@@ -103,6 +151,26 @@ export async function loginUser(input: LoginInput): Promise<{ user: UserProfileR
 
   if (user.bannedAt) {
     throw ApiError.forbidden('Compte suspendu. Contactez le support.', 'ACCOUNT_BANNED');
+  }
+
+  if (deviceId) {
+    const device = await prisma.device.findUnique({ where: { id: deviceId } });
+    if (device?.blocked) {
+      throw ApiError.forbidden('Cet appareil est bloqué.', 'DEVICE_BLOCKED');
+    }
+    await prisma.device.upsert({
+      where: { id: deviceId },
+      create: {
+        id: deviceId,
+        label: deviceId.startsWith('DESKTOP-') ? 'Application Desktop' : 'Navigateur Web',
+        lastSeen: new Date(),
+        users: { connect: { id: user.id } },
+      },
+      update: {
+        lastSeen: new Date(),
+        users: { connect: { id: user.id } },
+      },
+    });
   }
 
   const isValidPassword = await bcrypt.compare(input.password, user.passwordHash);

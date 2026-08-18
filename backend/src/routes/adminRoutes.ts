@@ -9,6 +9,14 @@ import {
   unbanUser, 
   deleteUserAdmin 
 } from '../controllers/adminUserController';
+import { 
+  getAdminDevices, 
+  blockDevice, 
+  unblockDevice, 
+  toggleUnlimitedDevice, 
+  getMaxPerDeviceSetting, 
+  updateMaxPerDeviceSetting 
+} from '../controllers/adminDeviceController';
 
 const router = Router();
 
@@ -29,5 +37,15 @@ router.post('/users/:id/unban', requireAuth, requireAdmin, unbanUser);
 
 // DELETE /api/v1/admin/users/:id
 router.delete('/users/:id', requireAuth, requireAdmin, deleteUserAdmin);
+
+// GET & ACTIONS /api/v1/admin/devices
+router.get('/devices', requireAuth, requireAdmin, getAdminDevices);
+router.post('/devices/:id/block', requireAuth, requireAdmin, blockDevice);
+router.post('/devices/:id/unblock', requireAuth, requireAdmin, unblockDevice);
+router.post('/devices/:id/unlimited', requireAuth, requireAdmin, toggleUnlimitedDevice);
+
+// SETTINGS /api/v1/admin/settings/max-per-device
+router.get('/settings/max-per-device', requireAuth, requireAdmin, getMaxPerDeviceSetting);
+router.put('/settings/max-per-device', requireAuth, requireAdmin, updateMaxPerDeviceSetting);
 
 export default router;

@@ -1,4 +1,5 @@
 import { ApiResponse } from '../types/api';
+import { getDeviceId } from './deviceService';
 
 const isTauri = typeof window !== 'undefined' && Boolean(
   (window as any).__TAURI__ ||
@@ -43,10 +44,15 @@ async function performTokenRefresh(): Promise<string | null> {
     return null;
   }
 
+  const deviceId = await getDeviceId();
+
   try {
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Device-Id': deviceId,
+      },
       body: JSON.stringify({ refreshToken }),
       credentials: 'include',
     });
@@ -78,12 +84,14 @@ export async function fetchApi<T>(
   options: RequestInit & { _isRetry?: boolean } = {}
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const deviceId = await getDeviceId();
 
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
   const headers: HeadersInit = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(currentAccessToken ? { Authorization: `Bearer ${currentAccessToken}` } : {}),
+    'X-Device-Id': deviceId,
     ...(options.headers || {}),
   };
 
