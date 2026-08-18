@@ -82,6 +82,12 @@ const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
     };
   }, [session.startTime, session.endTime, session.color, session.sessionType]);
 
+  const isShortSession = useMemo(() => {
+    const [sh, sm] = session.startTime.split(':').map(Number);
+    const [eh, em] = session.endTime.split(':').map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm) <= 45;
+  }, [session.startTime, session.endTime]);
+
   const typeColor = useMemo(() => getSessionTypeColor(session.sessionType), [session.sessionType]);
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -102,9 +108,11 @@ const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
     }
   };
 
+  const titleText = session.subject?.name || session.ecue?.title || session.notes || 'Séance';
+
   return (
     <div
-      className={`session-card-overlay ${session.hasConflict ? 'conflict' : ''}`}
+      className={`session-card-overlay ${session.hasConflict ? 'conflict' : ''} ${isShortSession ? 'short-session' : ''}`}
       style={style}
       draggable={!isPastWeek}
       onDragStart={handleDragStart}
@@ -112,31 +120,46 @@ const SessionCardOverlay: React.FC<SessionCardOverlayProps> = React.memo(({
         e.stopPropagation();
         onOpenSessionDetails(session);
       }}
-      title={`${session.subject?.name || session.ecue?.title || 'Séance'} (${session.startTime}–${session.endTime})`}
+      title={`${titleText} (${session.startTime}–${session.endTime})`}
     >
-      <div className="session-card-header">
-        <span className="session-type-badge" style={{ backgroundColor: typeColor }}>
-          {session.sessionType}
-        </span>
-        {session.hasConflict && <AlertTriangle size={12} className="conflict-icon" />}
-      </div>
-
-      <div className="session-card-title">
-        {session.ecue?.code && <span className="ecue-code">[{session.ecue.code}] </span>}
-        {session.subject?.name || session.ecue?.title || 'Séance'}
-      </div>
-
-      <div className="session-card-footer">
-        <span className="time-span">
-          {session.startTime}–{session.endTime}
-        </span>
-        {session.room && (
-          <span className="room-span">
-            <MapPin size={10} />
-            {session.room}
+      {isShortSession ? (
+        <div className="session-card-short-row">
+          <span className="session-type-badge-mini" style={{ backgroundColor: typeColor }}>
+            {session.sessionType}
           </span>
-        )}
-      </div>
+          <span className="session-title-short">
+            {session.ecue?.code ? `[${session.ecue.code}] ` : ''}
+            {titleText}
+          </span>
+          <span className="time-span-short">{session.startTime}–{session.endTime}</span>
+        </div>
+      ) : (
+        <>
+          <div className="session-card-header">
+            <span className="session-type-badge" style={{ backgroundColor: typeColor }}>
+              {session.sessionType}
+            </span>
+            {session.hasConflict && <AlertTriangle size={12} className="conflict-icon" />}
+          </div>
+
+          <div className="session-card-title">
+            {session.ecue?.code && <span className="ecue-code">[{session.ecue.code}] </span>}
+            {titleText}
+          </div>
+
+          <div className="session-card-footer">
+            <span className="time-span">
+              {session.startTime}–{session.endTime}
+            </span>
+            {session.room && (
+              <span className="room-span">
+                <MapPin size={10} />
+                {session.room}
+              </span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 });
@@ -558,6 +581,48 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
 
         .session-card-overlay.conflict {
           border: 1px solid #ef4444 !important;
+        }
+
+        .session-card-overlay.short-session {
+          padding: 0.15rem 0.35rem;
+          display: flex;
+          align-items: center;
+        }
+
+        .session-card-short-row {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          width: 100%;
+          overflow: hidden;
+          font-size: 0.72rem;
+          line-height: 1.1;
+        }
+
+        .session-type-badge-mini {
+          font-size: 0.6rem;
+          font-weight: 800;
+          color: #ffffff;
+          padding: 0.05rem 0.25rem;
+          border-radius: 3px;
+          flex-shrink: 0;
+        }
+
+        .session-title-short {
+          font-weight: 700;
+          color: #ffffff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .time-span-short {
+          font-size: 0.62rem;
+          color: rgba(255, 255, 255, 0.75);
+          flex-shrink: 0;
+          font-weight: 600;
         }
 
         .session-card-header {

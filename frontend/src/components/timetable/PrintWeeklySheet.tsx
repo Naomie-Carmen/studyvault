@@ -1071,30 +1071,36 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
         @media print {
           @page {
             size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
-            margin: 8mm;
+            margin: 6mm;
           }
-          .no-print, .no-print-backdrop {
-            background: transparent !important;
+          html, body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
             padding: 0 !important;
-            position: static !important;
-            inset: auto !important;
+            overflow: visible !important;
           }
-          .print-modal-dialog {
-            width: 100% !important;
-            max-width: 100% !important;
-            max-height: 100% !important;
-            border: none !important;
-            box-shadow: none !important;
-            background: transparent !important;
+          body * {
+            visibility: hidden !important;
           }
-          .print-preview-scroll-body {
-            padding: 0 !important;
-            background: transparent !important;
+          .print-weekly-sheet-root, .print-weekly-sheet-root * {
+            visibility: visible !important;
           }
           .print-weekly-sheet-root {
-            box-shadow: none !important;
-            max-width: 100% !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
+            height: auto !important;
+            background: #F5F0E6 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .no-print, .no-print-backdrop, .print-modal-header, .print-controls-bar {
+            display: none !important;
           }
         }
       `}</style>
