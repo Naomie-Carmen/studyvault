@@ -112,3 +112,33 @@ export async function uploadTimetableFile(
     };
   }
 }
+
+export async function duplicateDay(
+  sourceDay: number,
+  targetDays: number[],
+  overwrite = false
+): Promise<ApiResponse<{ count: number; sessions: TimetableSession[] }>> {
+  return fetchApi<{ count: number; sessions: TimetableSession[] }>('/timetable/duplicate-day', {
+    method: 'POST',
+    body: JSON.stringify({ sourceDay, targetDays, overwrite }),
+  });
+}
+
+export async function duplicateSession(
+  sessionId: string,
+  targetDays: number[]
+): Promise<ApiResponse<{ count: number; sessions: TimetableSession[] }>> {
+  return fetchApi<{ count: number; sessions: TimetableSession[] }>('/timetable/duplicate-session', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, targetDays }),
+  });
+}
+
+export async function duplicateWeek(
+  targetWeekStarts: string[]
+): Promise<ApiResponse<{ count: number; archives: WeekArchive[] }>> {
+  return fetchApi<{ count: number; archives: WeekArchive[] }>('/timetable/duplicate-week', {
+    method: 'POST',
+    body: JSON.stringify({ targetWeekStarts }),
+  });
+}

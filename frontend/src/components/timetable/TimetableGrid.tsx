@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
 import { getSessionTypeColor } from '../../utils/sessionTypesConfig';
-import { Clock, MapPin, AlertTriangle } from 'lucide-react';
+import { Clock, MapPin, AlertTriangle, Copy } from 'lucide-react';
 
 interface TimetableGridProps {
   weekData: Record<number, TimetableSession[]> | null;
@@ -18,6 +18,7 @@ interface TimetableGridProps {
     isPerso?: boolean;
   }) => void;
   onMoveSession: (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => void;
+  onOpenDuplicateDayModal?: (sourceDay: number) => void;
 }
 
 const HOURS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
@@ -275,6 +276,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
   onOpenSessionDetails,
   onOpenCreateModal,
   onMoveSession,
+  onOpenDuplicateDayModal,
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -337,9 +339,25 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
             </div>
             {DAYS.map((day) => {
               const isTodayColumn = isCurrentWeek && day.key === currentDayOfWeekIndex;
+              const hasSessions = (weekData?.[day.key]?.length || 0) > 0;
               return (
                 <div key={day.key} className={`day-header-cell ${isTodayColumn ? 'today-col' : ''}`}>
-                  <span className="day-name">{day.label}</span>
+                  <div className="header-name-row">
+                    <span className="day-name">{day.label}</span>
+                    {onOpenDuplicateDayModal && !isPastWeek && hasSessions && (
+                      <button
+                        type="button"
+                        className="btn-header-copy"
+                        title={`Dupliquer la journée (${day.label})`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenDuplicateDayModal(day.key);
+                        }}
+                      >
+                        <Copy size={12} />
+                      </button>
+                    )}
+                  </div>
                   <span className="day-date">{dayDateLabels[day.key]}</span>
                 </div>
               );
@@ -429,6 +447,30 @@ export const TimetableGrid: React.FC<TimetableGridProps> = React.memo(({
           justify-content: center;
           padding: 0.5rem;
           border-right: 1px solid rgba(255, 255, 255, 0.05);
+          position: relative;
+        }
+
+        .header-name-row {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        .btn-header-copy {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 0.15rem;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          transition: all 0.2s ease;
+        }
+
+        .btn-header-copy:hover {
+          color: #818cf8;
+          background: rgba(99, 102, 241, 0.15);
         }
 
         .day-header-cell.today-col {

@@ -10,6 +10,9 @@ import { TimetableImportModal } from '../../components/timetable/TimetableImport
 import { CoursesSidebarDrawer } from '../../components/timetable/CoursesSidebarDrawer';
 import { TimetableGrid } from '../../components/timetable/TimetableGrid';
 import { PrintWeeklySheet } from '../../components/timetable/PrintWeeklySheet';
+import { DuplicateDayModal } from '../../components/timetable/DuplicateDayModal';
+import { DuplicateWeekModal } from '../../components/timetable/DuplicateWeekModal';
+import { DuplicateSessionModal } from '../../components/timetable/DuplicateSessionModal';
 
 import { 
   Calendar as CalendarIcon, 
@@ -19,7 +22,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  Clock
+  Clock,
+  Copy,
+  Repeat
 } from 'lucide-react';
 
 type TimetableWeekData = Record<number, TimetableSession[]>;
@@ -80,6 +85,15 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+
+  // Duplication Modals State
+  const [isDuplicateDayOpen, setIsDuplicateDayOpen] = useState(false);
+  const [duplicateDaySource, setDuplicateDaySource] = useState<number>(0);
+
+  const [isDuplicateWeekOpen, setIsDuplicateWeekOpen] = useState(false);
+
+  const [isDuplicateSessionOpen, setIsDuplicateSessionOpen] = useState(false);
+  const [sessionToDuplicate, setSessionToDuplicate] = useState<TimetableSession | null>(null);
 
   const isCurrentWeek = useMemo(() =>
     selectedWeekMonday.getFullYear() === currentMonday.getFullYear() &&
@@ -201,6 +215,31 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         </div>
 
         <div className="header-actions">
+          {!isPastWeek && (
+            <>
+              <button
+                className="btn-dup-day"
+                onClick={() => {
+                  setDuplicateDaySource(0);
+                  setIsDuplicateDayOpen(true);
+                }}
+                title="Copier les séances d'une journée sur d'autres jours"
+              >
+                <Copy size={15} />
+                <span>Dupliquer une journée</span>
+              </button>
+
+              <button
+                className="btn-dup-week"
+                onClick={() => setIsDuplicateWeekOpen(true)}
+                title="Copier l'emploi du temps complet sur les semaines à venir"
+              >
+                <Repeat size={15} />
+                <span>Dupliquer la semaine</span>
+              </button>
+            </>
+          )}
+
           <button className="btn-print-week" onClick={() => setIsPrintOpen(true)} title={t('timetable.printWeek', 'Visualiser & Imprimer')}>
             <Printer size={16} />
             <span>{t('timetable.printWeek', 'Imprimer / Aperçu')}</span>
@@ -276,6 +315,10 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
               onOpenSessionDetails={handleOpenDetails}
               onOpenCreateModal={handleOpenCreateModal}
               onMoveSession={handleMoveSession}
+              onOpenDuplicateDayModal={(sourceDay) => {
+                setDuplicateDaySource(sourceDay);
+                setIsDuplicateDayOpen(true);
+              }}
             />
           )}
         </div>
@@ -309,6 +352,10 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         session={selectedSession}
         onDeleteSuccess={loadData}
         onNavigateToDocuments={onNavigateToDocuments}
+        onDuplicateSession={(sess) => {
+          setSessionToDuplicate(sess);
+          setIsDuplicateSessionOpen(true);
+        }}
       />
 
       {/* Import OCR Modal */}
@@ -318,12 +365,37 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         onSuccess={loadData}
       />
 
-      {/* Print Sheet Modal Preview (Hidden on screen unless opened via button) */}
+      {/* Print Sheet Modal Preview */}
       <PrintWeeklySheet
         weekData={weekData}
         selectedWeekMonday={selectedWeekMonday}
         isOpen={isPrintOpen}
         onClose={() => setIsPrintOpen(false)}
+      />
+
+      {/* Duplication Modals */}
+      <DuplicateDayModal
+        isOpen={isDuplicateDayOpen}
+        onClose={() => setIsDuplicateDayOpen(false)}
+        onSuccess={loadData}
+        initialSourceDay={duplicateDaySource}
+      />
+
+      <DuplicateWeekModal
+        isOpen={isDuplicateWeekOpen}
+        onClose={() => setIsDuplicateWeekOpen(false)}
+        onSuccess={loadData}
+        currentWeekMonday={selectedWeekMonday}
+      />
+
+      <DuplicateSessionModal
+        isOpen={isDuplicateSessionOpen}
+        onClose={() => {
+          setIsDuplicateSessionOpen(false);
+          setSessionToDuplicate(null);
+        }}
+        onSuccess={loadData}
+        session={sessionToDuplicate}
       />
 
       <style>{`
@@ -376,7 +448,7 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
           flex-wrap: wrap;
         }
 
-        .btn-print-week, .btn-import-file, .btn-add-session {
+        .btn-print-week, .btn-import-file, .btn-add-session, .btn-dup-day, .btn-dup-week {
           display: inline-flex;
           align-items: center;
           gap: 0.4rem;
@@ -386,6 +458,26 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s ease;
+        }
+
+        .btn-dup-day {
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          color: #818cf8;
+        }
+        .btn-dup-day:hover {
+          background: rgba(99, 102, 241, 0.25);
+          color: #ffffff;
+        }
+
+        .btn-dup-week {
+          background: rgba(16, 185, 129, 0.12);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          color: #34d399;
+        }
+        .btn-dup-week:hover {
+          background: rgba(16, 185, 129, 0.25);
+          color: #ffffff;
         }
 
         .btn-print-week {

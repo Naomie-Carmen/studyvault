@@ -203,3 +203,62 @@ export async function syncArchives(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+
+export async function duplicateDay(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { sourceDay, targetDays, overwrite } = req.body;
+
+    if (sourceDay === undefined || !Array.isArray(targetDays)) {
+      throw ApiError.badRequest('Paramètres sourceDay et targetDays (tableau) obligatoires.');
+    }
+
+    const sessions = await timetableService.duplicateDaySessions(
+      req.user.id,
+      Number(sourceDay),
+      targetDays.map(Number),
+      Boolean(overwrite)
+    );
+
+    sendSuccess(res, { count: sessions.length, sessions }, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function duplicateSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { sessionId, targetDays } = req.body;
+
+    if (!sessionId || !Array.isArray(targetDays)) {
+      throw ApiError.badRequest('Paramètres sessionId et targetDays obligatoires.');
+    }
+
+    const sessions = await timetableService.duplicateSingleSession(
+      req.user.id,
+      sessionId,
+      targetDays.map(Number)
+    );
+
+    sendSuccess(res, { count: sessions.length, sessions }, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function duplicateWeek(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw ApiError.unauthorized();
+    const { targetWeekStarts } = req.body;
+
+    if (!Array.isArray(targetWeekStarts) || targetWeekStarts.length === 0) {
+      throw ApiError.badRequest('La liste des dates de début de semaine cibles est obligatoire.');
+    }
+
+    const archives = await timetableService.duplicateWeekSchedule(req.user.id, targetWeekStarts);
+    sendSuccess(res, { count: archives.length, archives }, 201);
+  } catch (err) {
+    next(err);
+  }
+}

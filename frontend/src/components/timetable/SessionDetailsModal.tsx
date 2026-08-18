@@ -1,6 +1,6 @@
 import { TimetableSession } from '../../types/timetable';
 import * as timetableService from '../../services/timetableService';
-import { X, Clock, MapPin, AlertTriangle, FileText, Trash2 } from 'lucide-react';
+import { X, Clock, MapPin, AlertTriangle, FileText, Trash2, Copy } from 'lucide-react';
 
 interface SessionDetailsModalProps {
   session: TimetableSession | null;
@@ -9,6 +9,7 @@ interface SessionDetailsModalProps {
   onDelete?: (id: string) => void;
   onDeleteSuccess?: () => void;
   onNavigateToDocuments?: (subjectId: string) => void;
+  onDuplicateSession?: (session: TimetableSession) => void;
 }
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -20,6 +21,7 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
   onDelete,
   onDeleteSuccess,
   onNavigateToDocuments,
+  onDuplicateSession,
 }) => {
   if (!isOpen || !session) return null;
 
@@ -76,6 +78,19 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
         </div>
 
         <div className="details-footer">
+          {onDuplicateSession && (
+            <button
+              className="btn-duplicate"
+              onClick={() => {
+                onDuplicateSession(session);
+                onClose();
+              }}
+            >
+              <Copy size={16} />
+              <span>Dupliquer la séance</span>
+            </button>
+          )}
+
           <button
             className="btn-delete"
             onClick={async () => {
@@ -138,11 +153,17 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
         .cta-text h4 { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.1rem; }
         .cta-text p { font-size: 0.75rem; color: var(--text-muted); }
 
-        .details-footer { display: flex; align-items: center; justify-content: flex-end; border-top: 1px solid var(--border-color); pt: 0.85rem; }
+        .details-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); pt: 0.85rem; }
+
+        .btn-duplicate {
+          display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; border-radius: var(--radius-md);
+          background: rgba(99, 102, 241, 0.12); color: #818cf8; font-size: 0.8rem; font-weight: 600; border: none; cursor: pointer;
+        }
+        .btn-duplicate:hover { background: rgba(99, 102, 241, 0.25); color: #ffffff; }
 
         .btn-delete {
           display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; border-radius: var(--radius-md);
-          background: rgba(239, 68, 68, 0.1); color: var(--status-error); font-size: 0.8rem; font-weight: 600;
+          background: rgba(239, 68, 68, 0.1); color: var(--status-error); font-size: 0.8rem; font-weight: 600; border: none; cursor: pointer;
         }
 
         .btn-delete:hover { background: rgba(239, 68, 68, 0.2); }

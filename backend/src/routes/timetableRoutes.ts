@@ -16,7 +16,10 @@ import {
   rejectSuggestions,
   listArchives,
   getArchive,
-  syncArchives
+  syncArchives,
+  duplicateDay,
+  duplicateSession,
+  duplicateWeek
 } from '../controllers/timetableController';
 import { requireAuth } from '../middleware/authMiddleware';
 import { uploadMiddleware } from '../middleware/fileUploadMiddleware';
@@ -26,6 +29,9 @@ router.use(requireAuth);
 
 router.post('/sessions', createSession);
 router.get('/sessions', listSessions);
+router.post('/duplicate-day', duplicateDay);
+router.post('/duplicate-session', duplicateSession);
+router.post('/duplicate-week', duplicateWeek);
 router.get('/week', getWeek);
 router.get('/today', getToday);
 router.get('/upcoming', getUpcoming);

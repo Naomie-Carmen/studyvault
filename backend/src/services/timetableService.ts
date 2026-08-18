@@ -350,3 +350,126 @@ export async function syncPastWeekArchives(userId: string, currentWeekStart: str
 
   return getWeekArchives(userId);
 }
+
+export async function duplicateDaySessions(
+  userId: string,
+  sourceDay: number,
+  targetDays: number[],
+  overwrite = false
+) {
+  const sourceSessions = await prisma.timetableSession.findMany({
+    where: { userId, dayOfWeek: sourceDay },
+  });
+
+  if (sourceSessions.length === 0) {
+    throw ApiError.badRequest('Aucune séance trouvée sur la journée source.');
+  }
+
+  const createdSessions: any[] = [];
+
+  for (const targetDay of targetDays) {
+    if (targetDay === sourceDay) continue;
+
+    if (overwrite) {
+      await prisma.timetableSession.deleteMany({
+        where: { userId, dayOfWeek: targetDay },
+      });
+    }
+
+    for (const sess of sourceSessions) {
+      const copy = await prisma.timetableSession.create({
+        data: {
+          userId,
+          subjectId: sess.subjectId,
+          ecueId: sess.ecueId,
+          dayOfWeek: targetDay,
+          startTime: sess.startTime,
+          endTime: sess.endTime,
+          room: sess.room,
+          sessionType: sess.sessionType,
+          recurrence: sess.recurrence,
+          color: sess.color,
+          notes: sess.notes,
+        },
+        include: {
+          subject: { select: { id: true, name: true, color: true } },
+          ecue: { select: { id: true, title: true, code: true, instructor: true } },
+        },
+      });
+      createdSessions.push(copy);
+    }
+  }
+
+  return createdSessions;
+}
+
+export async function duplicateSingleSession(
+  userId: string,
+  sessionId: string,
+  targetDays: number[]
+) {
+  const sourceSess = await prisma.timetableSession.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!sourceSess || sourceSess.userId !== userId) {
+    throw ApiError.notFound('Séance introuvable.');
+  }
+
+  const created: any[] = [];
+
+  for (const targetDay of targetDays) {
+    if (targetDay === sourceSess.dayOfWeek) continue;
+
+    const copy = await prisma.timetableSession.create({
+      data: {
+        userId,
+        subjectId: sourceSess.subjectId,
+        ecueId: sourceSess.ecueId,
+        dayOfWeek: targetDay,
+        startTime: sourceSess.startTime,
+        endTime: sourceSess.endTime,
+        room: sourceSess.room,
+        sessionType: sourceSess.sessionType,
+        recurrence: sourceSess.recurrence,
+        color: sourceSess.color,
+        notes: sourceSess.notes,
+      },
+      include: {
+        subject: { select: { id: true, name: true, color: true } },
+        ecue: { select: { id: true, title: true, code: true, instructor: true } },
+      },
+    });
+    created.push(copy);
+  }
+
+  return created;
+}
+
+export async function duplicateWeekSchedule(
+  userId: string,
+  targetWeekStarts: string[]
+) {
+  const allSessions = await getSessions(userId);
+
+  const archives: any[] = [];
+
+  for (const weekStart of targetWeekStarts) {
+    const archive = await prisma.weekArchive.upsert({
+      where: {
+        userId_weekStart: { userId, weekStart },
+      },
+      create: {
+        userId,
+        weekStart,
+        data: allSessions as any,
+      },
+      update: {
+        data: allSessions as any,
+      },
+    });
+    archives.push(archive);
+  }
+
+  return archives;
+}
