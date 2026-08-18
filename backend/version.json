@@ -1,5 +1,5 @@
 {
-  "version": "1.2.23",
+  "version": "1.2.24",
   "releaseDate": "2026-08-18",
   "channel": "stable",
   "notes": [
@@ -9,6 +9,16 @@
     "Modale de séance réorganisée en grille 2 colonnes ultra-propre avec alignement parfait"
   ],
   "history": [
+    {
+      "version": "1.2.23",
+      "releaseDate": "2026-08-18",
+      "highlights": [
+        "Design dark theme professionnel unifié (color-scheme: dark) sur 100% des formulaires et modales",
+        "Elimination définitive de tous les widgets blancs natifs du navigateur (select, time pickers, inputs)",
+        "Contrôles stylisés avec fond translucide, contour réactif #6C63FF et chevron SVG personnalisé",
+        "Modale de séance réorganisée en grille 2 colonnes ultra-propre avec alignement parfait"
+      ]
+    },
     {
       "version": "1.2.22",
       "releaseDate": "2026-08-17",
