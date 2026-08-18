@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcademicStructureTree } from '../../types/structure';
-import { GripVertical, ChevronDown, ChevronRight, BookOpen, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, BookOpen, PanelLeftClose, PanelLeftOpen, Star } from 'lucide-react';
+import { getSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
 
 interface CoursesSidebarDrawerProps {
   tree: AcademicStructureTree | null;
@@ -19,6 +20,10 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
   const { t } = useTranslation();
   const [expandedUeIds, setExpandedUeIds] = useState<Record<string, boolean>>({});
 
+  const personalTypes = useMemo(() => {
+    return getSessionTypes().filter((t) => t.perso);
+  }, []);
+
   const toggleUe = (ueId: string) => {
     setExpandedUeIds((prev) => ({ ...prev, [ueId]: !prev[ueId] }));
   };
@@ -34,6 +39,27 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
       title: item.title,
       code: item.code,
       instructor: item.instructor,
+    };
+    const jsonStr = JSON.stringify(payload);
+    e.dataTransfer.effectAllowed = 'copy';
+    try {
+      e.dataTransfer.setData('application/json', jsonStr);
+    } catch (_e) {
+      /* ignore */
+    }
+    try {
+      e.dataTransfer.setData('text/plain', jsonStr);
+    } catch (_e) {
+      /* ignore */
+    }
+  };
+
+  const handlePersoDragStart = (e: React.DragEvent, type: SessionTypeConfig) => {
+    if (isPastWeek) return;
+    const payload = {
+      isPerso: true,
+      sessionType: type.id,
+      label: type.label,
     };
     const jsonStr = JSON.stringify(payload);
     e.dataTransfer.effectAllowed = 'copy';
@@ -73,7 +99,7 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
       <p className="drawer-subtitle">
         {isPastWeek
           ? t('timetable.readOnlyNotice', 'Semaine archivée en lecture seule.')
-          : t('timetable.dragInstruction', 'Glissez-déposez un cours sur un créneau de la grille 24h.')}
+          : t('timetable.dragInstruction', 'Glissez-déposez un cours ou un bloc perso sur un créneau de la grille 24h.')}
       </p>
 
       <div className="drawer-tree-container">
@@ -160,6 +186,36 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
             </div>
           ))
         )}
+
+        {/* Section ⭐ Perso under ECUEs */}
+        <div className="perso-drawer-group">
+          <div className="perso-section-header">
+            <Star size={14} className="text-amber" />
+            <span>⭐ {t('timetable.persoSection', 'Perso')}</span>
+          </div>
+
+          <div className="perso-blocks-list">
+            {personalTypes.map((type) => (
+              <div
+                key={type.id}
+                className={`course-drag-card perso-drag-card ${isPastWeek ? 'disabled' : ''}`}
+                draggable={!isPastWeek}
+                onDragStart={(e) => handlePersoDragStart(e, type)}
+                style={{ borderLeft: `3px solid ${type.color}` }}
+              >
+                <GripVertical size={14} className="drag-handle-icon" />
+                <div className="course-card-content">
+                  <div className="card-top-line">
+                    <span className="type-badge-mini" style={{ backgroundColor: type.color }}>
+                      {type.id}
+                    </span>
+                    <span className="course-title">{type.label}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <style>{`
@@ -309,6 +365,38 @@ export const CoursesSidebarDrawer: React.FC<CoursesSidebarDrawerProps> = React.m
         .course-drag-card.disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+
+        .perso-drawer-group {
+          margin-top: 0.75rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .perso-section-header {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: #f59e0b;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 0.5rem;
+        }
+
+        .perso-blocks-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+
+        .type-badge-mini {
+          font-size: 0.65rem;
+          font-weight: 700;
+          color: #ffffff;
+          padding: 0.05rem 0.35rem;
+          border-radius: 4px;
         }
 
         .drag-handle-icon {

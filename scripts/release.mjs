@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Refonte esthétique intégrale de la modale de séance : design dark glassmorphism ultra-moderne",
-    "Champs de saisie & sélecteurs stylisés : élimination complète des contrôles blancs natifs du navigateur",
-    "Mise en page aérée en grille 2 et 3 colonnes pour une lisibilité parfaite des heures, salles et enseignants",
-    "Bannière de cours et pastilles colorées avec halos luminescents au survol et à la sélection"
+    "Design dark theme professionnel unifié (color-scheme: dark) sur 100% des formulaires et modales",
+    "Elimination définitive de tous les widgets blancs natifs du navigateur (select, time pickers, inputs)",
+    "Contrôles stylisés avec fond translucide, contour réactif #6C63FF et chevron SVG personnalisé",
+    "Modale de séance réorganisée en grille 2 colonnes ultra-propre avec alignement parfait"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

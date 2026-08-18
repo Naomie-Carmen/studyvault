@@ -3,15 +3,19 @@ export interface SessionTypeConfig {
   label: string;
   color: string;
   isDefault?: boolean;
+  perso: boolean;
 }
 
 export const DEFAULT_SESSION_TYPES: SessionTypeConfig[] = [
-  { id: 'CM', label: 'Cours Magistral (CM)', color: '#6366f1', isDefault: true },
-  { id: 'TD', label: 'Travaux Dirigés (TD)', color: '#06b6d4', isDefault: true },
-  { id: 'TP', label: 'Travaux Pratiques (TP)', color: '#10b981', isDefault: true },
-  { id: 'COMPO', label: 'Composition / Contrôle (Compo)', color: '#f59e0b', isDefault: true },
-  { id: 'EXAM', label: 'Examen Final', color: '#ef4444', isDefault: true },
-  { id: 'OTHER', label: 'Autre Séance', color: '#8b5cf6', isDefault: true },
+  { id: 'CM', label: 'Cours Magistral (CM)', color: '#6366f1', isDefault: true, perso: false },
+  { id: 'TD', label: 'Travaux Dirigés (TD)', color: '#06b6d4', isDefault: true, perso: false },
+  { id: 'TP', label: 'Travaux Pratiques (TP)', color: '#10b981', isDefault: true, perso: false },
+  { id: 'COMPO', label: 'Composition / Contrôle (Compo)', color: '#f59e0b', isDefault: true, perso: false },
+  { id: 'EXAM', label: 'Examen Final', color: '#ef4444', isDefault: true, perso: false },
+  { id: 'RÉVISION', label: 'Révision', color: '#ec4899', isDefault: true, perso: true },
+  { id: 'LOISIRS', label: 'Loisirs', color: '#8b5cf6', isDefault: true, perso: true },
+  { id: 'SPORT', label: 'Sport', color: '#84cc16', isDefault: true, perso: true },
+  { id: 'AUTRE', label: 'Autre (Perso)', color: '#64748b', isDefault: true, perso: true },
 ];
 
 const STORAGE_KEY = 'studyvault_session_types';
@@ -22,7 +26,23 @@ export function getSessionTypes(): SessionTypeConfig[] {
     if (!raw) return DEFAULT_SESSION_TYPES;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      const mapped = parsed.map((item: any) => {
+        const defaultMatch = DEFAULT_SESSION_TYPES.find(
+          (d) => d.id.toUpperCase() === item.id.toUpperCase()
+        );
+        return {
+          ...item,
+          perso: item.perso ?? (defaultMatch ? defaultMatch.perso : false),
+        };
+      });
+
+      DEFAULT_SESSION_TYPES.forEach((def) => {
+        if (!mapped.some((m: SessionTypeConfig) => m.id.toUpperCase() === def.id.toUpperCase())) {
+          mapped.push(def);
+        }
+      });
+
+      return mapped;
     }
   } catch (err) {
     console.error('Error loading session types:', err);

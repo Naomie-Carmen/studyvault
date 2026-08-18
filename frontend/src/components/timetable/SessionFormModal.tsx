@@ -3,7 +3,7 @@ import { AcademicStructureTree } from '../../types/structure';
 import * as structureService from '../../services/academicStructureService';
 import * as timetableService from '../../services/timetableService';
 import { TimetableSessionInput } from '../../types/validators';
-import { X, Plus, AlertCircle, Calendar, BookOpen, Check } from 'lucide-react';
+import { X, Plus, AlertCircle, Calendar, BookOpen, Check, User } from 'lucide-react';
 import { getSessionTypes, SessionTypeConfig } from '../../utils/sessionTypesConfig';
 
 interface SessionFormModalProps {
@@ -15,6 +15,8 @@ interface SessionFormModalProps {
   initialEcueId?: string;
   initialSubjectId?: string;
   initialDurationMinutes?: number;
+  initialSessionType?: string;
+  initialIsPerso?: boolean;
   tree: AcademicStructureTree | null;
 }
 
@@ -41,6 +43,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   initialEcueId = '',
   initialSubjectId = '',
   initialDurationMinutes = 90,
+  initialSessionType,
+  initialIsPerso,
   tree,
 }) => {
   const [subjectId, setSubjectId] = useState<string>(initialSubjectId);
@@ -52,6 +56,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   const [room, setRoom] = useState<string>('');
   const [instructor, setInstructor] = useState<string>('');
   const [sessionType, setSessionType] = useState<string>('CM');
+  const [isPerso, setIsPerso] = useState<boolean>(false);
+  const [personalLabel, setPersonalLabel] = useState<string>('');
   const [recurrence, setRecurrence] = useState<'weekly' | 'biweekly' | 'none'>('weekly');
   const [notes, setNotes] = useState<string>('');
   const [availableTypes, setAvailableTypes] = useState<SessionTypeConfig[]>([]);
@@ -68,7 +74,8 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setAvailableTypes(getSessionTypes());
+    const types = getSessionTypes();
+    setAvailableTypes(types);
   }, [isOpen]);
 
   // Recalculate end time whenever startTime or durationMinutes changes
@@ -86,15 +93,26 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     setStartTime(initialStartTime);
     setDurationMinutes(initialDurationMinutes);
 
+    const types = getSessionTypes();
+    const effectiveType = initialSessionType || 'CM';
+    setSessionType(effectiveType);
+
+    const matchType = types.find((t) => t.id.toUpperCase() === effectiveType.toUpperCase());
+    const isPersoMode = initialIsPerso ?? (matchType ? matchType.perso : false);
+    setIsPerso(isPersoMode);
+    if (isPersoMode) {
+      setPersonalLabel('');
+    }
+
     const effectiveEcue = initialEcueId || initialSubjectId || '';
     const effectiveSub = initialSubjectId || initialEcueId || '';
 
     setSelectedEcueId(effectiveEcue);
     setSubjectId(effectiveSub);
-    setShowManualCoursePicker(!effectiveEcue && !effectiveSub);
+    setShowManualCoursePicker(!effectiveEcue && !effectiveSub && !isPersoMode);
 
     updateEndTime(initialStartTime, initialDurationMinutes);
-  }, [initialDayOfWeek, initialStartTime, initialEcueId, initialSubjectId, initialDurationMinutes, isOpen]);
+  }, [initialDayOfWeek, initialStartTime, initialEcueId, initialSubjectId, initialDurationMinutes, initialSessionType, initialIsPerso, isOpen]);
 
   // Build full course options list (all ECUEs and Subjects)
   const allCourseOptions = useMemo(() => {
@@ -171,6 +189,15 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     setShowManualCoursePicker(false);
   };
 
+  const handleSelectType = (typeConfig: SessionTypeConfig) => {
+    setSessionType(typeConfig.id);
+    if (typeConfig.perso) {
+      setIsPerso(true);
+    } else {
+      setIsPerso(false);
+    }
+  };
+
   const handleCreateQuickSubject = async () => {
     if (!newSubjectName.trim() || !selectedUeId) return;
     try {
@@ -195,11 +222,21 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const finalSubId = subjectId || selectedEcueId;
+    let finalSubId = subjectId || selectedEcueId;
+    let finalEcueId: string | null = selectedEcueId || finalSubId || null;
 
-    if (!finalSubId) {
-      setErrorMsg('Veuillez sélectionner un cours ou une ECUE dans la liste.');
-      return;
+    if (isPerso) {
+      if (!personalLabel.trim()) {
+        setErrorMsg('Veuillez saisir un libellé pour la séance perso (ex: Piano, Foot, Réviser...).');
+        return;
+      }
+      finalSubId = personalLabel.trim();
+      finalEcueId = null;
+    } else {
+      if (!finalSubId) {
+        setErrorMsg('Veuillez sélectionner un cours ou une ECUE dans la liste.');
+        return;
+      }
     }
 
     if (startTime >= endTime) {
@@ -216,7 +253,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
 
       const payload: TimetableSessionInput = {
         subjectId: finalSubId,
-        ecueId: selectedEcueId || finalSubId,
+        ecueId: finalEcueId,
         dayOfWeek: Number(dayOfWeek),
         startTime,
         endTime,
@@ -249,7 +286,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
         <div className="modal-header">
           <div className="title-group">
             <Calendar size={20} className="text-indigo" />
-            <h3>Ajouter une Séance de Cours</h3>
+            <h3>{isPerso ? 'Ajouter une Séance Perso' : 'Ajouter une Séance de Cours'}</h3>
           </div>
           <button className="btn-close" onClick={onClose}>
             <X size={18} />
@@ -264,89 +301,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
             </div>
           )}
 
-          {/* Locked Selected Course Banner OR Dropdown Switcher */}
-          {!showManualCoursePicker && activeCourseId ? (
-            <div className="selected-course-banner glass-card">
-              <div className="banner-left">
-                <BookOpen size={18} className="text-indigo" />
-                <div className="banner-text">
-                  <span className="banner-sub">Cours sélectionné :</span>
-                  <span className="banner-main-title">{selectedCourseLabel}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn-switch-course"
-                onClick={() => setShowManualCoursePicker(true)}
-              >
-                Changer de cours
-              </button>
-            </div>
-          ) : (
-            <div className="form-group">
-              <div className="label-row">
-                <label className="field-label">Cours / ECUE d'enseignement *</label>
-                <button
-                  type="button"
-                  className="btn-quick-create"
-                  onClick={() => setShowQuickSubject(!showQuickSubject)}
-                >
-                  <Plus size={12} />
-                  <span>Nouveau cours</span>
-                </button>
-              </div>
-
-              {showQuickSubject ? (
-                <div className="quick-subject-subform glass-card">
-                  <input
-                    type="text"
-                    placeholder="Intitulé du cours (ex: Microéconomie II)"
-                    value={newSubjectName}
-                    onChange={(e) => setNewSubjectName(e.target.value)}
-                  />
-                  <select
-                    value={selectedUeId}
-                    onChange={(e) => setSelectedUeId(e.target.value)}
-                  >
-                    <option value="">Sélectionnez l'UE parente *</option>
-                    {tree?.semesters.flatMap((sem) =>
-                      sem.ues.map((ue) => (
-                        <option key={ue.id} value={ue.id}>
-                          S{sem.number} — {ue.title}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn-save-sub"
-                    onClick={handleCreateQuickSubject}
-                  >
-                    Créer et sélectionner
-                  </button>
-                </div>
-              ) : (
-                <select
-                  value={activeCourseId}
-                  onChange={(e) => handleSelectCourse(e.target.value)}
-                >
-                  <option value="">-- Sélectionnez une ECUE / matière --</option>
-                  {activeCourseId && !allCourseOptions.some((o) => o.id === activeCourseId) && (
-                    <option value={activeCourseId}>
-                      {selectedCourseLabel || '[Cours sélectionné]'}
-                    </option>
-                  )}
-                  {allCourseOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* Prominent Session Type Chips Selector (CM, TD, TP, Compo, Révision...) */}
+          {/* Type Selection Chips */}
           <div className="form-group">
             <label className="field-label">Type de séance *</label>
             <div className="type-chips-container">
@@ -363,16 +318,116 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
                       color: isActive ? '#ffffff' : 'var(--text-primary)',
                       boxShadow: isActive ? `0 0 12px ${type.color}40` : 'none',
                     }}
-                    onClick={() => setSessionType(type.id)}
+                    onClick={() => handleSelectType(type)}
                   >
                     <span className="chip-color-dot" style={{ backgroundColor: type.color }} />
                     <span className="chip-label">{type.id}</span>
+                    {type.perso && <User size={10} className="perso-icon-mini" />}
                     {isActive && <Check size={12} className="check-icon" />}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* Conditional Field: Personal Label vs Academic Course Picker */}
+          {isPerso ? (
+            <div className="form-group">
+              <label className="field-label">Libellé (ex : Piano, Foot, Réviser MIF4II51) *</label>
+              <input
+                type="text"
+                placeholder="ex : Piano, Foot, Réviser MIF4II51..."
+                value={personalLabel}
+                onChange={(e) => setPersonalLabel(e.target.value)}
+                className="perso-label-input"
+                required
+                autoFocus
+              />
+            </div>
+          ) : (
+            <>
+              {!showManualCoursePicker && activeCourseId ? (
+                <div className="selected-course-banner glass-card">
+                  <div className="banner-left">
+                    <BookOpen size={18} className="text-indigo" />
+                    <div className="banner-text">
+                      <span className="banner-sub">Cours sélectionné :</span>
+                      <span className="banner-main-title">{selectedCourseLabel}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-switch-course"
+                    onClick={() => setShowManualCoursePicker(true)}
+                  >
+                    Changer de cours
+                  </button>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <div className="label-row">
+                    <label className="field-label">Cours / ECUE d'enseignement *</label>
+                    <button
+                      type="button"
+                      className="btn-quick-create"
+                      onClick={() => setShowQuickSubject(!showQuickSubject)}
+                    >
+                      <Plus size={12} />
+                      <span>Nouveau cours</span>
+                    </button>
+                  </div>
+
+                  {showQuickSubject ? (
+                    <div className="quick-subject-subform glass-card">
+                      <input
+                        type="text"
+                        placeholder="Intitulé du cours (ex: Microéconomie II)"
+                        value={newSubjectName}
+                        onChange={(e) => setNewSubjectName(e.target.value)}
+                      />
+                      <select
+                        value={selectedUeId}
+                        onChange={(e) => setSelectedUeId(e.target.value)}
+                      >
+                        <option value="">Sélectionnez l'UE parente *</option>
+                        {tree?.semesters.flatMap((sem) =>
+                          sem.ues.map((ue) => (
+                            <option key={ue.id} value={ue.id}>
+                              S{sem.number} — {ue.title}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn-save-sub"
+                        onClick={handleCreateQuickSubject}
+                      >
+                        Créer et sélectionner
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={activeCourseId}
+                      onChange={(e) => handleSelectCourse(e.target.value)}
+                    >
+                      <option value="">-- Sélectionnez une ECUE / matière --</option>
+                      {activeCourseId && !allCourseOptions.some((o) => o.id === activeCourseId) && (
+                        <option value={activeCourseId}>
+                          {selectedCourseLabel || '[Cours sélectionné]'}
+                        </option>
+                      )}
+                      {allCourseOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Row 1: Day & Duration (Clean 2-Column Grid) */}
           <div className="modal-grid-2">
@@ -438,20 +493,20 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           {/* Row 3: Room & Instructor (Clean 2-Column Grid) */}
           <div className="modal-grid-2">
             <div className="form-group">
-              <label className="field-label">Salle (optionnel)</label>
+              <label className="field-label">Lieu / Salle (optionnel)</label>
               <input
                 type="text"
-                placeholder="ex: Amphi A, Salle 102"
+                placeholder={isPerso ? 'ex: Gymnase, Maison, Bibliothèque' : 'ex: Amphi A, Salle 102'}
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
               />
             </div>
 
             <div className="form-group">
-              <label className="field-label">Enseignant (optionnel)</label>
+              <label className="field-label">Enseignant / Coach (optionnel)</label>
               <input
                 type="text"
-                placeholder="ex: Dr. Dupont"
+                placeholder="ex: Dr. Dupont, Coach Marc"
                 value={instructor}
                 onChange={(e) => setInstructor(e.target.value)}
               />
@@ -476,7 +531,7 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
               <label className="field-label">Notes & remarques (optionnel)</label>
               <input
                 type="text"
-                placeholder="ex: Chapitres 1 à 3..."
+                placeholder="ex: Matériel à apporter, chapitres..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -566,6 +621,21 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           display: flex;
           flex-direction: column;
           gap: 16px;
+        }
+
+        .perso-label-input {
+          padding: 0.6rem 0.85rem;
+          border-radius: 8px;
+          border: 1px solid rgba(236, 72, 153, 0.5);
+          background: rgba(236, 72, 153, 0.08);
+          color: #ffffff;
+          font-size: 0.95rem;
+          font-weight: 600;
+          outline: none;
+        }
+        .perso-label-input:focus {
+          border-color: #ec4899;
+          box-shadow: 0 0 10px rgba(236, 72, 153, 0.3);
         }
 
         .modal-grid-2 {
@@ -672,6 +742,10 @@ export const SessionFormModal: React.FC<SessionFormModalProps> = ({
           width: 8px;
           height: 8px;
           border-radius: 50%;
+        }
+
+        .perso-icon-mini {
+          opacity: 0.7;
         }
 
         .btn-quick-create {

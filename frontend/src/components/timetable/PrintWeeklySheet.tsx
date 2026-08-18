@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimetableSession } from '../../types/timetable';
-import { useAuth } from '../../context/useAuth';
-import { useAcademic } from '../../context/useAcademic';
+import { getSessionTypeColor } from '../../utils/sessionTypesConfig';
+import { Printer, LayoutGrid, List, FileSpreadsheet, Smartphone } from 'lucide-react';
 
 type TimetableWeekData = Record<number, TimetableSession[]>;
 
 interface PrintWeeklySheetProps {
   weekData: TimetableWeekData | null;
   selectedWeekMonday?: Date;
+  defaultStyle?: 'grid24h' | 'compactList';
+  defaultOrientation?: 'landscape' | 'portrait';
 }
 
-function getWeekRange(refDate?: Date): { mondayStr: string; sundayStr: string } {
+function getWeekRange(refDate?: Date): { mondayStr: string; sundayStr: string; mondayDate: Date; sundayDate: Date } {
   const now = refDate ? new Date(refDate) : new Date();
   const dayOfWeek = now.getDay();
   const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -32,220 +34,697 @@ function getWeekRange(refDate?: Date): { mondayStr: string; sundayStr: string } 
   return {
     mondayStr: formatDate(monday),
     sundayStr: formatDate(sunday),
+    mondayDate: monday,
+    sundayDate: sunday,
   };
 }
 
-export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({ weekData, selectedWeekMonday }) => {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-  const { profile } = useAcademic();
+function parseTimeToMins(timeStr: string): number {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
 
-  const { mondayStr, sundayStr } = getWeekRange(selectedWeekMonday);
-  const todayFormatted = new Date().toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+// Convert Hex color to soft pastel background
+function hexToPastelBg(hexColor: string): string {
+  if (!hexColor || !hexColor.startsWith('#')) return 'rgba(244, 211, 198, 0.35)';
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) || 99;
+  const g = parseInt(hex.substring(2, 4), 16) || 102;
+  const b = parseInt(hex.substring(4, 6), 16) || 241;
+  return `rgba(${r}, ${g}, ${b}, 0.18)`;
+}
 
-  const firstName = user?.fullName ? user.fullName.split(' ')[0] : (user?.fullName || '');
-  const university = profile?.university || '';
-  const program = profile?.program || '';
-  const level = profile?.level || '';
+export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({
+  weekData,
+  selectedWeekMonday,
+  defaultStyle = 'grid24h',
+  defaultOrientation = 'landscape',
+}) => {
+  const { t, i18n } = useTranslation();
+  const isEn = i18n.language === 'en';
 
-  const DAYS = [
-    { key: 0, label: t('print.days.monday', 'Lundi') },
-    { key: 1, label: t('print.days.tuesday', 'Mardi') },
-    { key: 2, label: t('print.days.wednesday', 'Mercredi') },
-    { key: 3, label: t('print.days.thursday', 'Jeudi') },
-    { key: 4, label: t('print.days.friday', 'Vendredi') },
-    { key: 5, label: t('print.days.saturday', 'Samedi') },
-    { key: 6, label: t('print.days.sunday', 'Dimanche') },
-  ];
+  const [printStyle, setPrintStyle] = useState<'grid24h' | 'compactList'>(defaultStyle);
+  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>(defaultOrientation);
 
-  const getSortedDaySessions = (dayKey: number): TimetableSession[] => {
-    if (!weekData || !Array.isArray(weekData[dayKey])) return [];
-    return [...weekData[dayKey]].sort((a, b) => {
-      return a.startTime.localeCompare(b.startTime);
+  const { mondayStr, sundayStr } = useMemo(() => getWeekRange(selectedWeekMonday), [selectedWeekMonday]);
+
+  const DAYS = useMemo(() => [
+    { key: 0, label: isEn ? 'Monday' : 'Lundi', short: 'LUN' },
+    { key: 1, label: isEn ? 'Tuesday' : 'Mardi', short: 'MAR' },
+    { key: 2, label: isEn ? 'Wednesday' : 'Mercredi', short: 'MER' },
+    { key: 3, label: isEn ? 'Thursday' : 'Jeudi', short: 'JEU' },
+    { key: 4, label: isEn ? 'Friday' : 'Vendredi', short: 'VEN' },
+    { key: 5, label: isEn ? 'Saturday' : 'Samedi', short: 'SAM' },
+    { key: 6, label: isEn ? 'Sunday' : 'Dimanche', short: 'DIM' },
+  ], [isEn]);
+
+  const HOURS_24 = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00'), []);
+
+  // Collect all COMPO/EXAM sessions for "NE PAS OUBLIER" banner
+  const notForgetSessions = useMemo(() => {
+    if (!weekData) return [];
+    const list: { title: string; dayLabel: string; time: string; type: string }[] = [];
+    Object.entries(weekData).forEach(([dayKeyStr, sessions]) => {
+      const dayIdx = Number(dayKeyStr);
+      const dayObj = DAYS.find((d) => d.key === dayIdx);
+      const dayName = dayObj ? dayObj.short : '';
+
+      sessions.forEach((s) => {
+        const typeUp = (s.sessionType || '').toUpperCase();
+        if (typeUp === 'COMPO' || typeUp === 'EXAM') {
+          const name = s.subject?.name || s.ecue?.title || 'Évaluation';
+          list.push({
+            title: name,
+            dayLabel: dayName,
+            time: s.startTime,
+            type: typeUp,
+          });
+        }
+      });
     });
+    return list;
+  }, [weekData, DAYS]);
+
+  // Compute total sessions count for page ceiling check (>40 blocks -> page 2 suite ceiling)
+  const totalSessionsCount = useMemo(() => {
+    if (!weekData) return 0;
+    return Object.values(weekData).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+  }, [weekData]);
+
+  // Overlap calculation helper for 24h columns
+  const getPositionedDaySessions = (dayKey: number) => {
+    if (!weekData || !Array.isArray(weekData[dayKey])) return [];
+    const sorted = [...weekData[dayKey]].sort((a, b) => parseTimeToMins(a.startTime) - parseTimeToMins(b.startTime));
+
+    // Calculate overlap groups
+    const clusters: TimetableSession[][] = [];
+    sorted.forEach((sess) => {
+      let added = false;
+      for (const cluster of clusters) {
+        const hasOverlap = cluster.some((item) => {
+          const s1 = parseTimeToMins(sess.startTime);
+          const e1 = parseTimeToMins(sess.endTime);
+          const s2 = parseTimeToMins(item.startTime);
+          const e2 = parseTimeToMins(item.endTime);
+          return Math.max(s1, s2) < Math.min(e1, e2);
+        });
+        if (hasOverlap) {
+          cluster.push(sess);
+          added = true;
+          break;
+        }
+      }
+      if (!added) {
+        clusters.push([sess]);
+      }
+    });
+
+    // Map sessions to visual positioning properties
+    const positioned: {
+      session: TimetableSession;
+      topPercent: number;
+      heightPercent: number;
+      leftPercent: number;
+      widthPercent: number;
+      overflowCount?: number;
+      hidden?: boolean;
+    }[] = [];
+
+    clusters.forEach((cluster) => {
+      const count = cluster.length;
+      cluster.forEach((sess, idx) => {
+        const startMins = parseTimeToMins(sess.startTime);
+        const endMins = parseTimeToMins(sess.endTime);
+        const durationMins = Math.max(20, endMins - startMins);
+
+        const topPercent = (startMins / 1440) * 100;
+        const heightPercent = (durationMins / 1440) * 100;
+
+        if (count <= 3) {
+          positioned.push({
+            session: sess,
+            topPercent,
+            heightPercent,
+            widthPercent: 100 / count,
+            leftPercent: idx * (100 / count),
+          });
+        } else {
+          // More than 3 overlapping: place first 3, indicate +n on 3rd
+          if (idx < 3) {
+            positioned.push({
+              session: sess,
+              topPercent,
+              heightPercent,
+              widthPercent: 33.33,
+              leftPercent: idx * 33.33,
+              overflowCount: idx === 2 ? count - 3 : undefined,
+            });
+          } else {
+            // hidden beyond top 3
+            positioned.push({
+              session: sess,
+              topPercent,
+              heightPercent,
+              widthPercent: 33.33,
+              leftPercent: 66.66,
+              hidden: true,
+            });
+          }
+        }
+      });
+    });
+
+    return positioned;
+  };
+
+  const handleTriggerPrint = () => {
+    window.print();
   };
 
   return (
-    <div className="print-sheet">
-      <div className="sheet-inner">
-        {/* Top Header Row */}
-        <div className="sheet-header">
-          {/* Top Left: Week Dates */}
-          <div className="week-dates-box">
-            <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
-            <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+    <div className={`print-weekly-sheet-root ${orientation}`}>
+      {/* Top Controls Bar (hidden during actual printing) */}
+      <div className="print-controls-bar no-print">
+        <div className="controls-group">
+          <label className="control-label">{t('print.styleLabel', 'Style :')}</label>
+          <div className="segmented-control">
+            <button
+              type="button"
+              className={`segmented-btn ${printStyle === 'grid24h' ? 'active' : ''}`}
+              onClick={() => setPrintStyle('grid24h')}
+            >
+              <LayoutGrid size={14} />
+              <span>{t('print.styleGrid24h', 'Grille 24h')}</span>
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${printStyle === 'compactList' ? 'active' : ''}`}
+              onClick={() => setPrintStyle('compactList')}
+            >
+              <List size={14} />
+              <span>{t('print.styleCompactList', 'Liste compacte')}</span>
+            </button>
           </div>
+        </div>
 
-          {/* Top Center: Calligraphic Title */}
-          <div className="title-box">
-            <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
-            <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
-              <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#d5afa6" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
+        {printStyle === 'grid24h' && (
+          <div className="controls-group">
+            <label className="control-label">{t('print.orientationLabel', 'Orientation :')}</label>
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${orientation === 'landscape' ? 'active' : ''}`}
+                onClick={() => setOrientation('landscape')}
+              >
+                <FileSpreadsheet size={14} />
+                <span>{t('print.landscape', 'Paysage')}</span>
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${orientation === 'portrait' ? 'active' : ''}`}
+                onClick={() => setOrientation('portrait')}
+              >
+                <Smartphone size={14} />
+                <span>{t('print.portrait', 'Portrait')}</span>
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Top Right: Pink Ribbon Badge */}
-          <div className="ribbon-badge">
-            <span className="ribbon-text">PLANNER</span>
-          </div>
-        </div>
-
-        {/* Personalized Student Subheader */}
-        <div className="student-info-bar">
-          <span>
-            <strong>{firstName || 'Étudiant'}</strong>
-            {(program || level) && ` — ${program} ${level}`}
-            {university && ` · ${university}`}
-          </span>
-        </div>
-
-        {/* 3-Column Grid Layout */}
-        <div className="planner-grid">
-          {/* Row 1: Lundi, Mardi, Mercredi */}
-          {DAYS.slice(0, 3).map((day) => {
-            const sessions = getSortedDaySessions(day.key);
-            return (
-              <div key={day.key} className="day-card">
-                <h2 className="day-title">{day.label}</h2>
-                <div className="sessions-container">
-                  {sessions.length === 0 ? (
-                    <div className="empty-day" />
-                  ) : (
-                    sessions.map((sess) => (
-                      <div key={sess.id} className="session-item">
-                        <div className="session-main">
-                          <span className="session-time">{sess.startTime} – {sess.endTime}</span>
-                          <span className="session-dot">·</span>
-                          <span className="session-name">{sess.subject?.name || 'Cours'}</span>
-                        </div>
-                        {(sess.room || sess.sessionType) && (
-                          <div className="session-sub">
-                            {sess.room && <span>{t('print.room', 'Salle')} {sess.room}</span>}
-                            {sess.sessionType && <span> ({sess.sessionType})</span>}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Row 2: Jeudi, Vendredi, Samedi */}
-          {DAYS.slice(3, 6).map((day) => {
-            const sessions = getSortedDaySessions(day.key);
-            return (
-              <div key={day.key} className="day-card">
-                <h2 className="day-title">{day.label}</h2>
-                <div className="sessions-container">
-                  {sessions.length === 0 ? (
-                    <div className="empty-day" />
-                  ) : (
-                    sessions.map((sess) => (
-                      <div key={sess.id} className="session-item">
-                        <div className="session-main">
-                          <span className="session-time">{sess.startTime} – {sess.endTime}</span>
-                          <span className="session-dot">·</span>
-                          <span className="session-name">{sess.subject?.name || 'Cours'}</span>
-                        </div>
-                        {(sess.room || sess.sessionType) && (
-                          <div className="session-sub">
-                            {sess.room && <span>{t('print.room', 'Salle')} {sess.room}</span>}
-                            {sess.sessionType && <span> ({sess.sessionType})</span>}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Row 3: Dimanche (1 col) + NE PAS OUBLIER (2 cols) */}
-          {(() => {
-            const sunday = DAYS[6];
-            const sundaySessions = getSortedDaySessions(sunday.key);
-            return (
-              <>
-                <div className="day-card">
-                  <h2 className="day-title">{sunday.label}</h2>
-                  <div className="sessions-container">
-                    {sundaySessions.length === 0 ? (
-                      <div className="empty-day" />
-                    ) : (
-                      sundaySessions.map((sess) => (
-                        <div key={sess.id} className="session-item">
-                          <div className="session-main">
-                            <span className="session-time">{sess.startTime} – {sess.endTime}</span>
-                            <span className="session-dot">·</span>
-                            <span className="session-name">{sess.subject?.name || 'Cours'}</span>
-                          </div>
-                          {(sess.room || sess.sessionType) && (
-                            <div className="session-sub">
-                              {sess.room && <span>{t('print.room', 'Salle')} {sess.room}</span>}
-                              {sess.sessionType && <span> ({sess.sessionType})</span>}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="day-card not-forget-card">
-                  <h2 className="day-title not-forget-title">{t('print.doNotForget', 'NE PAS OUBLIER')}</h2>
-                  <div className="ruled-lines">
-                    <div className="ruled-line" />
-                    <div className="ruled-line" />
-                    <div className="ruled-line" />
-                    <div className="ruled-line" />
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Footer */}
-        <div className="sheet-footer">
-          <span>{t('print.printedOn', 'StudyVault — imprimé le')} {todayFormatted}</span>
-        </div>
+        <button type="button" className="btn-print-now" onClick={handleTriggerPrint}>
+          <Printer size={16} />
+          <span>{t('print.printBtn', 'Imprimer / Exporter PDF')}</span>
+        </button>
       </div>
 
+      {/* Main Printable Container */}
+      <div className={`printable-content-wrapper ${orientation}`}>
+        {printStyle === 'compactList' ? (
+          /* ==================== V1: COMPACT LIST TEMPLATE ==================== */
+          <div className="compact-list-template sheet-inner">
+            <div className="sheet-header">
+              <div className="week-dates-box">
+                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+              </div>
+              <div className="title-box">
+                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
+                  <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#d5afa6" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div className="ribbon-badge">
+                <span>PLANNER</span>
+              </div>
+            </div>
+
+            <div className="compact-grid">
+              {DAYS.map((day) => {
+                const daySessions = weekData && weekData[day.key] ? [...weekData[day.key]].sort((a, b) => a.startTime.localeCompare(b.startTime)) : [];
+                return (
+                  <div key={day.key} className="compact-day-card">
+                    <h3 className="day-card-title">{day.label}</h3>
+                    <div className="compact-sessions-list">
+                      {daySessions.length === 0 ? (
+                        <div className="empty-day-placeholder" />
+                      ) : (
+                        daySessions.map((sess) => {
+                          const typeColor = sColor(sess);
+                          return (
+                            <div key={sess.id} className="compact-session-row" style={{ borderLeftColor: typeColor }}>
+                              <div className="sess-time">{sess.startTime}–{sess.endTime}</div>
+                              <div className="sess-title">{sess.subject?.name || sess.ecue?.title || 'Séance'}</div>
+                              {sess.room && <div className="sess-room">📍 {sess.room}</div>}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="compact-day-card not-forget-card">
+                <h3 className="day-card-title not-forget-title">{t('print.doNotForget', 'NE PAS OUBLIER')}</h3>
+                {notForgetSessions.length > 0 && (
+                  <div className="not-forget-items-list">
+                    {notForgetSessions.map((nf, i) => (
+                      <span key={i} className="nf-item-chip">
+                        📌 {nf.title} ({nf.type}, {nf.dayLabel} {nf.time})
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="ruled-wavy-lines">
+                  <div className="ruled-line" />
+                  <div className="ruled-line" />
+                  <div className="ruled-line" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : orientation === 'landscape' ? (
+          /* ==================== V2: 24H LANDSCAPE GRID TEMPLATE ==================== */
+          <div className="grid24h-landscape-template sheet-inner">
+            {/* Header */}
+            <div className="sheet-header">
+              <div className="week-dates-box">
+                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+              </div>
+
+              <div className="title-box">
+                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                <svg className="flourish-svg" width="140" height="14" viewBox="0 0 140 14" fill="none">
+                  <path d="M2 7 C35 1, 52 13, 70 7 C88 1, 105 13, 138 7" stroke="#cfa69c" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </div>
+
+              <div className="pink-ribbon-corner">
+                <svg width="70" height="70" viewBox="0 0 100 100" fill="none">
+                  <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
+                  <circle cx="50" cy="48" r="6" fill="#E2A697" />
+                  <path d="M46 53 C38 72, 22 88, 14 92 C22 84, 40 68, 48 56 Z" fill="#E2A697" opacity="0.95"/>
+                  <path d="M54 53 C62 72, 78 88, 86 92 C78 84, 60 68, 52 56 Z" fill="#E2A697" opacity="0.95"/>
+                </svg>
+              </div>
+            </div>
+
+            {/* 24h Grid Body */}
+            <div className="grid-landscape-body">
+              {/* Day Headers Row */}
+              <div className="day-headers-row">
+                <div className="time-header-cell">{t('print.hours', 'Heures')}</div>
+                {DAYS.map((d) => (
+                  <div key={d.key} className="day-header-cell">
+                    {d.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* 24h Grid Matrix */}
+              <div className="grid-matrix-container">
+                {/* Left Hours Column */}
+                <div className="hours-left-column">
+                  {HOURS_24.map((h, i) => (
+                    <div key={i} className="hour-time-label">
+                      <span>{h}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 7 Day Columns */}
+                <div className="days-columns-wrapper">
+                  {/* Horizontal Hour Lines Background */}
+                  <div className="hour-lines-bg">
+                    {HOURS_24.map((_, i) => (
+                      <div key={i} className="hour-line-row">
+                        <div className="half-hour-dotted-line" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Columns Overlay */}
+                  <div className="days-columns-overlay">
+                    {DAYS.map((day) => {
+                      const positionedSessions = getPositionedDaySessions(day.key);
+                      return (
+                        <div key={day.key} className="day-column-cell">
+                          {positionedSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent, overflowCount, hidden }, idx) => {
+                            if (hidden) return null;
+                            const typeColor = sColor(session);
+                            const pastelBg = hexToPastelBg(typeColor);
+                            const titleText = session.subject?.name || session.ecue?.title || 'Séance';
+
+                            return (
+                              <div
+                                key={session.id || idx}
+                                className="landscape-session-block"
+                                style={{
+                                  top: `${topPercent}%`,
+                                  height: `${heightPercent}%`,
+                                  left: `${leftPercent}%`,
+                                  width: `${widthPercent}%`,
+                                  backgroundColor: pastelBg,
+                                  borderColor: typeColor,
+                                }}
+                              >
+                                <div className="session-block-text" style={{ color: '#2c2c2c' }}>
+                                  <strong>{session.startTime}–{session.endTime}</strong> · <span className="sess-type-tag" style={{ color: typeColor }}>{session.sessionType}</span> {titleText} {session.room ? `· ${session.room}` : ''}
+                                </div>
+                                {overflowCount && overflowCount > 0 && (
+                                  <span className="overflow-badge">+{overflowCount}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Banner: NE PAS OUBLIER */}
+            <div className="bottom-banner-not-forget">
+              <div className="not-forget-header">
+                <span className="nf-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')} :</span>
+                {notForgetSessions.length > 0 ? (
+                  <div className="nf-sessions-inline">
+                    {notForgetSessions.map((nf, i) => (
+                      <span key={i} className="nf-tag">
+                        <strong>{nf.title}</strong> ({nf.type} - {nf.dayLabel} {nf.time})
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="nf-empty-hint">{isEn ? "No exam or composition scheduled this week." : "Aucune composition ni examen cette semaine."}</span>
+                )}
+                {totalSessionsCount > 40 && (
+                  <span className="suite-page-badge">📄 Page 1 / 2 (Suite sur Page 2)</span>
+                )}
+              </div>
+
+              <div className="wavy-lines-container">
+                <svg width="100%" height="18" viewBox="0 0 500 18" preserveAspectRatio="none" fill="none">
+                  <path d="M0 4 Q 15 0, 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 T 270 4 T 300 4 T 330 4 T 360 4 T 390 4 T 420 4 T 450 4 T 480 4 T 500 4" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                  <path d="M0 10 Q 15 6, 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 T 270 10 T 300 10 T 330 10 T 360 10 T 390 10 T 420 10 T 450 10 T 480 10 T 500 10" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                  <path d="M0 16 Q 15 12, 30 16 T 60 16 T 90 16 T 120 16 T 150 16 T 180 16 T 210 16 T 240 16 T 270 16 T 300 16 T 330 16 T 360 16 T 390 16 T 420 16 T 450 16 T 480 16 T 500 16" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ==================== V2: 24H PORTRAIT GRID TEMPLATE ==================== */
+          <div className="grid24h-portrait-template sheet-inner">
+            {/* Header */}
+            <div className="sheet-header">
+              <div className="week-dates-box">
+                <span className="date-line"><strong>{t('print.from', 'DU :')}</strong> {mondayStr}</span>
+                <span className="date-line"><strong>{t('print.to', 'AU :')}</strong> {sundayStr}</span>
+              </div>
+
+              <div className="title-box">
+                <h1 className="planner-title">{t('print.title', 'Ma Semaine')}</h1>
+                <svg className="flourish-svg" width="120" height="12" viewBox="0 0 120 12" fill="none">
+                  <path d="M2 6 C30 1, 45 11, 60 6 C75 1, 90 11, 118 6" stroke="#cfa69c" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+
+              <div className="pink-ribbon-corner">
+                <svg width="60" height="60" viewBox="0 0 100 100" fill="none">
+                  <path d="M50 40 C35 15, 10 28, 38 48 C8 68, 32 80, 50 56 C68 80, 92 68, 62 48 C90 28, 65 15, 50 40 Z" fill="#F2C4B7" opacity="0.9"/>
+                  <circle cx="50" cy="48" r="6" fill="#E2A697" />
+                </svg>
+              </div>
+            </div>
+
+            {/* 2 Main Columns: Left (Lundi..Jeudi) & Right (Vendredi..Dimanche + NE PAS OUBLIER) */}
+            <div className="portrait-columns-grid">
+              {/* Left Column: Lundi, Mardi, Mercredi, Jeudi */}
+              <div className="portrait-column-section">
+                {DAYS.slice(0, 4).map((day) => {
+                  const posSessions = getPositionedDaySessions(day.key);
+                  return (
+                    <div key={day.key} className="portrait-day-card">
+                      <div className="portrait-day-title">{day.label}</div>
+                      <div className="portrait-mini-grid">
+                        <div className="mini-hours-col">
+                          {HOURS_24.map((h, i) => (
+                            <span key={i} className="mini-hour-label">{h}</span>
+                          ))}
+                        </div>
+                        <div className="mini-grid-content">
+                          <div className="mini-lines-bg">
+                            {HOURS_24.map((_, i) => (
+                              <div key={i} className="mini-hour-line" />
+                            ))}
+                          </div>
+                          <div className="mini-blocks-overlay">
+                            {posSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent }, idx) => {
+                              const typeColor = sColor(session);
+                              const titleText = session.subject?.name || session.ecue?.title || 'Séance';
+                              return (
+                                <div
+                                  key={session.id || idx}
+                                  className="portrait-session-block"
+                                  style={{
+                                    top: `${topPercent}%`,
+                                    height: `${heightPercent}%`,
+                                    left: `${leftPercent}%`,
+                                    width: `${widthPercent}%`,
+                                    backgroundColor: hexToPastelBg(typeColor),
+                                    borderColor: typeColor,
+                                  }}
+                                >
+                                  <span>{session.startTime} {titleText}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Right Column: Vendredi, Samedi, Dimanche + NE PAS OUBLIER */}
+              <div className="portrait-column-section">
+                {DAYS.slice(4, 7).map((day) => {
+                  const posSessions = getPositionedDaySessions(day.key);
+                  return (
+                    <div key={day.key} className="portrait-day-card">
+                      <div className="portrait-day-title">{day.label}</div>
+                      <div className="portrait-mini-grid">
+                        <div className="mini-hours-col">
+                          {HOURS_24.map((h, i) => (
+                            <span key={i} className="mini-hour-label">{h}</span>
+                          ))}
+                        </div>
+                        <div className="mini-grid-content">
+                          <div className="mini-lines-bg">
+                            {HOURS_24.map((_, i) => (
+                              <div key={i} className="mini-hour-line" />
+                            ))}
+                          </div>
+                          <div className="mini-blocks-overlay">
+                            {posSessions.map(({ session, topPercent, heightPercent, leftPercent, widthPercent }, idx) => {
+                              const typeColor = sColor(session);
+                              const titleText = session.subject?.name || session.ecue?.title || 'Séance';
+                              return (
+                                <div
+                                  key={session.id || idx}
+                                  className="portrait-session-block"
+                                  style={{
+                                    top: `${topPercent}%`,
+                                    height: `${heightPercent}%`,
+                                    left: `${leftPercent}%`,
+                                    width: `${widthPercent}%`,
+                                    backgroundColor: hexToPastelBg(typeColor),
+                                    borderColor: typeColor,
+                                  }}
+                                >
+                                  <span>{session.startTime} {titleText}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* NE PAS OUBLIER Box in Portrait */}
+                <div className="portrait-not-forget-card">
+                  <div className="portrait-day-title not-forget-title">📌 {t('print.doNotForget', 'NE PAS OUBLIER')}</div>
+                  {notForgetSessions.length > 0 ? (
+                    <div className="nf-portrait-items">
+                      {notForgetSessions.map((nf, i) => (
+                        <div key={i} className="nf-portrait-row">
+                          • {nf.title} ({nf.type} - {nf.dayLabel} {nf.time})
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="wavy-lines-container" style={{ marginTop: '0.4rem' }}>
+                    <svg width="100%" height="16" viewBox="0 0 300 16" preserveAspectRatio="none" fill="none">
+                      <path d="M0 4 Q 15 0, 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 T 270 4 T 300 4" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                      <path d="M0 10 Q 15 6, 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 T 270 10 T 300 10" stroke="#cfa69c" strokeWidth="1" opacity="0.7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Styles */}
       <style>{`
-        .sheet-inner {
-          box-sizing: border-box;
+        @page {
+          size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
+          margin: 8mm;
+        }
+
+        .print-weekly-sheet-root {
+          font-family: 'Inter', -apple-system, sans-serif;
+          color: #2c2c2c;
+          background: #F5F0E6;
+        }
+
+        .print-controls-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1.25rem;
+          background: rgba(15, 23, 42, 0.9);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
+          margin-bottom: 1rem;
+          color: #ffffff;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+
+        .controls-group {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .control-label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #94a3b8;
+        }
+
+        .segmented-control {
+          display: inline-flex;
+          background: rgba(0, 0, 0, 0.4);
+          padding: 2px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .segmented-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          border: none;
+          background: transparent;
+          color: #cbd5e1;
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .segmented-btn.active {
+          background: #6366f1;
+          color: #ffffff;
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-print-now {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          padding: 0.45rem 1.1rem;
+          border-radius: 8px;
+          border: none;
+          background: var(--gradient-primary, linear-gradient(135deg, #6366f1 0%, #a855f7 100%));
+          color: #ffffff;
+          font-size: 0.825rem;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Printable Area */
+        .printable-content-wrapper {
+          background-color: #F5F0E6;
           width: 100%;
-          min-height: 100%;
-          padding: 1.5rem;
-          background-color: #f2efeb;
-          color: #1a1a1a;
-          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          box-sizing: border-box;
+        }
+
+        .sheet-inner {
+          background-color: #F5F0E6;
+          padding: 0.8rem;
+          box-sizing: border-box;
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 0.5rem;
         }
 
         .sheet-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding-bottom: 0.5rem;
-          border-bottom: 1px solid #dcd6ce;
+          border-bottom: 1px solid #d8cdb8;
+          padding-bottom: 0.35rem;
         }
 
         .week-dates-box {
           display: flex;
           flex-direction: column;
-          gap: 0.2rem;
-          font-size: 0.8rem;
-          color: #4a4a4a;
+          font-size: 0.75rem;
+          color: #5a5043;
+        }
+
+        .planner-title {
+          font-family: 'Parisienne', 'Great Vibes', cursive;
+          font-size: 2.4rem;
+          margin: 0;
+          color: #2b2b2b;
+          font-weight: 400;
+          line-height: 1;
         }
 
         .title-box {
@@ -254,137 +733,298 @@ export const PrintWeeklySheet: React.FC<PrintWeeklySheetProps> = ({ weekData, se
           align-items: center;
         }
 
-        .planner-title {
-          font-family: 'Parisienne', 'Great Vibes', cursive;
-          font-size: 2.8rem;
-          margin: 0;
-          color: #2b2b2b;
-          font-weight: 400;
-          line-height: 1;
-        }
-
-        .flourish-svg {
-          margin-top: 0.1rem;
-        }
-
-        .ribbon-badge {
-          background-color: #e8c9c0;
-          color: #5c3a32;
-          padding: 0.35rem 1rem;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 700;
-          letter-spacing: 0.1em;
-        }
-
-        .student-info-bar {
-          text-align: center;
-          font-size: 0.85rem;
-          color: #555555;
-          margin-top: -0.25rem;
-          padding-bottom: 0.5rem;
-        }
-
-        .planner-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0.9rem;
-          flex: 1;
-        }
-
-        .day-card {
-          background-color: #fbf9f7;
-          border: 1px solid #e2ddd7;
-          border-radius: 10px;
-          padding: 0.8rem;
+        /* V2 LANDSCAPE STYLES */
+        .grid-landscape-body {
           display: flex;
           flex-direction: column;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-          min-height: 170px;
+          border: 1px solid #d8cdb8;
+          border-radius: 6px;
+          background: #faf7f2;
+          overflow: hidden;
         }
 
-        .not-forget-card {
-          grid-column: span 2;
-        }
-
-        .day-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 1.05rem;
+        .day-headers-row {
+          display: grid;
+          grid-template-columns: 42px repeat(7, 1fr);
+          background: #ede6d8;
+          border-bottom: 1px solid #d8cdb8;
+          font-size: 0.75rem;
           font-weight: 700;
           text-align: center;
-          margin: 0 0 0.6rem 0;
+        }
+
+        .time-header-cell {
+          padding: 0.25rem 0.1rem;
+          border-right: 1px solid #d8cdb8;
+          color: #7a6e5d;
+          font-size: 0.65rem;
+        }
+
+        .day-header-cell {
+          padding: 0.25rem 0.2rem;
+          border-right: 1px solid #d8cdb8;
           color: #2c2c2c;
-          border-bottom: 1px solid #efeae4;
-          padding-bottom: 0.4rem;
+          font-family: 'Playfair Display', serif;
+        }
+        .day-header-cell:last-child { border-right: none; }
+
+        .grid-matrix-container {
+          display: grid;
+          grid-template-columns: 42px 1fr;
+          height: calc(100vh - 170px);
+          min-height: 480px;
+          max-height: 620px;
+          position: relative;
         }
 
-        .not-forget-title {
-          letter-spacing: 0.05em;
+        .hours-left-column {
+          display: grid;
+          grid-template-rows: repeat(24, 1fr);
+          border-right: 1px solid #d8cdb8;
+          background: #f4eee2;
+        }
+
+        .hour-time-label {
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          font-size: 6.5pt;
+          font-weight: 600;
+          color: #6e6252;
+          border-bottom: 1px solid #e5dccb;
+          padding-top: 1px;
+        }
+
+        .days-columns-wrapper {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+
+        .hour-lines-bg {
+          display: grid;
+          grid-template-rows: repeat(24, 1fr);
+          position: absolute;
+          inset: 0;
+        }
+
+        .hour-line-row {
+          border-bottom: 1px solid #e5dccb;
+          position: relative;
+        }
+
+        .half-hour-dotted-line {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          border-top: 1px dotted #ece4d4;
+        }
+
+        .days-columns-overlay {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          position: absolute;
+          inset: 0;
+        }
+
+        .day-column-cell {
+          position: relative;
+          border-right: 1px solid #e8e0d0;
+          height: 100%;
+        }
+        .day-column-cell:last-child { border-right: none; }
+
+        .landscape-session-block {
+          position: absolute;
+          box-sizing: border-box;
+          border-left-width: 3px;
+          border-left-style: solid;
+          border-top: 1px solid rgba(0,0,0,0.1);
+          border-right: 1px solid rgba(0,0,0,0.1);
+          border-bottom: 1px solid rgba(0,0,0,0.1);
+          border-radius: 3px;
+          padding: 1px 3px;
+          overflow: hidden;
+          font-size: 6.5pt;
+          line-height: 1.15;
+          z-index: 2;
+        }
+
+        .overflow-badge {
+          position: absolute;
+          bottom: 1px;
+          right: 2px;
+          background: #ef4444;
+          color: #ffffff;
+          font-size: 5.5pt;
+          font-weight: 800;
+          padding: 0 3px;
+          border-radius: 4px;
+        }
+
+        .bottom-banner-not-forget {
+          margin-top: 0.35rem;
+          background: #fcfaf7;
+          border: 1px solid #d8cdb8;
+          border-radius: 6px;
+          padding: 0.4rem 0.6rem;
+        }
+
+        .not-forget-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.75rem;
+        }
+
+        .nf-title {
+          font-family: 'Playfair Display', serif;
+          font-weight: 700;
           color: #7a5c53;
+          white-space: nowrap;
         }
 
-        .sessions-container {
+        .nf-sessions-inline {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+        }
+
+        .nf-tag {
+          background: #f2e6df;
+          color: #5c3a32;
+          padding: 0.1rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.7rem;
+        }
+
+        .nf-empty-hint {
+          font-size: 0.7rem;
+          color: #888888;
+          font-style: italic;
+        }
+
+        .wavy-lines-container {
+          margin-top: 0.25rem;
+        }
+
+        /* V2 PORTRAIT STYLES */
+        .portrait-columns-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.6rem;
+        }
+
+        .portrait-column-section {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
-          flex: 1;
         }
 
-        .session-item {
-          background-color: #ffffff;
-          border-left: 3px solid #d5afa6;
-          border-radius: 4px;
-          padding: 0.35rem 0.5rem;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        .portrait-day-card {
+          border: 1px solid #d8cdb8;
+          border-radius: 6px;
+          background: #faf7f2;
+          padding: 0.35rem;
         }
 
-        .session-main {
+        .portrait-day-title {
+          font-family: 'Playfair Display', serif;
           font-size: 0.8rem;
-          font-weight: 600;
-          color: #1a1a1a;
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          flex-wrap: wrap;
+          font-weight: 700;
+          color: #2c2c2c;
+          border-bottom: 1px solid #e8e0d0;
+          padding-bottom: 0.15rem;
+          margin-bottom: 0.25rem;
         }
 
-        .session-time {
-          color: #666;
-          font-size: 0.75rem;
+        .portrait-mini-grid {
+          display: grid;
+          grid-template-columns: 32px 1fr;
+          height: 140px;
         }
 
-        .session-dot {
-          color: #aaa;
+        .mini-hours-col {
+          display: grid;
+          grid-template-rows: repeat(24, 1fr);
+          border-right: 1px solid #e8e0d0;
         }
 
-        .session-sub {
+        .mini-hour-label {
+          font-size: 5.5pt;
+          color: #7a6e5d;
+          line-height: 1;
+        }
+
+        .mini-grid-content {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+
+        .mini-lines-bg {
+          display: grid;
+          grid-template-rows: repeat(24, 1fr);
+          position: absolute;
+          inset: 0;
+        }
+
+        .mini-hour-line {
+          border-bottom: 1px solid #eee7db;
+        }
+
+        .mini-blocks-overlay {
+          position: absolute;
+          inset: 0;
+        }
+
+        .portrait-session-block {
+          position: absolute;
+          box-sizing: border-box;
+          border-left: 2px solid;
+          border-radius: 2px;
+          padding: 0 2px;
+          font-size: 5.5pt;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+
+        .portrait-not-forget-card {
+          border: 1px solid #d8cdb8;
+          border-radius: 6px;
+          background: #fcfaf7;
+          padding: 0.4rem;
+        }
+
+        .nf-portrait-items {
           font-size: 0.7rem;
-          color: #666666;
-          margin-top: 0.15rem;
-        }
-
-        .ruled-lines {
+          color: #5c3a32;
           display: flex;
           flex-direction: column;
-          justify-content: space-evenly;
-          flex: 1;
-          padding: 0.5rem 0.5rem 0.2rem 0.5rem;
+          gap: 0.15rem;
         }
 
-        .ruled-line {
-          border-bottom: 1px dashed #dcd6ce;
-          height: 1.8rem;
-        }
-
-        .sheet-footer {
-          margin-top: auto;
-          text-align: center;
-          font-size: 0.75rem;
-          color: #888888;
-          padding-top: 0.5rem;
-          border-top: 1px solid #e2ddd7;
+        /* Hide elements on print */
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background: #F5F0E6 !important;
+          }
+          .printable-content-wrapper {
+            background: #F5F0E6 !important;
+          }
         }
       `}</style>
     </div>
   );
 };
+
+// Helper for session color lookup
+function sColor(session: TimetableSession): string {
+  if (session.color) return session.color;
+  return getSessionTypeColor(session.sessionType);
+}

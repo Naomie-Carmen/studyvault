@@ -9,7 +9,14 @@ interface TimetableGridProps {
   selectedWeekMonday: Date;
   isPastWeek: boolean;
   onOpenSessionDetails: (session: TimetableSession) => void;
-  onOpenCreateModal: (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => void;
+  onOpenCreateModal: (params: {
+    dayOfWeek: number;
+    startTime: string;
+    ecueId?: string;
+    subjectId?: string;
+    sessionType?: string;
+    isPerso?: boolean;
+  }) => void;
   onMoveSession: (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => void;
 }
 
@@ -144,7 +151,14 @@ interface DayColumnProps {
   isTodayColumn: boolean;
   isPastWeek: boolean;
   onOpenSessionDetails: (session: TimetableSession) => void;
-  onOpenCreateModal: (params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => void;
+  onOpenCreateModal: (params: {
+    dayOfWeek: number;
+    startTime: string;
+    ecueId?: string;
+    subjectId?: string;
+    sessionType?: string;
+    isPerso?: boolean;
+  }) => void;
   onMoveSession: (sessionId: string, newDayOfWeek: number, newStartTime: string, newEndTime: string) => void;
 }
 
@@ -187,7 +201,18 @@ const DayColumn: React.FC<DayColumnProps> = React.memo(({
           return;
         }
 
-        // Case 2: Dragging a course from sidebar to create session
+        // Case 2: Dragging a personal session block from sidebar
+        if (parsed && parsed.isPerso) {
+          onOpenCreateModal({
+            dayOfWeek: dayKey,
+            startTime: hourStr,
+            sessionType: parsed.sessionType,
+            isPerso: true,
+          });
+          return;
+        }
+
+        // Case 3: Dragging a course from sidebar to create session
         if (parsed && (parsed.ecueId || parsed.subjectId)) {
           onOpenCreateModal({
             dayOfWeek: dayKey,

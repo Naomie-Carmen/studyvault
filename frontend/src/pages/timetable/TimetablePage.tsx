@@ -72,6 +72,8 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     startTime?: string;
     ecueId?: string;
     subjectId?: string;
+    sessionType?: string;
+    isPerso?: boolean;
   }>({});
 
   const [selectedSession, setSelectedSession] = useState<TimetableSession | null>(null);
@@ -147,7 +149,14 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
     setIsDetailsOpen(true);
   }, []);
 
-  const handleOpenCreateModal = useCallback((params: { dayOfWeek: number; startTime: string; ecueId?: string; subjectId?: string }) => {
+  const handleOpenCreateModal = useCallback((params: {
+    dayOfWeek: number;
+    startTime: string;
+    ecueId?: string;
+    subjectId?: string;
+    sessionType?: string;
+    isPerso?: boolean;
+  }) => {
     if (isPastWeek) return;
     setModalCreateParams(params);
     setIsFormOpen(true);
@@ -283,6 +292,8 @@ export const TimetablePage: React.FC<TimetablePageProps> = ({ onNavigateToDocume
         initialStartTime={modalCreateParams.startTime ?? '08:00'}
         initialEcueId={modalCreateParams.ecueId}
         initialSubjectId={modalCreateParams.subjectId}
+        initialSessionType={modalCreateParams.sessionType}
+        initialIsPerso={modalCreateParams.isPerso}
         initialDurationMinutes={90}
         tree={tree}
       />
