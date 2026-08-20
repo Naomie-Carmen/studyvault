@@ -20,7 +20,6 @@ import {
   Image as ImageIcon, 
   Film, 
   Trash2, 
-  ExternalLink,
   UploadCloud,
   Info,
   CheckCircle2
@@ -163,13 +162,24 @@ export const LibraryPage: React.FC = () => {
     return map[ext.toLowerCase()] || 'application/octet-stream';
   };
 
+  // Base folder path state for header display
+  const [baseFolderPath, setBaseFolderPath] = useState<string>('');
+
+  useEffect(() => {
+    fileOrganizer.getRootPath().then((path) => {
+      if (path) setBaseFolderPath(path);
+    });
+  }, []);
+
   // Process file import from local paths (Desktop Tauri)
   const importFilePathsToCategory = useCallback(async (paths: string[], targetCat: DocumentCategoryItem | null) => {
     const currentEcue = activeEcueRef.current;
     if (!currentEcue || paths.length === 0) return;
 
+    let copiedFiles: { fileName: string; destPath: string }[] = [];
+
     if (fileOrganizer.isTauri) {
-      await fileOrganizer.copyFilesToCategoryFolder(
+      copiedFiles = await fileOrganizer.copyFilesToCategoryFolder(
         paths,
         currentEcue.semNumber,
         currentEcue.ueCode,
@@ -203,7 +213,24 @@ export const LibraryPage: React.FC = () => {
 
       const res = await docService.uploadFiles(formData);
       if (res.success) {
-        showToast(`${paths.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
+        if (copiedFiles.length > 0) {
+          const firstPath = copiedFiles[0].destPath;
+          showToast(`✅ Rangé dans : ${firstPath}`);
+        } else if (fileOrganizer.isTauri) {
+          const targetPath = await fileOrganizer.resolveCategoryPath(
+            currentEcue.semNumber,
+            currentEcue.ueCode,
+            currentEcue.ueTitle,
+            currentEcue.ecue.code,
+            currentEcue.ecue.title,
+            targetCat?.name
+          );
+          const firstFileName = paths[0]?.split(/[/\\]/).pop() || 'fichier';
+          const sep = targetPath.includes('\\') ? '\\' : '/';
+          showToast(`✅ Rangé dans : ${targetPath}${sep}${firstFileName}`);
+        } else {
+          showToast(`✅ Rangé dans : ${targetCat ? targetCat.name : 'Non classé'}`);
+        }
       } else {
         showToast(`Erreur d'ajout : ${res.error?.message || 'Échec du téléversement'}`);
       }
@@ -428,7 +455,21 @@ export const LibraryPage: React.FC = () => {
           const res = await docService.uploadFiles(formData);
           if (res.success) {
             fetchEcueData();
-            showToast(`${files.length} fichier(s) ajouté(s) à ${targetCat ? targetCat.name : 'Non classé'}`);
+            if (fileOrganizer.isTauri && selectedEcue) {
+              const targetPath = await fileOrganizer.resolveCategoryPath(
+                selectedEcue.semNumber,
+                selectedEcue.ueCode,
+                selectedEcue.ueTitle,
+                selectedEcue.ecue.code,
+                selectedEcue.ecue.title,
+                targetCat?.name
+              );
+              const firstFileName = files[0]?.name || 'fichier';
+              const sep = targetPath.includes('\\') ? '\\' : '/';
+              showToast(`✅ Rangé dans : ${targetPath}${sep}${firstFileName}`);
+            } else {
+              showToast(`✅ Rangé dans : ${targetCat ? targetCat.name : 'Non classé'}`);
+            }
           } else {
             showToast(`Erreur d'ajout : ${res.error?.message || 'Échec'}`);
           }
@@ -475,6 +516,16 @@ export const LibraryPage: React.FC = () => {
           <div>
             <h1>{t('library.title', 'Bibliothèque Académique')}</h1>
             <p className="subtitle">{t('library.subtitle', 'Rangement structuré des cours, TD et sujets par ECUE et compartiments.')}</p>
+            {baseFolderPath && (
+              <div
+                className="base-folder-path-bar"
+                onClick={() => fileOrganizer.openFolderByPath(baseFolderPath)}
+                title="Cliquer pour ouvrir le dossier miroir complet dans l'explorateur Windows"
+              >
+                <FolderOpen size={14} className="text-indigo" />
+                <span>📁 Dossier : <strong className="path-text">{baseFolderPath}</strong></span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -629,18 +680,22 @@ export const LibraryPage: React.FC = () => {
 
                           <div className="cat-actions">
                             <button
+                              className="btn-open-cat-folder"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenFolder(cat.name);
+                              }}
+                              title={`Ouvrir le sous-dossier ${cat.name} dans l'explorateur OS`}
+                            >
+                              <FolderOpen size={13} />
+                              <span>📁 Ouvrir le dossier</span>
+                            </button>
+                            <button
                               className="icon-action-btn"
                               onClick={() => handleCategoryClickImport(cat)}
                               title={`Ajouter des fichiers à ${cat.name}`}
                             >
                               <Plus size={14} />
-                            </button>
-                            <button
-                              className="icon-action-btn"
-                              onClick={() => handleOpenFolder(cat.name)}
-                              title={`Ouvrir le sous-dossier ${cat.name}`}
-                            >
-                              <ExternalLink size={14} />
                             </button>
                             <button
                               className="icon-action-btn btn-delete"
@@ -702,13 +757,26 @@ export const LibraryPage: React.FC = () => {
                             <span className="count-badge">{unclassifiedDocs.length}</span>
                           </div>
 
-                          <button
-                            className="icon-action-btn"
-                            onClick={() => handleCategoryClickImport(null)}
-                            title="Ajouter des fichiers non classés"
-                          >
-                            <Plus size={14} />
-                          </button>
+                          <div className="cat-actions">
+                            <button
+                              className="btn-open-cat-folder"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenFolder();
+                              }}
+                              title="Ouvrir le dossier de cette ECUE dans l'explorateur OS"
+                            >
+                              <FolderOpen size={13} />
+                              <span>📁 Ouvrir le dossier</span>
+                            </button>
+                            <button
+                              className="icon-action-btn"
+                              onClick={() => handleCategoryClickImport(null)}
+                              title="Ajouter des fichiers non classés"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="category-docs-list" onClick={() => handleCategoryClickImport(null)}>
@@ -1084,10 +1152,58 @@ export const LibraryPage: React.FC = () => {
           color: var(--text-secondary);
         }
 
+        .base-folder-path-bar {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          margin-top: 0.45rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .base-folder-path-bar:hover {
+          background: rgba(99, 102, 241, 0.25);
+          color: #ffffff;
+          border-color: #6366f1;
+        }
+
+        .base-folder-path-bar .path-text {
+          color: #818cf8;
+          font-weight: 600;
+          font-family: monospace, sans-serif;
+          word-break: break-all;
+        }
+
+        .btn-open-cat-folder {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.25rem 0.55rem;
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-muted);
+          font-size: 0.72rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-open-cat-folder:hover {
+          background: rgba(99, 102, 241, 0.2);
+          color: #ffffff;
+          border-color: rgba(99, 102, 241, 0.4);
+        }
+
         .cat-actions {
           display: flex;
           align-items: center;
-          gap: 0.25rem;
+          gap: 0.35rem;
         }
 
         .icon-action-btn {

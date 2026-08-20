@@ -53,18 +53,86 @@ export function buildEcueFolderPath(
 }
 
 /**
+ * Retourne le chemin racine du dossier miroir (ex: C:\Users\...\Documents\StudyVault).
+ * Logue automatiquement dans la console au démarrage.
+ */
+export async function getRootPath(): Promise<string> {
+  if (!isTauri) return 'C:\\Users\\DELL\\Documents\\StudyVault';
+
+  try {
+    const { documentDir } = await import('@tauri-apps/api/path');
+    const docDir = await documentDir();
+    const sep = docDir.includes('\\') ? '\\' : '/';
+    const rootPath = docDir.endsWith(sep) ? `${docDir}StudyVault` : `${docDir}${sep}StudyVault`;
+    console.log(`[fileOrganizer] Base : ${rootPath}`);
+    return rootPath;
+  } catch (err) {
+    console.error('FileOrganizer getRootPath error:', err);
+    return 'C:\\Users\\DELL\\Documents\\StudyVault';
+  }
+}
+
+/**
+ * Résout le chemin absolu du dossier d'un compartiment.
+ */
+export async function resolveCategoryPath(
+  semNumber: number,
+  ueCode: string | null | undefined,
+  ueTitle: string | undefined,
+  ecueCode: string | null | undefined,
+  ecueTitle: string | undefined,
+  categoryName?: string
+): Promise<string> {
+  const docDir = isTauri
+    ? await (await import('@tauri-apps/api/path')).documentDir()
+    : 'C:\\Users\\DELL\\Documents';
+
+  let folderPath = buildEcueFolderPath(docDir, semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+  if (categoryName) {
+    const sep = folderPath.includes('\\') ? '\\' : '/';
+    folderPath = `${folderPath}${sep}${sanitizeName(categoryName)}`;
+  }
+  return folderPath;
+}
+
+/**
+ * Ouvre n'importe quel dossier par son chemin absolu dans l'explorateur OS.
+ */
+export async function openFolderByPath(folderPath: string): Promise<boolean> {
+  if (!isTauri) return false;
+
+  try {
+    const { open } = await import('@tauri-apps/api/shell');
+    const { createDir, exists } = await import('@tauri-apps/api/fs');
+
+    if (!(await exists(folderPath))) {
+      await createDir(folderPath, { recursive: true });
+    }
+
+    await open(folderPath);
+    return true;
+  } catch (err) {
+    console.error('FileOrganizer openFolderByPath error:', err);
+    return false;
+  }
+}
+
+// Loguer le chemin de base au démarrage de l'application
+if (isTauri) {
+  getRootPath().catch(() => {});
+}
+
+/**
  * Synchronise l'arborescence locale dans Documents/StudyVault/
  */
 export async function syncStructure(tree: AcademicStructureTree): Promise<string | null> {
   if (!isTauri) return null;
 
   try {
-    const { documentDir } = await import('@tauri-apps/api/path');
+    const rootPath = await getRootPath();
+    const docDir = await (await import('@tauri-apps/api/path')).documentDir();
     const { createDir, exists } = await import('@tauri-apps/api/fs');
-
-    const docDir = await documentDir();
     const sep = docDir.includes('\\') ? '\\' : '/';
-    const rootPath = docDir.endsWith(sep) ? `${docDir}StudyVault` : `${docDir}${sep}StudyVault`;
 
     if (!(await exists(rootPath))) {
       await createDir(rootPath, { recursive: true });
