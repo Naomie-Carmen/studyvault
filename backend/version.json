@@ -1,14 +1,24 @@
 {
-  "version": "1.2.41",
+  "version": "1.2.42",
   "releaseDate": "2026-08-26",
   "channel": "stable",
   "notes": [
-    "Résolution de l'erreur 404 lors de l'ouverture et la prévisualisation des fichiers téléversés",
-    "Algorithme de recherche fallback multi-emplacement sur le serveur (storage/uploads, dossier miroir local StudyVault et OneDrive)",
-    "Prévisualisation ultra-rapide en mode Desktop Tauri via le protocole sécurisé convertFileSrc",
-    "Interface de secours propre en cas de fichier manquant avec bouton d'ouverture dans l'application système par défaut"
+    "Activation complète des permissions et fonctionnalités Tauri natives (dialog-open, fs-all, path-all, protocol-asset)",
+    "Résolution définitive du clic sur '+ Ajouter' et '📁 Ouvrir le dossier' dans l'arborescence académique",
+    "Commandes Rust natives open_system_folder et create_local_folder pour ouverture instantanée de l'explorateur Windows",
+    "Création et synchronisation automatique sans faille des dossiers et sous-dossiers locaux d'UE et d'ECUE"
   ],
   "history": [
+    {
+      "version": "1.2.41",
+      "releaseDate": "2026-08-26",
+      "highlights": [
+        "Résolution de l'erreur 404 lors de l'ouverture et la prévisualisation des fichiers téléversés",
+        "Algorithme de recherche fallback multi-emplacement sur le serveur (storage/uploads, dossier miroir local StudyVault et OneDrive)",
+        "Prévisualisation ultra-rapide en mode Desktop Tauri via le protocole sécurisé convertFileSrc",
+        "Interface de secours propre en cas de fichier manquant avec bouton d'ouverture dans l'application système par défaut"
+      ]
+    },
     {
       "version": "1.2.40",
       "releaseDate": "2026-08-26",

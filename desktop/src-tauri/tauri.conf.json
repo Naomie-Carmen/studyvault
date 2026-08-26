@@ -8,22 +8,40 @@
   },
   "package": {
     "productName": "StudyVault",
-    "version": "1.2.41"
+    "version": "1.2.42"
   },
   "tauri": {
     "allowlist": {
       "all": false,
+      "fs": {
+        "all": true,
+        "scope": [
+          "**"
+        ]
+      },
+      "path": {
+        "all": true
+      },
       "shell": {
         "all": false,
         "open": true
       },
       "dialog": {
-        "all": false,
+        "all": true,
+        "open": true,
         "ask": true,
-        "message": true
+        "message": true,
+        "confirm": true,
+        "save": true
       },
       "process": {
         "relaunch": true
+      },
+      "protocol": {
+        "asset": true,
+        "assetScope": [
+          "**"
+        ]
       }
     },
     "bundle": {
