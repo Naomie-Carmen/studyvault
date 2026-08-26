@@ -1,14 +1,24 @@
 {
-  "version": "1.2.38",
-  "releaseDate": "2026-08-20",
+  "version": "1.2.39",
+  "releaseDate": "2026-08-26",
   "channel": "stable",
   "notes": [
-    "Dossier miroir local visible : chemin complet dans les toasts de dépôt, bandeau en-tête cliquable et boutons d'ouverture directe",
-    "Lisibilité optimale des séances courtes : affichage compact sur 1 ligne sans aucun texte coincé ou tronqué",
-    "Impression 100% propre de l'emploi du temps : suppression définitive de toutes les pages blanches lors de l'export PDF/print",
-    "Duplication & récurrence des séances : copie express par jour, par semaine ou séance individuelle vers d'autres créneaux"
+    "Création automatique des dossiers et sous-dossiers locaux lors de la création d'UE, ECUE et Matières",
+    "Dépôt direct des fichiers dans le dossier local de la matière ECUE sans forcer les sous-dossiers CM/TD/Sujets",
+    "Comptage récursif et affichage du nombre total réel de documents avec confirmation par toast du chemin d'accès",
+    "Fonctionnalité complète des boutons Ajouter et Ouvrir le dossier"
   ],
   "history": [
+    {
+      "version": "1.2.38",
+      "releaseDate": "2026-08-20",
+      "highlights": [
+        "Dossier miroir local visible : chemin complet dans les toasts de dépôt, bandeau en-tête cliquable et boutons d'ouverture directe",
+        "Lisibilité optimale des séances courtes : affichage compact sur 1 ligne sans aucun texte coincé ou tronqué",
+        "Impression 100% propre de l'emploi du temps : suppression définitive de toutes les pages blanches lors de l'export PDF/print",
+        "Duplication & récurrence des séances : copie express par jour, par semaine ou séance individuelle vers d'autres créneaux"
+      ]
+    },
     {
       "version": "1.2.37",
       "releaseDate": "2026-08-18",
