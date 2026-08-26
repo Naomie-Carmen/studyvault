@@ -1,14 +1,24 @@
 {
-  "version": "1.2.39",
+  "version": "1.2.40",
   "releaseDate": "2026-08-26",
   "channel": "stable",
   "notes": [
-    "Création automatique des dossiers et sous-dossiers locaux lors de la création d'UE, ECUE et Matières",
-    "Dépôt direct des fichiers dans le dossier local de la matière ECUE sans forcer les sous-dossiers CM/TD/Sujets",
-    "Comptage récursif et affichage du nombre total réel de documents avec confirmation par toast du chemin d'accès",
-    "Fonctionnalité complète des boutons Ajouter et Ouvrir le dossier"
+    "Choix interactif de l'emplacement de stockage : modale de confirmation permettant de choisir où créer les dossiers",
+    "Bouton 'Choisir un autre emplacement...' avec sélecteur de dossier OS natif (Tauri openDialog directory)",
+    "Possibilité de personnaliser librement le dossier racine sur le disque dur (ex: D:\\MesCours ou OneDrive)",
+    "Prise en compte instantanée du dossier personnalisé pour toutes les créations d'UE, ECUE et fichiers"
   ],
   "history": [
+    {
+      "version": "1.2.39",
+      "releaseDate": "2026-08-26",
+      "highlights": [
+        "Création automatique des dossiers et sous-dossiers locaux lors de la création d'UE, ECUE et Matières",
+        "Dépôt direct des fichiers dans le dossier local de la matière ECUE sans forcer les sous-dossiers CM/TD/Sujets",
+        "Comptage récursif et affichage du nombre total réel de documents avec confirmation par toast du chemin d'accès",
+        "Fonctionnalité complète des boutons Ajouter et Ouvrir le dossier"
+      ]
+    },
     {
       "version": "1.2.38",
       "releaseDate": "2026-08-20",
