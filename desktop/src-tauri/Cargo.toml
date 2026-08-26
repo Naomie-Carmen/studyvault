@@ -8,6 +8,7 @@ edition = "2021"
 [build-dependencies]
 tauri-build = { version = "1.5.4", features = [] }
 
+[dependencies]
 tauri = { version = "1.6.2", features = [
     "shell-open",
     "dialog-open",

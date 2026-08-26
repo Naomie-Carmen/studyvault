@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Arborescence locale complète auto-générée depuis la structure académique (UE/ECUE/Matières/CM/TD/TP/Examen/Sujets)",
-    "Correction de compilation CI TypeScript sur le module d'organisation des fichiers",
-    "Gestion multi-niveaux et comptage dynamique des documents par catégorie",
-    "Intégration native des commandes système pour ouverture et gestion des dossiers"
+    "Correction de l'en-tête [dependencies] dans Cargo.toml pour la compilation Desktop Tauri",
+    "Activation native de toutes les fonctionnalités système (sélecteur dialog-open, fs-all, protocol-asset)",
+    "Arborescence locale complète auto-générée depuis la structure académique (UE/ECUE/Matières/{CM,TD,TP,Examen,Sujets})",
+    "Commandes Rust natives open_system_folder et create_local_folder"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');
