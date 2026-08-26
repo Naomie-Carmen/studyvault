@@ -1,14 +1,24 @@
 {
-  "version": "1.2.40",
+  "version": "1.2.41",
   "releaseDate": "2026-08-26",
   "channel": "stable",
   "notes": [
-    "Choix interactif de l'emplacement de stockage : modale de confirmation permettant de choisir où créer les dossiers",
-    "Bouton 'Choisir un autre emplacement...' avec sélecteur de dossier OS natif (Tauri openDialog directory)",
-    "Possibilité de personnaliser librement le dossier racine sur le disque dur (ex: D:\\MesCours ou OneDrive)",
-    "Prise en compte instantanée du dossier personnalisé pour toutes les créations d'UE, ECUE et fichiers"
+    "Résolution de l'erreur 404 lors de l'ouverture et la prévisualisation des fichiers téléversés",
+    "Algorithme de recherche fallback multi-emplacement sur le serveur (storage/uploads, dossier miroir local StudyVault et OneDrive)",
+    "Prévisualisation ultra-rapide en mode Desktop Tauri via le protocole sécurisé convertFileSrc",
+    "Interface de secours propre en cas de fichier manquant avec bouton d'ouverture dans l'application système par défaut"
   ],
   "history": [
+    {
+      "version": "1.2.40",
+      "releaseDate": "2026-08-26",
+      "highlights": [
+        "Choix interactif de l'emplacement de stockage : modale de confirmation permettant de choisir où créer les dossiers",
+        "Bouton 'Choisir un autre emplacement...' avec sélecteur de dossier OS natif (Tauri openDialog directory)",
+        "Possibilité de personnaliser librement le dossier racine sur le disque dur (ex: D:\\MesCours ou OneDrive)",
+        "Prise en compte instantanée du dossier personnalisé pour toutes les créations d'UE, ECUE et fichiers"
+      ]
+    },
     {
       "version": "1.2.39",
       "releaseDate": "2026-08-26",
