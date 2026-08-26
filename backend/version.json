@@ -1,14 +1,24 @@
 {
-  "version": "1.2.42",
+  "version": "1.2.44",
   "releaseDate": "2026-08-26",
   "channel": "stable",
   "notes": [
-    "Activation complète des permissions et fonctionnalités Tauri natives (dialog-open, fs-all, path-all, protocol-asset)",
-    "Résolution définitive du clic sur '+ Ajouter' et '📁 Ouvrir le dossier' dans l'arborescence académique",
-    "Commandes Rust natives open_system_folder et create_local_folder pour ouverture instantanée de l'explorateur Windows",
-    "Création et synchronisation automatique sans faille des dossiers et sous-dossiers locaux d'UE et d'ECUE"
+    "Arborescence locale complète auto-générée depuis la structure académique (UE/ECUE/Matières/CM/TD/TP/Examen/Sujets)",
+    "Correction de compilation CI TypeScript sur le module d'organisation des fichiers",
+    "Gestion multi-niveaux et comptage dynamique des documents par catégorie",
+    "Intégration native des commandes système pour ouverture et gestion des dossiers"
   ],
   "history": [
+    {
+      "version": "1.2.42",
+      "releaseDate": "2026-08-26",
+      "highlights": [
+        "Activation complète des permissions et fonctionnalités Tauri natives (dialog-open, fs-all, path-all, protocol-asset)",
+        "Résolution définitive du clic sur '+ Ajouter' et '📁 Ouvrir le dossier' dans l'arborescence académique",
+        "Commandes Rust natives open_system_folder et create_local_folder pour ouverture instantanée de l'explorateur Windows",
+        "Création et synchronisation automatique sans faille des dossiers et sous-dossiers locaux d'UE et d'ECUE"
+      ]
+    },
     {
       "version": "1.2.41",
       "releaseDate": "2026-08-26",

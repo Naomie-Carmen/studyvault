@@ -674,7 +674,7 @@ export async function getSubjectFolderStats(
   if (!isTauri) return empty;
 
   try {
-    const { readDir, exists } = await import('@tauri-apps/api/fs');
+    const { exists } = await import('@tauri-apps/api/fs');
     const docDir = await (await import('@tauri-apps/api/path')).documentDir();
     const subjectPath = buildSubjectFolderPath(
       docDir, yearLabel, level, program,

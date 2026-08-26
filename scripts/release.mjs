@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Activation complète des permissions et fonctionnalités Tauri natives (dialog-open, fs-all, path-all, protocol-asset)",
-    "Résolution définitive du clic sur '+ Ajouter' et '📁 Ouvrir le dossier' dans l'arborescence académique",
-    "Commandes Rust natives open_system_folder et create_local_folder pour ouverture instantanée de l'explorateur Windows",
-    "Création et synchronisation automatique sans faille des dossiers et sous-dossiers locaux d'UE et d'ECUE"
+    "Arborescence locale complète auto-générée depuis la structure académique (UE/ECUE/Matières/CM/TD/TP/Examen/Sujets)",
+    "Correction de compilation CI TypeScript sur le module d'organisation des fichiers",
+    "Gestion multi-niveaux et comptage dynamique des documents par catégorie",
+    "Intégration native des commandes système pour ouverture et gestion des dossiers"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');
@@ -73,11 +73,11 @@ if (fs.existsSync(backendVersionPath)) {
 }
 
 // 3. Git commit, tag & push
-const commitMessage = `release: ${tag} — bêta complète (recherche, drag&drop, notes, i18n, import intelligent)`;
+const commitMessage = `release: ${tag} — arborescence locale auto-créée (UE/ECUE/Matières/{CM,TD,TP,Examen,Sujets})`;
 
 try {
   console.log('📦 Git add & commit...');
-  execSync('git add desktop/src-tauri/tauri.conf.json backend/version.json package.json', { cwd: rootDir, stdio: 'inherit' });
+  execSync('git add -A', { cwd: rootDir, stdio: 'inherit' });
   execSync(`git commit -m "${commitMessage}"`, { cwd: rootDir, stdio: 'inherit' });
   
   console.log('⬆️ Push de main vers GitHub...');
