@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
+import path from 'path';
 import jwt from 'jsonwebtoken';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
@@ -97,6 +98,68 @@ export async function getDocument(req: Request, res: Response, next: NextFunctio
   }
 }
 
+function findFileByNameRecursively(dir: string, targetName: string): string | null {
+  try {
+    if (!fs.existsSync(dir)) return null;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const found = findFileByNameRecursively(fullPath, targetName);
+        if (found) return found;
+      } else if (entry.isFile() && entry.name.toLowerCase() === targetName.toLowerCase()) {
+        return fullPath;
+      }
+    }
+  } catch (_e) {
+    /* ignore */
+  }
+  return null;
+}
+
+function resolveExistingFilePath(doc: any): string | null {
+  if (!doc || !doc.filePath) return null;
+
+  if (fs.existsSync(doc.filePath)) {
+    return doc.filePath;
+  }
+
+  const normalized = path.normalize(doc.filePath);
+  if (fs.existsSync(normalized)) {
+    return normalized;
+  }
+
+  const fileName = path.basename(doc.filePath);
+  const storagePath = path.join(process.cwd(), 'storage', 'uploads', doc.userId, fileName);
+  if (fs.existsSync(storagePath)) {
+    return storagePath;
+  }
+
+  const storageRootPath = path.join(process.cwd(), 'storage', 'uploads', fileName);
+  if (fs.existsSync(storageRootPath)) {
+    return storageRootPath;
+  }
+
+  try {
+    const os = require('os');
+    const homeDir = os.homedir();
+    const searchDirs = [
+      path.join(homeDir, 'Documents', 'StudyVault'),
+      path.join(homeDir, 'OneDrive', 'Documents', 'StudyVault')
+    ];
+    for (const baseDir of searchDirs) {
+      if (fs.existsSync(baseDir)) {
+        const found = findFileByNameRecursively(baseDir, doc.originalName);
+        if (found) return found;
+      }
+    }
+  } catch (_e) {
+    /* ignore search errors */
+  }
+
+  return null;
+}
+
 export async function previewFile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let userId = req.user?.id;
@@ -115,11 +178,12 @@ export async function previewFile(req: Request, res: Response, next: NextFunctio
     if (!userId) throw ApiError.unauthorized();
 
     const doc = await docService.getDocumentById(userId, req.params.id);
-    if (!fs.existsSync(doc.filePath)) {
+    const existingFilePath = resolveExistingFilePath(doc);
+    if (!existingFilePath) {
       throw ApiError.notFound('Fichier introuvable sur le serveur.');
     }
 
-    const stat = fs.statSync(doc.filePath);
+    const stat = fs.statSync(existingFilePath);
     const fileSize = stat.size;
     const range = req.headers.range;
 
@@ -144,7 +208,7 @@ export async function previewFile(req: Request, res: Response, next: NextFunctio
       }
 
       const chunksize = end - start + 1;
-      const fileStream = fs.createReadStream(doc.filePath, { start, end });
+      const fileStream = fs.createReadStream(existingFilePath, { start, end });
 
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -162,7 +226,7 @@ export async function previewFile(req: Request, res: Response, next: NextFunctio
         'Accept-Ranges': 'bytes',
       });
 
-      fs.createReadStream(doc.filePath).pipe(res);
+      fs.createReadStream(existingFilePath).pipe(res);
     }
   } catch (err) {
     next(err);
@@ -187,11 +251,12 @@ export async function downloadFile(req: Request, res: Response, next: NextFuncti
     if (!userId) throw ApiError.unauthorized();
 
     const doc = await docService.getDocumentById(userId, req.params.id);
-    if (!fs.existsSync(doc.filePath)) {
+    const existingFilePath = resolveExistingFilePath(doc);
+    if (!existingFilePath) {
       throw ApiError.notFound('Fichier introuvable sur le serveur.');
     }
 
-    res.download(doc.filePath, doc.originalName);
+    res.download(existingFilePath, doc.originalName);
   } catch (err) {
     next(err);
   }

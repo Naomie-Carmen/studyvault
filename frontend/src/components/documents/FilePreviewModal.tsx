@@ -62,46 +62,87 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // Load Blob or Text content for preview
   useEffect(() => {
     if (isOpen && document) {
       previewService.recordDocumentView(document.id, 5).catch(() => {});
+      setLoadError(null);
 
-      const url = getPreviewUrl(document.id);
+      let isCancelled = false;
 
-      // Fetch blob to construct in-app Object URL for PDF/Images
-      fetch(url)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const blobUrl = URL.createObjectURL(blob);
-          setObjectUrl(blobUrl);
-        })
-        .catch(() => {
-          setObjectUrl(url);
-        });
+      const loadPreview = async () => {
+        // 1. Check local file if running in Tauri desktop mode
+        if (fileOrganizer.isTauri && document.filePath) {
+          try {
+            const { exists } = await import('@tauri-apps/api/fs');
+            const { convertFileSrc } = await import('@tauri-apps/api/tauri');
 
-      if (isText) {
-        setLoadingText(true);
-        fetch(url)
-          .then((res) => res.text())
-          .then((text) => {
-            setTextContent(text);
-          })
-          .catch(() => {
-            setTextContent("Erreur de chargement du texte.");
-          })
-          .finally(() => setLoadingText(false));
-      }
+            if (await exists(document.filePath)) {
+              const src = convertFileSrc(document.filePath);
+              if (!isCancelled) {
+                setObjectUrl(src);
+                return;
+              }
+            }
+          } catch (_e) {
+            /* ignore & fallback to network fetch */
+          }
+        }
+
+        // 2. Fetch from backend URL
+        const url = getPreviewUrl(document.id);
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            let errorMsg = `Erreur HTTP ${res.status}`;
+            try {
+              const json = await res.json();
+              if (json.error?.message) errorMsg = json.error.message;
+            } catch (_e) { /* ignore */ }
+            throw new Error(errorMsg);
+          }
+
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json = await res.json();
+            throw new Error(json.error?.message || 'Fichier introuvable sur le serveur.');
+          }
+
+          if (isText) {
+            const text = await res.text();
+            if (!isCancelled) {
+              setTextContent(text);
+              setLoadingText(false);
+            }
+          } else {
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            if (!isCancelled) setObjectUrl(blobUrl);
+          }
+        } catch (err: any) {
+          console.error('FilePreviewModal load error:', err);
+          if (!isCancelled) {
+            setObjectUrl(null);
+            setLoadError(err.message || 'Fichier introuvable sur le serveur.');
+          }
+        }
+      };
+
+      loadPreview();
+
+      return () => {
+        isCancelled = true;
+        if (objectUrl && objectUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
     } else {
       setObjectUrl(null);
       setTextContent(null);
+      setLoadError(null);
     }
-
-    return () => {
-      if (objectUrl && objectUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
   }, [isOpen, document, isText]);
 
   if (!isOpen || !document) return null;
@@ -167,7 +208,25 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
         {/* Viewport Content Area */}
         <div className="preview-modal-body">
-          {isPdf ? (
+          {loadError ? (
+            <div className="unsupported-viewer">
+              <FileText size={56} className="text-indigo mb-2" />
+              <h3>Fichier non disponible pour prévisualisation directe</h3>
+              <p>{loadError}</p>
+              <div className="unsupported-actions">
+                {fileOrganizer.isTauri && (
+                  <button className="download-cta-btn secondary" onClick={handleOpenExternally}>
+                    <ExternalLink size={18} />
+                    <span>{t('viewer.openDefaultApp', "Ouvrir avec l'application par défaut")}</span>
+                  </button>
+                )}
+                <button className="download-cta-btn" onClick={handleDownload}>
+                  <Download size={18} />
+                  <span>{t('viewer.downloadFile', 'Télécharger le fichier')}</span>
+                </button>
+              </div>
+            </div>
+          ) : isPdf ? (
             <PDFViewer previewUrl={previewUrl} title={document.originalName} onClose={onClose} />
           ) : isImage ? (
             <ImageViewer previewUrl={previewUrl} title={document.originalName} onClose={onClose} />

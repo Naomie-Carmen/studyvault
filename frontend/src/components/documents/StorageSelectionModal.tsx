@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, HardDrive, Cloud, Check } from 'lucide-react';
+import { X, HardDrive, Cloud, Check, FolderOpen } from 'lucide-react';
 import * as docService from '../../services/documentService';
+import * as fileOrganizer from '../../services/fileOrganizer';
 
 interface StorageSelectionModalProps {
   isOpen: boolean;
@@ -16,9 +17,17 @@ export const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({
   const [cloudEnabled, setCloudEnabled] = useState(false);
   const [selectedStorage, setSelectedStorage] = useState<'local' | 'cloud'>('local');
   const [remember, setRemember] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>('');
+
+  const loadRootPath = () => {
+    fileOrganizer.getRootPath().then((path) => {
+      if (path) setCurrentPath(path);
+    });
+  };
 
   useEffect(() => {
     if (isOpen) {
+      loadRootPath();
       docService.getCloudStatus().then((res) => {
         if (res.success && res.data) {
           setCloudEnabled(res.data.enabled);
@@ -28,6 +37,14 @@ export const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handlePickCustomFolder = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newPath = await fileOrganizer.pickCustomRootFolder();
+    if (newPath) {
+      setCurrentPath(newPath);
+    }
+  };
 
   const handleProceed = () => {
     onConfirm(selectedStorage, remember);
@@ -46,7 +63,7 @@ export const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({
 
         <div className="storage-modal-body">
           <p className="subtitle">
-            Où souhaitez-vous conserver vos documents pour cette ECUE ?
+            Où souhaitez-vous créer et conserver vos dossiers de cours pour cette ECUE ?
           </p>
 
           <div className="storage-options-grid">
@@ -60,7 +77,23 @@ export const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({
               </div>
               <div className="option-info">
                 <h4>💻 Ce PC (Stockage Local)</h4>
-                <p>Vos fichiers restent stockés directement dans votre dossier Documents local.</p>
+                <p>Vos dossiers et fichiers sont créés localement sur votre ordinateur.</p>
+                {currentPath && (
+                  <div className="current-path-badge">
+                    <span>📁 {currentPath}</span>
+                  </div>
+                )}
+                {fileOrganizer.isTauri && (
+                  <button
+                    type="button"
+                    className="btn-pick-custom-dir"
+                    onClick={handlePickCustomFolder}
+                    title="Choisir un autre dossier personnalisé sur votre ordinateur"
+                  >
+                    <FolderOpen size={12} />
+                    <span>Choisir un autre emplacement...</span>
+                  </button>
+                )}
               </div>
               {selectedStorage === 'local' && (
                 <div className="check-badge">
@@ -182,6 +215,38 @@ export const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({
         .option-info p {
           font-size: 0.8rem;
           color: var(--text-muted);
+        }
+
+        .current-path-badge {
+          margin-top: 0.35rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 6px;
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          font-size: 0.72rem;
+          color: #818cf8;
+          font-weight: 600;
+          word-break: break-all;
+        }
+
+        .btn-pick-custom-dir {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          margin-top: 0.4rem;
+          padding: 0.25rem 0.6rem;
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: rgba(255, 255, 255, 0.08);
+          color: #ffffff;
+          font-size: 0.72rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-pick-custom-dir:hover {
+          background: rgba(99, 102, 241, 0.3);
+          border-color: #6366f1;
         }
 
         .title-row {

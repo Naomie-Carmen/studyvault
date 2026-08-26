@@ -70,9 +70,16 @@ const ECUEDocumentsSection: React.FC<{
   const { t } = useTranslation();
   const [files, setFiles] = useState<fileOrganizer.LocalEcueFile[]>([]);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 6000);
+  };
 
   const loadFiles = useCallback(async () => {
     if (!fileOrganizer.isTauri) return;
+    await fileOrganizer.ensureEcueFolder(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
     const docs = await fileOrganizer.listEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
     setFiles(docs);
   }, [semNumber, ueCode, ueTitle, ecueCode, ecueTitle]);
@@ -91,8 +98,13 @@ const ECUEDocumentsSection: React.FC<{
   }
 
   const triggerAddFlow = async () => {
-    const updated = await fileOrganizer.addEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
-    setFiles(updated);
+    const res = await fileOrganizer.addEcueDocuments(semNumber, ueCode, ueTitle, ecueCode, ecueTitle);
+    if (res && res.files) {
+      setFiles(res.files);
+      if (res.copiedPaths && res.copiedPaths.length > 0) {
+        showToast(`✅ Rangé dans : ${res.copiedPaths[0]}`);
+      }
+    }
   };
 
   const handleAddClick = () => {
@@ -131,13 +143,18 @@ const ECUEDocumentsSection: React.FC<{
 
   return (
     <div className="ecue-docs-section">
+      {toastMsg && (
+        <div className="ecue-docs-toast" title={toastMsg}>
+          <span>{toastMsg}</span>
+        </div>
+      )}
       <div className="ecue-docs-header">
         <div className="docs-title">
           <Folder size={13} className="text-indigo" />
           <span>Documents ({files.length})</span>
         </div>
         <div className="docs-actions">
-          <button className="doc-action-btn primary" onClick={handleAddClick} title="Ajouter des fichiers dans le dossier ECUE">
+          <button className="doc-action-btn primary" onClick={handleAddClick} title="Ajouter des fichiers directement dans le dossier ECUE">
             <Plus size={11} />
             <span>+ Ajouter</span>
           </button>
@@ -1116,6 +1133,18 @@ export const TreeView: React.FC<TreeViewProps> = ({
           border-radius: 8px;
           background: rgba(15, 23, 42, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ecue-docs-toast {
+          margin-bottom: 0.35rem;
+          padding: 0.3rem 0.6rem;
+          border-radius: 6px;
+          background: rgba(16, 185, 129, 0.15);
+          border: 1px solid rgba(16, 185, 129, 0.35);
+          color: #10b981;
+          font-size: 0.72rem;
+          font-weight: 600;
+          word-break: break-all;
         }
 
         .ecue-docs-header {

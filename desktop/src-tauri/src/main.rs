@@ -76,13 +76,56 @@ fn get_device_id() -> String {
     format!("DESKTOP-{}-{}", comp.trim(), user.trim())
 }
 
+#[tauri::command]
+fn open_system_folder(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        let _ = std::fs::create_dir_all(p);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn create_local_folder(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
 fn main() {
     let menu = create_app_menu();
 
     tauri::Builder::default()
         .menu(menu)
         .on_menu_event(handle_menu_event)
-        .invoke_handler(tauri::generate_handler![get_device_id])
+        .invoke_handler(tauri::generate_handler![
+            get_device_id,
+            open_system_folder,
+            create_local_folder
+        ])
         .run(tauri::generate_context!())
         .expect("Erreur lors du lancement de l'application StudyVault Desktop");
 }

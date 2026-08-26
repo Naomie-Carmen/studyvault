@@ -60,10 +60,10 @@ if (fs.existsSync(backendVersionPath)) {
   backendJson.version = version;
   backendJson.releaseDate = new Date().toISOString().split('T')[0];
   backendJson.notes = [
-    "Design dark theme professionnel unifié (color-scheme: dark) sur 100% des formulaires et modales",
-    "Elimination définitive de tous les widgets blancs natifs du navigateur (select, time pickers, inputs)",
-    "Contrôles stylisés avec fond translucide, contour réactif #6C63FF et chevron SVG personnalisé",
-    "Modale de séance réorganisée en grille 2 colonnes ultra-propre avec alignement parfait"
+    "Activation complète des permissions et fonctionnalités Tauri natives (dialog-open, fs-all, path-all, protocol-asset)",
+    "Résolution définitive du clic sur '+ Ajouter' et '📁 Ouvrir le dossier' dans l'arborescence académique",
+    "Commandes Rust natives open_system_folder et create_local_folder pour ouverture instantanée de l'explorateur Windows",
+    "Création et synchronisation automatique sans faille des dossiers et sous-dossiers locaux d'UE et d'ECUE"
   ];
 
   fs.writeFileSync(backendVersionPath, JSON.stringify(backendJson, null, 2) + '\n', 'utf8');

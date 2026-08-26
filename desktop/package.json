@@ -1,6 +1,6 @@
 {
   "name": "studyvault-desktop",
-  "version": "1.0.0",
+  "version": "1.2.43",
   "description": "StudyVault Desktop Application built with Tauri and React",
   "private": true,
   "scripts": {
